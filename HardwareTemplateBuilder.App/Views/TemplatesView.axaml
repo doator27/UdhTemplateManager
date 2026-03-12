@@ -1,0 +1,8 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.TemplatesView">
+    <StackPanel Margin="20">
+        <TextBlock Text="Individual Templates" FontSize="16" FontWeight="Bold" />
+        <TextBlock Text="(Coming in Phase 5)" Margin="0,8,0,0" Foreground="#808080" />
+    </StackPanel>
+</UserControl>

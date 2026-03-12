@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.JobsView">
+    <DockPanel Margin="8">
+        <TextBlock DockPanel.Dock="Top" Text="Jobs" FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
+        <Grid ColumnDefinitions="260,*">
+            <!-- Left: job list -->
+            <DockPanel Grid.Column="0" Margin="0,0,8,0">
+                <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2"/>
+                <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4"/>
+                <ListBox Name="JobList"/>
+            </DockPanel>
+            <!-- Right: form + hardware sub-panel -->
+            <ScrollViewer Grid.Column="1">
+                <StackPanel>
+                    <!-- Main job form -->
+                    <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                        <StackPanel>
+                            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Job Number:" Margin="0,0,8,2"/>
+                                <TextBox   Grid.Row="1" Grid.Column="0" Name="JobNumberBox" Margin="0,0,8,8"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="Job Name:" Margin="0,0,0,2"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" Name="JobNameBox" Margin="0,0,0,8"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Customer:" Margin="0,0,8,2"/>
+                                <ComboBox  Grid.Row="3" Grid.Column="0" Name="CustomerCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="Project Manager:" Margin="0,0,0,2"/>
+                                <ComboBox  Grid.Row="3" Grid.Column="1" Name="ProjectManagerCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="User Profile:" Margin="0,0,8,2"/>
+                                <ComboBox  Grid.Row="5" Grid.Column="0" Name="UserProfileCombo" HorizontalAlignment="Stretch" Margin="0,0,8,0"/>
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Name="SaveButton" Content="Save" Margin="0,0,8,0"/>
+                                <Button Name="NewButton" Content="New" Margin="0,0,8,0"/>
+                                <Button Name="DeleteButton" Content="Delete"/>
+                            </StackPanel>
+                            <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Linked Hardware Items sub-panel -->
+                    <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+                        <StackPanel>
+                            <TextBlock Text="Linked Hardware Items" FontWeight="Bold" Margin="0,0,0,6"/>
+                            <TextBlock Text="(Drag items to reorder)" Foreground="#606060" FontSize="11" Margin="0,0,0,4"/>
+                            <ListBox Name="LinkedHardwareList" Height="120" Margin="0,0,0,8"/>
+                            <Button Name="RemoveHardwareButton" Content="Remove from Job" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+
+                            <TextBlock Text="Search Hardware Items to Add:" FontWeight="Bold" Margin="0,0,0,4"/>
+                            <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,4">
+                                <ComboBox Grid.Column="0" Name="SearchMfrCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
+                                <ComboBox Grid.Column="1" Name="SearchDescCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
+                                <TextBox  Grid.Column="2" Name="SearchModelBox" Watermark="Model #"/>
+                            </Grid>
+                            <ListBox Name="HardwareSearchList" Height="120" Margin="0,0,0,8"/>
+                            <Button Name="AddHardwareButton" Content="Add to Job" HorizontalAlignment="Left"/>
+                            <TextBlock Name="LinkStatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</UserControl>

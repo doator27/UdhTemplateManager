@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.DashboardView">
+    <ScrollViewer>
+        <StackPanel Margin="20">
+            <TextBlock Text="Hardware Template Builder"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Margin="0,0,0,20" />
+            <WrapPanel>
+                <Button Classes="dashboard" Name="BtnTemplateLookup" Content="Template Lookup" />
+                <Button Classes="dashboard" Name="BtnJobs" Content="Jobs" />
+                <Button Classes="dashboard" Name="BtnHardwareItems" Content="Hardware Items" />
+                <Button Classes="dashboard" Name="BtnTemplates" Content="Templates" />
+                <Button Classes="dashboard" Name="BtnCustomers" Content="Customers" />
+                <Button Classes="dashboard" Name="BtnManufacturers" Content="Manufacturers" />
+                <Button Classes="dashboard" Name="BtnDescriptions" Content="Descriptions" />
+                <Button Classes="dashboard" Name="BtnProjectManagers" Content="Project Managers" />
+                <Button Classes="dashboard" Name="BtnUserProfiles" Content="User Profiles" />
+                <Button Classes="dashboard" Name="BtnWeights" Content="Weights" />
+                <Button Classes="dashboard" Name="BtnDoorMaterials" Content="Door Materials" />
+                <Button Classes="dashboard" Name="BtnRefreshTemplates" Content="Refresh Templates" />
+            </WrapPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

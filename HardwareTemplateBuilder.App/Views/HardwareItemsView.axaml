@@ -1,0 +1,63 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.HardwareItemsView">
+    <DockPanel Margin="8">
+        <TextBlock DockPanel.Dock="Top" Text="Hardware Items" FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
+        <Grid ColumnDefinitions="260,*">
+            <!-- Left: list -->
+            <DockPanel Grid.Column="0" Margin="0,0,8,0">
+                <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2"/>
+                <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4"/>
+                <ListBox Name="RecordList"/>
+            </DockPanel>
+            <!-- Right: form + linked templates -->
+            <ScrollViewer Grid.Column="1">
+                <StackPanel>
+                    <!-- Main form -->
+                    <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                        <StackPanel>
+                            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer:" Margin="0,0,8,2"/>
+                                <ComboBox Grid.Row="1" Grid.Column="0" Name="ManufacturerCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="Description:" Margin="0,0,0,2"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" Name="DescriptionCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Model Number:" Margin="0,0,8,2"/>
+                                <TextBox Grid.Row="3" Grid.Column="0" Name="ModelNumberBox" Margin="0,0,8,8"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="Frequency (read-only):" Margin="0,0,0,2"/>
+                                <TextBox Grid.Row="3" Grid.Column="1" Name="FrequencyBox" IsReadOnly="True" Background="#E0E0E0" Margin="0,0,0,8"/>
+                                <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Text="Remarks (optional):" Margin="0,0,0,2"/>
+                                <TextBox Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Name="RemarksBox" Margin="0,0,0,0"/>
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Name="SaveButton" Content="Save" Margin="0,0,8,0"/>
+                                <Button Name="NewButton" Content="New" Margin="0,0,8,0"/>
+                                <Button Name="DeleteButton" Content="Delete"/>
+                            </StackPanel>
+                            <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Linked Templates sub-panel -->
+                    <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+                        <StackPanel>
+                            <TextBlock Text="Linked Templates" FontWeight="Bold" Margin="0,0,0,8"/>
+                            <ListBox Name="LinkedTemplatesList" Height="100" Margin="0,0,0,8"/>
+                            <TextBlock Text="Search Templates to Link:" FontWeight="Bold" Margin="0,0,0,4"/>
+                            <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,4">
+                                <ComboBox Grid.Column="0" Name="SearchMfrCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
+                                <ComboBox Grid.Column="1" Name="SearchDescCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
+                                <TextBox  Grid.Column="2" Name="SearchTemplateNumBox" Watermark="Template #" Margin="0,0,0,0"/>
+                            </Grid>
+                            <ListBox Name="TemplateSearchList" Height="100" Margin="0,0,0,8"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Name="LinkButton" Content="Link Selected" Margin="0,0,8,0"/>
+                                <Button Name="UnlinkButton" Content="Unlink Selected"/>
+                            </StackPanel>
+                            <TextBlock Name="LinkStatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</UserControl>

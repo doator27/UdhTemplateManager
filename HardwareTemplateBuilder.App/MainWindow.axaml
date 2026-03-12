@@ -1,0 +1,47 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="HardwareTemplateBuilder.App.MainWindow"
+        Title="Hardware Template Builder"
+        Width="1024"
+        Height="768"
+        WindowStartupLocation="CenterScreen">
+
+    <DockPanel>
+        <!-- Top menu bar -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_Exit" Name="MenuFileExit" />
+            </MenuItem>
+            <MenuItem Header="_Jobs">
+                <MenuItem Header="_Jobs" Name="MenuJobs" />
+            </MenuItem>
+            <MenuItem Header="_Maintenance">
+                <MenuItem Header="_Refresh Templates" Name="MenuRefreshTemplates" />
+            </MenuItem>
+            <MenuItem Header="_Admin">
+                <MenuItem Header="_Hardware Items" Name="MenuHardwareItems" />
+                <MenuItem Header="_Templates" Name="MenuTemplates" />
+                <Separator />
+                <MenuItem Header="_Customers" Name="MenuCustomers" />
+                <MenuItem Header="_Manufacturers" Name="MenuManufacturers" />
+                <MenuItem Header="_Descriptions" Name="MenuDescriptions" />
+                <MenuItem Header="_Door Materials" Name="MenuDoorMaterials" />
+                <MenuItem Header="_Weights" Name="MenuWeights" />
+                <MenuItem Header="_Project Managers" Name="MenuProjectManagers" />
+                <MenuItem Header="_User Profiles" Name="MenuUserProfiles" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Status bar at the bottom -->
+        <Border DockPanel.Dock="Bottom"
+                Background="#C0C0C0"
+                BorderBrush="#808080"
+                BorderThickness="0,1,0,0"
+                Padding="4,2">
+            <TextBlock Name="StatusText" Text="Ready" FontSize="11" />
+        </Border>
+
+        <!-- Main content area — views are swapped in here -->
+        <ContentControl Name="ContentArea" Background="#C0C0C0" />
+    </DockPanel>
+</Window>

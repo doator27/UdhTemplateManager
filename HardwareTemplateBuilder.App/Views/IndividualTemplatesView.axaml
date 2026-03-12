@@ -1,0 +1,61 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.IndividualTemplatesView">
+    <DockPanel Margin="8">
+        <TextBlock DockPanel.Dock="Top" Text="Individual Templates" FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
+        <Grid ColumnDefinitions="260,*">
+            <!-- Left: list -->
+            <DockPanel Grid.Column="0" Margin="0,0,8,0">
+                <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2"/>
+                <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4"/>
+                <ListBox Name="RecordList"/>
+            </DockPanel>
+            <!-- Right: form -->
+            <ScrollViewer Grid.Column="1">
+                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+                    <StackPanel>
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer:" Margin="0,0,8,2"/>
+                            <ComboBox Grid.Row="1" Grid.Column="0" Name="ManufacturerCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Description:" Margin="0,0,0,2"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" Name="DescriptionCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Template Number:" Margin="0,0,8,2"/>
+                            <TextBox Grid.Row="3" Grid.Column="0" Name="TemplateNumberBox" Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Num Pages:" Margin="0,0,0,2"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" Name="NumPagesBox" Margin="0,0,0,8"/>
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Pages To Print:" Margin="0,0,8,2"/>
+                            <TextBox Grid.Row="5" Grid.Column="0" Name="PagesToPrintBox" Watermark="e.g. 1,3-5,8" Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Pages To Rotate:" Margin="0,0,0,2"/>
+                            <TextBox Grid.Row="5" Grid.Column="1" Name="PagesToRotateBox" Watermark="e.g. 2,4 (optional)" Margin="0,0,0,8"/>
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Rotation Direction (degrees):" Margin="0,0,8,2"/>
+                            <TextBox Grid.Row="7" Grid.Column="0" Name="RotationDirectionBox" Watermark="e.g. 90 or -90" Margin="0,0,8,8"/>
+
+                            <TextBlock Grid.Row="6" Grid.Column="1" Text="Door Material:" Margin="0,0,0,2"/>
+                            <ComboBox Grid.Row="7" Grid.Column="1" Name="DoorMaterialCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+
+                            <TextBlock Grid.Row="8" Grid.Column="0" Text="Weight:" Margin="0,0,8,2"/>
+                            <ComboBox Grid.Row="9" Grid.Column="0" Name="WeightCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
+
+                            <TextBlock Grid.Row="10" Grid.Column="0" Text="Online Link (URL):" Margin="0,0,8,2"/>
+                            <TextBox Grid.Row="11" Grid.Column="0" Name="OnlineLinkBox" Watermark="https://..." Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="10" Grid.Column="1" Text="Local Link (file path):" Margin="0,0,0,2"/>
+                            <Grid Grid.Row="11" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                                <TextBox Grid.Column="0" Name="LocalLinkBox"/>
+                                <Button Grid.Column="1" Name="BrowseLocalLinkButton" Content="..." Width="30" Margin="4,0,0,0"/>
+                            </Grid>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <Button Name="SaveButton" Content="Save" Margin="0,0,8,0"/>
+                            <Button Name="NewButton" Content="New" Margin="0,0,8,0"/>
+                            <Button Name="DeleteButton" Content="Delete"/>
+                        </StackPanel>
+                        <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</UserControl>
