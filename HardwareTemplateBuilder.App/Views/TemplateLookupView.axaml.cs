@@ -293,9 +293,9 @@ public partial class TemplateLookupView : UserControl
             throw new InvalidOperationException(
                 "This hardware item has no linked templates. Link templates via the Hardware Items screen.");
 
-        // Sort by weight (single-item lookup: sort is purely by weight ascending).
+        // Sort by description sort order.
         var sortedTemplates = new TemplateSorter(
-            new WeightTemplateSortStrategy(new WeightParser())).Sort(templates);
+            new WeightTemplateSortStrategy()).Sort(templates);
 
         // Run heavy PDF work on a thread-pool thread to keep the UI responsive.
         return await Task.Run(async () =>

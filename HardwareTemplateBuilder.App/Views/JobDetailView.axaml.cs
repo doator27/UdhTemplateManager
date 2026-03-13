@@ -493,7 +493,7 @@ public partial class JobDetailView : UserControl
     /// <summary>Creates a fully wired <see cref="PdfAssemblyService"/> with all required dependencies.</summary>
     private static PdfAssemblyService BuildAssemblyService() =>
         new PdfAssemblyService(
-            new TemplateSorter(new WeightTemplateSortStrategy(new WeightParser())),
+            new TemplateSorter(new WeightTemplateSortStrategy()),
             new FileAcquirer(new HttpClient()),
             new PageRangeParser(),
             new PageExtractor(),

@@ -48,6 +48,11 @@ public class FileAcquirer
 
         if (!string.IsNullOrWhiteSpace(template.OnlineLink))
         {
+            if (!Uri.TryCreate(template.OnlineLink, UriKind.Absolute, out _))
+                throw new InvalidOperationException(
+                    $"Template '{template.TemplateNumber}' has an invalid online link: '{template.OnlineLink}'. " +
+                    "It must be a full URL (e.g. https://example.com/file.pdf).");
+
             await DownloadAsync(template.OnlineLink, destinationPath);
             return destinationPath;
         }

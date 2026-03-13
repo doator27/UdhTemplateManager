@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HardwareTemplateBuilder.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2b6383565cc2bfaaf019c52a0ec9555ab8c0beaa")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+98453e094a828d6becde856a4794283a60791cc9")]
 [assembly: System.Reflection.AssemblyProductAttribute("HardwareTemplateBuilder.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HardwareTemplateBuilder.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

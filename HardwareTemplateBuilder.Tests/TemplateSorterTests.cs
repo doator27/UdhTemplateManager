@@ -1,5 +1,4 @@
 using HardwareTemplateBuilder.Core.Models;
-using HardwareTemplateBuilder.Core.Services;
 using HardwareTemplateBuilder.Core.Services.Pdf;
 
 namespace HardwareTemplateBuilder.Tests;
@@ -7,13 +6,7 @@ namespace HardwareTemplateBuilder.Tests;
 /// <summary>Tests for <see cref="TemplateSorter"/> and <see cref="WeightTemplateSortStrategy"/>.</summary>
 public class TemplateSorterTests
 {
-    private readonly TemplateSorter _sorter;
-
-    /// <summary>Initializes the sorter with the default weight-based strategy.</summary>
-    public TemplateSorterTests()
-    {
-        _sorter = new TemplateSorter(new WeightTemplateSortStrategy(new WeightParser()));
-    }
+    private readonly TemplateSorter _sorter = new(new WeightTemplateSortStrategy());
 
     // ---------- Helpers ----------
 
@@ -21,13 +14,13 @@ public class TemplateSorterTests
         new Manufacturer { Id = id, ManufacturerName = name };
 
     private static IndividualTemplate MakeTemplate(
-        int id, Manufacturer manufacturer, string weightValue, string templateNumber = "T") =>
+        int id, Manufacturer manufacturer, int sortOrder, string templateNumber = "T") =>
         new IndividualTemplate
         {
             Id = id,
             ManufacturerId = manufacturer.Id,
             Manufacturer = manufacturer,
-            Description = new Description { WeightValue = weightValue },
+            Description = new Description { SortOrder = sortOrder },
             TemplateNumber = templateNumber,
             PagesToPrint = "1"
         };
@@ -35,14 +28,14 @@ public class TemplateSorterTests
     // ---------- Tests ----------
 
     [Fact]
-    public void Sort_SingleGroup_OrdersByWeightAscending()
+    public void Sort_SingleGroup_OrdersBySortOrderAscending()
     {
         var mfr = MakeManufacturer(1, "Alpha");
         var templates = new[]
         {
-            MakeTemplate(1, mfr, "02.001.001", "T3"),
-            MakeTemplate(2, mfr, "01.001.001", "T1"),
-            MakeTemplate(3, mfr, "01.002.001", "T2"),
+            MakeTemplate(1, mfr, 20, "T3"),
+            MakeTemplate(2, mfr, 10, "T1"),
+            MakeTemplate(3, mfr, 15, "T2"),
         };
 
         var result = _sorter.Sort(templates);
@@ -51,37 +44,35 @@ public class TemplateSorterTests
     }
 
     [Fact]
-    public void Sort_MultipleGroups_OrdersByGroupMinWeightAscending()
+    public void Sort_MultipleGroups_OrdersByGroupMinSortOrderAscending()
     {
-        var mfrA = MakeManufacturer(1, "Alpha");  // min weight 02.001.001
-        var mfrB = MakeManufacturer(2, "Beta");   // min weight 01.001.001
+        var mfrA = MakeManufacturer(1, "Alpha");  // min sort order 20
+        var mfrB = MakeManufacturer(2, "Beta");   // min sort order 10
 
         var templates = new[]
         {
-            MakeTemplate(1, mfrA, "02.001.001", "A1"),
-            MakeTemplate(2, mfrB, "01.001.001", "B1"),
-            MakeTemplate(3, mfrB, "01.002.001", "B2"),
+            MakeTemplate(1, mfrA, 20, "A1"),
+            MakeTemplate(2, mfrB, 10, "B1"),
+            MakeTemplate(3, mfrB, 15, "B2"),
         };
 
         var result = _sorter.Sort(templates);
 
-        // Beta group (lower min weight) should come before Alpha group.
+        // Beta group (lower min sort order) should come before Alpha group.
         Assert.Equal(new[] { "B1", "B2", "A1" }, result.Select(t => t.TemplateNumber));
     }
 
     [Fact]
-    public void Sort_TiedGroupMinWeight_TiebrokenByManufacturerNameAlphabetically()
+    public void Sort_TiedGroupMinSortOrder_TiebrokenByManufacturerNameAlphabetically()
     {
         var mfrZ = MakeManufacturer(1, "Zebra");
         var mfrA = MakeManufacturer(2, "Acme");
 
-        // Both groups have the same minimum weight.
-        var sharedWeight = "01.001.001";
-
+        // Both groups have the same minimum sort order.
         var templates = new[]
         {
-            MakeTemplate(1, mfrZ, sharedWeight, "Z1"),
-            MakeTemplate(2, mfrA, sharedWeight, "A1"),
+            MakeTemplate(1, mfrZ, 5, "Z1"),
+            MakeTemplate(2, mfrA, 5, "A1"),
         };
 
         var result = _sorter.Sort(templates);
@@ -91,22 +82,37 @@ public class TemplateSorterTests
     }
 
     [Fact]
-    public void Sort_WithinGroupOrderedByWeight_CrossGroupOrderByMinWeight()
+    public void Sort_WithinGroupOrderedBySortOrder_CrossGroupOrderByMinSortOrder()
     {
         var mfrA = MakeManufacturer(1, "Alpha");
         var mfrB = MakeManufacturer(2, "Beta");
 
         var templates = new[]
         {
-            MakeTemplate(1, mfrA, "01.005.001", "A-High"),
-            MakeTemplate(2, mfrA, "01.001.001", "A-Low"),
-            MakeTemplate(3, mfrB, "02.001.001", "B1"),
+            MakeTemplate(1, mfrA, 50, "A-High"),
+            MakeTemplate(2, mfrA, 10, "A-Low"),
+            MakeTemplate(3, mfrB, 20, "B1"),
         };
 
         var result = _sorter.Sort(templates);
 
-        // Alpha group has lower min weight (01.001.001) — comes first, A-Low before A-High.
+        // Alpha group has lower min sort order (10) — comes first, A-Low before A-High.
         Assert.Equal(new[] { "A-Low", "A-High", "B1" }, result.Select(t => t.TemplateNumber));
+    }
+
+    [Fact]
+    public void Sort_EqualSortOrder_TiebrokenByTemplateNumberAlphabetically()
+    {
+        var mfr = MakeManufacturer(1, "Alpha");
+        var templates = new[]
+        {
+            MakeTemplate(1, mfr, 5, "T-Zebra"),
+            MakeTemplate(2, mfr, 5, "T-Acme"),
+        };
+
+        var result = _sorter.Sort(templates);
+
+        Assert.Equal(new[] { "T-Acme", "T-Zebra" }, result.Select(t => t.TemplateNumber));
     }
 
     [Fact]

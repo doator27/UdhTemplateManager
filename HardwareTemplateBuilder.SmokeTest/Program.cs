@@ -28,8 +28,7 @@ context.Customers.Add(customer);
 var manufacturer = new Manufacturer { ManufacturerName = "Test Mfr Co." };
 context.Manufacturers.Add(manufacturer);
 
-// Description (WeightValue is now stored directly on Description)
-var description = new Description { DescriptionText = "Test Lockset", WeightValue = "01.001.001" };
+var description = new Description { DescriptionText = "Test Lockset", SortOrder = 1 };
 context.Descriptions.Add(description);
 
 // ProjectManager
@@ -126,7 +125,7 @@ Console.WriteLine("Reading back records...");
 Console.WriteLine($"  UserProfile: {context.UserProfiles.Find(user.Id)?.UserName}");
 Console.WriteLine($"  Customer: {context.Customers.Find(customer.Id)?.CustomerName}");
 Console.WriteLine($"  Manufacturer: {context.Manufacturers.Find(manufacturer.Id)?.ManufacturerName}");
-Console.WriteLine($"  Description: {context.Descriptions.Find(description.Id)?.DescriptionText} (weight: {context.Descriptions.Find(description.Id)?.WeightValue})");
+Console.WriteLine($"  Description: {context.Descriptions.Find(description.Id)?.DescriptionText} (sort: {context.Descriptions.Find(description.Id)?.SortOrder})");
 Console.WriteLine($"  DoorMaterial(1): {context.DoorMaterials.Find(1)?.Material}");
 Console.WriteLine($"  ProjectManager: {context.ProjectManagers.Find(pm.Id)?.ProjectManagerName}");
 Console.WriteLine($"  HardwareItem: {context.HardwareItems.Find(hardwareItem.Id)?.ModelNumber}");

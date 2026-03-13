@@ -1,49 +1,38 @@
 using HardwareTemplateBuilder.Core.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace HardwareTemplateBuilder.Core.Services.Pdf;
 
 /// <summary>
-/// Sorts templates by manufacturer group and weight, following the package assembly rules:
-/// within a group sort by <c>Weight</c> ascending; between groups sort by the group's
-/// lowest weight, with alphabetical <c>ManufacturerName</c> as a tiebreaker.
+/// Sorts templates by description sort order within manufacturer groups, then orders groups
+/// by their lowest description sort order with alphabetical <c>ManufacturerName</c> as a tiebreaker.
 /// </summary>
 public class WeightTemplateSortStrategy : ITemplateSortStrategy
 {
-    private readonly WeightParser _weightParser;
-
-    /// <summary>
-    /// Initializes a new <see cref="WeightTemplateSortStrategy"/> with the given weight parser.
-    /// </summary>
-    /// <param name="weightParser">Parser used to compare weight strings.</param>
-    public WeightTemplateSortStrategy(WeightParser weightParser)
-    {
-        _weightParser = weightParser;
-    }
-
     /// <inheritdoc/>
     public IReadOnlyList<IndividualTemplate> Sort(IEnumerable<IndividualTemplate> templates)
     {
-        // Group by manufacturer, sort within each group by weight ascending.
         var groups = templates
             .GroupBy(t => t.ManufacturerId)
             .Select(g =>
             {
                 var sortedTemplates = g
-                    .OrderBy(t => _weightParser.Parse(t.Description.WeightValue))
+                    .OrderBy(t => t.Description.SortOrder)
+                    .ThenBy(t => t.TemplateNumber, StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-                var minWeight = sortedTemplates
-                    .Select(t => _weightParser.Parse(t.Description.WeightValue))
-                    .Min();
+                var minOrder = sortedTemplates.Min(t => t.Description.SortOrder);
 
                 return new
                 {
                     ManufacturerName = g.First().Manufacturer.ManufacturerName,
                     Templates = sortedTemplates,
-                    MinWeight = minWeight
+                    MinOrder = minOrder
                 };
             })
-            .OrderBy(g => g.MinWeight)
+            .OrderBy(g => g.MinOrder)
             .ThenBy(g => g.ManufacturerName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
