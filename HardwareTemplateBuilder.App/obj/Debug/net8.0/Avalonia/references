@@ -47,6 +47,13 @@
 /home/paperclip/.nuget/packages/microsoft.netcore.app.ref/8.0.22/ref/net8.0/Microsoft.Win32.Registry.dll
 /home/paperclip/.nuget/packages/microsoft.netcore.app.ref/8.0.22/ref/net8.0/mscorlib.dll
 /home/paperclip/.nuget/packages/microsoft.netcore.app.ref/8.0.22/ref/net8.0/netstandard.dll
+/home/paperclip/.nuget/packages/pdfsharp/6.1.1/lib/net6.0/PdfSharp.Charting.dll
+/home/paperclip/.nuget/packages/pdfsharp/6.1.1/lib/net6.0/PdfSharp.dll
+/home/paperclip/.nuget/packages/pdfsharp/6.1.1/lib/net6.0/PdfSharp.Quality.dll
+/home/paperclip/.nuget/packages/pdfsharp/6.1.1/lib/net6.0/PdfSharp.Snippets.dll
+/home/paperclip/.nuget/packages/pdfsharp/6.1.1/lib/net6.0/PdfSharp.System.dll
+/home/paperclip/.nuget/packages/pdfsharp/6.1.1/lib/net6.0/PdfSharp.WPFonts.dll
+/home/paperclip/.nuget/packages/questpdf/2024.12.3/lib/net8.0/QuestPDF.dll
 /home/paperclip/.nuget/packages/skiasharp/2.88.9/lib/net6.0/SkiaSharp.dll
 /home/paperclip/.nuget/packages/sqlitepclraw.bundle_e_sqlite3/2.1.6/lib/netstandard2.0/SQLitePCLRaw.batteries_v2.dll
 /home/paperclip/.nuget/packages/sqlitepclraw.core/2.1.6/lib/netstandard2.0/SQLitePCLRaw.core.dll

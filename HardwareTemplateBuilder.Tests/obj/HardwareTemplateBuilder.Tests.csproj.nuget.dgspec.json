@@ -54,6 +54,14 @@
             "Microsoft.EntityFrameworkCore.Sqlite": {
               "target": "Package",
               "version": "[8.0.*, )"
+            },
+            "PDFsharp": {
+              "target": "Package",
+              "version": "[6.1.*, )"
+            },
+            "QuestPDF": {
+              "target": "Package",
+              "version": "[2024.*, )"
             }
           },
           "imports": [
@@ -142,6 +150,10 @@
             "Microsoft.NET.Test.Sdk": {
               "target": "Package",
               "version": "[17.6.0, )"
+            },
+            "PDFsharp": {
+              "target": "Package",
+              "version": "[6.1.*, )"
             },
             "coverlet.collector": {
               "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",

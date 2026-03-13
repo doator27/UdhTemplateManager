@@ -9,6 +9,50 @@ namespace HardwareTemplateBuilder.App.Helpers;
 public static class DialogHelper
 {
     /// <summary>
+    /// Shows an informational dialog with an OK button.
+    /// </summary>
+    /// <param name="owner">The parent window.</param>
+    /// <param name="message">The message to display.</param>
+    /// <param name="title">The dialog title.</param>
+    public static async Task ShowInfoAsync(Window owner, string message, string title = "Information")
+    {
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 440,
+            Height = 220,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Background = Avalonia.Media.Brushes.Silver,
+        };
+
+        var okButton = new Button { Content = "OK", Width = 80, Margin = new Avalonia.Thickness(5) };
+        okButton.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(16),
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = message,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    Margin = new Avalonia.Thickness(0, 0, 0, 16)
+                },
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    Children = { okButton }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(owner);
+    }
+
+    /// <summary>
     /// Shows a Yes/No confirmation dialog and returns true if the user confirms.
     /// </summary>
     /// <param name="owner">The parent window.</param>

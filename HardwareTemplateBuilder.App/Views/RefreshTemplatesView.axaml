@@ -1,8 +1,67 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="HardwareTemplateBuilder.App.Views.RefreshTemplatesView">
-    <StackPanel Margin="20">
-        <TextBlock Text="Refresh Templates" FontSize="16" FontWeight="Bold" />
-        <TextBlock Text="(Coming in Phase 11)" Margin="0,8,0,0" Foreground="#808080" />
-    </StackPanel>
+    <DockPanel Margin="8">
+
+        <TextBlock DockPanel.Dock="Top"
+                   Text="Refresh Templates"
+                   FontSize="16" FontWeight="Bold"
+                   Margin="0,0,0,8"/>
+
+        <!-- Status line (docked bottom so it is always visible) -->
+        <TextBlock DockPanel.Dock="Bottom"
+                   Name="StatusLabel"
+                   Foreground="#800000"
+                   TextWrapping="Wrap"
+                   Margin="0,4,0,0"/>
+
+        <!-- Info + start/cancel controls -->
+        <Border DockPanel.Dock="Top"
+                BorderBrush="#808080" BorderThickness="1"
+                Padding="8" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock TextWrapping="Wrap" Margin="0,0,0,8">
+                    Downloads the latest version of every template that has an Online Link, saves it
+                    to the active user's Default Template Save Location, and updates the Local Link
+                    field on success.  Failures are listed at the bottom.
+                    JobTemplateSnapshot records are never modified.
+                </TextBlock>
+                <StackPanel Orientation="Horizontal">
+                    <Button Name="StartButton"  Content="Start Refresh" Margin="0,0,8,0"/>
+                    <Button Name="CancelButton" Content="Cancel" IsEnabled="False"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Progress area (hidden until refresh starts) -->
+        <StackPanel DockPanel.Dock="Top"
+                    Name="ProgressPanel" IsVisible="False"
+                    Margin="0,0,0,8">
+            <ProgressBar Name="RefreshProgress"
+                         IsIndeterminate="True"
+                         Height="14" Margin="0,0,0,4"/>
+            <TextBlock Name="ProgressText" Foreground="#404040"/>
+        </StackPanel>
+
+        <!-- Results area (fills remaining space; hidden until refresh completes) -->
+        <ScrollViewer Name="ResultsPanel" IsVisible="False">
+            <StackPanel Margin="0,4,0,0">
+                <TextBlock Name="SummaryLabel" FontWeight="Bold" Margin="0,0,0,8"/>
+
+                <!-- Failure list (hidden when there are no failures) -->
+                <StackPanel Name="FailuresPanel" IsVisible="False">
+                    <TextBlock Name="FailuresLabel"
+                               Foreground="#800000" FontWeight="Bold"
+                               Margin="0,0,0,4"/>
+                    <ListBox Name="FailuresList" MaxHeight="300"/>
+                </StackPanel>
+
+                <TextBlock Name="NoFailuresLabel"
+                           Text="All templates refreshed successfully."
+                           Foreground="#006000"
+                           IsVisible="False"/>
+            </StackPanel>
+        </ScrollViewer>
+
+    </DockPanel>
 </UserControl>

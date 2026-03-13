@@ -1,16 +1,24 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
 using HardwareTemplateBuilder.Core.Services;
+using HardwareTemplateBuilder.Core.Services.Pdf;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
 
 namespace HardwareTemplateBuilder.App.Views;
 
@@ -32,6 +40,9 @@ public partial class JobsView : UserControl
     private ObservableCollection<HardwareItem> _linkedHardware = new();
 
     private int _selectedJobId;
+
+    /// <summary>Cancellation source for any in-progress package generation.</summary>
+    private CancellationTokenSource? _packageCts;
 
     /// <summary>The hardware item being dragged for reorder operations.</summary>
     private HardwareItem? _draggedItem;
@@ -99,6 +110,7 @@ public partial class JobsView : UserControl
         SearchModelBox.TextChanged += (_, _) => SearchHardware();
         AddHardwareButton.Click += (_, _) => AddHardwareToJob();
         RemoveHardwareButton.Click += (_, _) => RemoveHardwareFromJob();
+        GeneratePackageButton.Click += async (_, _) => await OnGeneratePackageAsync();
 
         // Drag-and-drop reorder on linked hardware list
         LinkedHardwareList.AddHandler(PointerPressedEvent, OnLinkedListPointerPressed, RoutingStrategies.Tunnel);
@@ -252,6 +264,261 @@ public partial class JobsView : UserControl
             LoadLinkedHardware();
         }
     }
+
+    // --- Generate Package ---
+
+    /// <summary>
+    /// Checks that every template linked to the job's hardware items has at least one
+    /// usable file source: a non-empty <c>LocalLink</c> whose file exists on disk,
+    /// or a non-empty <c>OnlineLink</c>.
+    /// </summary>
+    /// <returns>
+    /// Null if all templates pass; otherwise a user-facing message listing the failures.
+    /// </returns>
+    private string? RunPreflightCheck(int jobId)
+    {
+        using var context = DatabaseInitializer.CreateContext();
+
+        var hardwareIds = context.JobHardware
+            .Where(jh => jh.JobId == jobId)
+            .Select(jh => jh.HardwareItemId)
+            .ToList();
+
+        var problems = new List<string>();
+
+        foreach (var hwId in hardwareIds)
+        {
+            var templates = context.HardwareItemTemplates
+                .Include(hit => hit.IndividualTemplate)
+                    .ThenInclude(t => t.Manufacturer)
+                .Where(hit => hit.HardwareItemId == hwId)
+                .Select(hit => hit.IndividualTemplate)
+                .ToList();
+
+            foreach (var t in templates)
+            {
+                bool hasOnline    = !string.IsNullOrWhiteSpace(t.OnlineLink);
+                bool hasLocalFile = !string.IsNullOrWhiteSpace(t.LocalLink) && File.Exists(t.LocalLink);
+
+                if (!hasOnline && !hasLocalFile)
+                {
+                    var mfr    = t.Manufacturer?.ManufacturerName ?? "Unknown";
+                    var reason = string.IsNullOrWhiteSpace(t.LocalLink)
+                        ? "no local or online link"
+                        : "local file not found and no online link";
+                    problems.Add($"  \u2022 {mfr} {t.TemplateNumber}: {reason}");
+                }
+            }
+        }
+
+        if (problems.Count == 0) return null;
+
+        return "The following templates cannot be acquired:\n\n"
+             + string.Join("\n", problems)
+             + "\n\nSet a Local Link or Online Link for each template, then retry.";
+    }
+
+    /// <summary>
+    /// Returns the expected final output path for the job package without creating any files,
+    /// or null if the job or its user profile cannot be resolved.
+    /// </summary>
+    private string? GetExpectedOutputPath(int jobId)
+    {
+        using var context = DatabaseInitializer.CreateContext();
+        var job = context.Jobs.Find(jobId);
+        if (job == null) return null;
+
+        var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
+        var saveDir = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
+            ? profile.DefaultTemplateSaveLocation
+            : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+        return Path.Combine(saveDir, job.JobNumber, $"{job.JobNumber}_templates.pdf");
+    }
+
+    private async Task OnGeneratePackageAsync()
+    {
+        if (_selectedJobId == 0)
+        {
+            PackageStatusLabel.Text = "Select a job first.";
+            return;
+        }
+        if (_linkedHardware.Count == 0)
+        {
+            PackageStatusLabel.Text = "Add hardware items to the job first.";
+            return;
+        }
+
+        // Pre-flight: ensure every linked template has a usable file source.
+        var preflightMessage = RunPreflightCheck(_selectedJobId);
+        if (preflightMessage != null)
+        {
+            var win = TopLevel.GetTopLevel(this) as Window;
+            if (win != null)
+                await DialogHelper.ShowInfoAsync(win, preflightMessage, "Cannot Generate Package");
+            else
+                PackageStatusLabel.Text = "Some templates are missing file links. Fix them before generating.";
+            return;
+        }
+
+        // Overwrite check: warn if a package file already exists.
+        var expectedPath = GetExpectedOutputPath(_selectedJobId);
+        if (expectedPath != null && File.Exists(expectedPath))
+        {
+            var win = TopLevel.GetTopLevel(this) as Window;
+            if (win != null)
+            {
+                var overwrite = await DialogHelper.ConfirmAsync(win,
+                    $"A package already exists:\n{Path.GetFileName(expectedPath)}\n\nOverwrite it?",
+                    "File Already Exists");
+                if (!overwrite) return;
+            }
+        }
+
+        _packageCts?.Cancel();
+        _packageCts = new CancellationTokenSource();
+        var ct = _packageCts.Token;
+
+        GeneratePackageButton.IsEnabled = false;
+        PackageProgress.IsVisible = true;
+        PackageStatusLabel.Text = "Loading job data...";
+
+        // Capture state from UI thread before switching to background.
+        int jobId = _selectedJobId;
+        var orderedHardwareIds = _linkedHardware.Select(h => h.Id).ToList();
+
+        string outputPath;
+        IReadOnlyList<TemplateSnapshotInfo> snapshots;
+
+        try
+        {
+            (outputPath, snapshots) = await Task.Run(async () =>
+            {
+                using var context = DatabaseInitializer.CreateContext();
+
+                var job = context.Jobs
+                    .Include(j => j.Customer)
+                    .Include(j => j.ProjectManager)
+                    .First(j => j.Id == jobId);
+
+                var hardwareDict = context.HardwareItems
+                    .Include(h => h.Manufacturer)
+                    .Include(h => h.Description)
+                    .Where(h => orderedHardwareIds.Contains(h.Id))
+                    .ToDictionary(h => h.Id);
+
+                // Preserve drag-ordered sequence and load templates per item.
+                var hardware = orderedHardwareIds
+                    .Where(id => hardwareDict.ContainsKey(id))
+                    .Select(id =>
+                    {
+                        var templates = context.HardwareItemTemplates
+                            .Include(hit => hit.IndividualTemplate)
+                                .ThenInclude(t => t.Manufacturer)
+                            .Include(hit => hit.IndividualTemplate)
+                                .ThenInclude(t => t.Weight)
+                            .Where(hit => hit.HardwareItemId == id)
+                            .Select(hit => hit.IndividualTemplate)
+                            .ToList()
+                            .AsReadOnly();
+
+                        return new HardwareWithTemplates
+                        {
+                            Item      = hardwareDict[id],
+                            Templates = templates
+                        };
+                    })
+                    .ToList()
+                    .AsReadOnly();
+
+                var profile = context.UserProfiles
+                    .FirstOrDefault(u => u.Id == job.UserProfileId);
+                var saveDir = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
+                    ? profile.DefaultTemplateSaveLocation
+                    : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+                var request = new AssemblyRequest
+                {
+                    Job             = job,
+                    Hardware        = hardware,
+                    OutputDirectory = saveDir
+                };
+
+                var progress = new Progress<string>(msg =>
+                    Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = msg));
+
+                var service = BuildAssemblyService();
+                var result  = await service.AssembleAsync(request, progress, ct);
+                return (result.OutputPath, result.TemplateSnapshots);
+            }, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            PackageStatusLabel.Text = "Cancelled.";
+            return;
+        }
+        catch (Exception ex)
+        {
+            PackageStatusLabel.Text = $"Error: {ex.Message}";
+            return;
+        }
+        finally
+        {
+            GeneratePackageButton.IsEnabled = true;
+            PackageProgress.IsVisible = false;
+        }
+
+        // Write immutable JobTemplateSnapshot records and increment frequency.
+        using (var ctx = DatabaseInitializer.CreateContext())
+        {
+            var snapshotRepo = new JobTemplateSnapshotRepository(ctx);
+            foreach (var info in snapshots)
+            {
+                snapshotRepo.Add(new JobTemplateSnapshot
+                {
+                    JobId                = jobId,
+                    IndividualTemplateId = info.IndividualTemplateId,
+                    SnapshotLocalLink    = info.AcquiredFilePath,
+                    SnapshotDate         = DateTime.UtcNow,
+                    PagesToPrint         = info.PagesToPrint,
+                    PagesToRotate        = info.PagesToRotate,
+                    RotationDirection    = info.RotationDirection
+                });
+            }
+
+            var freqService = new FrequencyService(ctx);
+            foreach (var itemId in orderedHardwareIds)
+            {
+                var item = ctx.HardwareItems.Find(itemId);
+                if (item != null) freqService.IncrementFrequency(item);
+            }
+        }
+
+        PackageStatusLabel.Text = $"Generated: {Path.GetFileName(outputPath)}";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(outputPath) { UseShellExecute = true });
+        }
+        catch
+        {
+            // Non-fatal: file was generated but couldn't be auto-opened.
+        }
+    }
+
+    /// <summary>
+    /// Creates a fully wired <see cref="PdfAssemblyService"/> with all required dependencies.
+    /// </summary>
+    private static PdfAssemblyService BuildAssemblyService() =>
+        new PdfAssemblyService(
+            new TemplateSorter(new WeightTemplateSortStrategy(new WeightParser())),
+            new FileAcquirer(new HttpClient()),
+            new PageRangeParser(),
+            new PageExtractor(),
+            new PageRotator(),
+            new PdfMerger(),
+            new CoverSheetBuilder(),
+            new PageNumberer());
 
     // --- Save / Delete / Clear ---
 

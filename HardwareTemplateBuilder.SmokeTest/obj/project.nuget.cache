@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "XRaRjLvdEpw=",
+  "dgSpecHash": "jKmXGtGzxv8=",
   "success": true,
   "projectFilePath": "/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.SmokeTest/HardwareTemplateBuilder.SmokeTest.csproj",
   "expectedPackageFiles": [
@@ -30,6 +30,8 @@
     "/home/paperclip/.nuget/packages/microsoft.extensions.options/8.0.2/microsoft.extensions.options.8.0.2.nupkg.sha512",
     "/home/paperclip/.nuget/packages/microsoft.extensions.primitives/8.0.0/microsoft.extensions.primitives.8.0.0.nupkg.sha512",
     "/home/paperclip/.nuget/packages/mono.texttemplating/2.2.1/mono.texttemplating.2.2.1.nupkg.sha512",
+    "/home/paperclip/.nuget/packages/pdfsharp/6.1.1/pdfsharp.6.1.1.nupkg.sha512",
+    "/home/paperclip/.nuget/packages/questpdf/2024.12.3/questpdf.2024.12.3.nupkg.sha512",
     "/home/paperclip/.nuget/packages/sqlitepclraw.bundle_e_sqlite3/2.1.6/sqlitepclraw.bundle_e_sqlite3.2.1.6.nupkg.sha512",
     "/home/paperclip/.nuget/packages/sqlitepclraw.core/2.1.6/sqlitepclraw.core.2.1.6.nupkg.sha512",
     "/home/paperclip/.nuget/packages/sqlitepclraw.lib.e_sqlite3/2.1.6/sqlitepclraw.lib.e_sqlite3.2.1.6.nupkg.sha512",

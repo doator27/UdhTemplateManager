@@ -10,6 +10,8 @@
         <!-- Top menu bar -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
+                <MenuItem Header="_About" Name="MenuFileAbout" />
+                <Separator />
                 <MenuItem Header="_Exit" Name="MenuFileExit" />
             </MenuItem>
             <MenuItem Header="_Jobs">

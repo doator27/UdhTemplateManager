@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "I2ou8p7HPso=",
+  "dgSpecHash": "PH5Hw6TNRL0=",
   "success": true,
   "projectFilePath": "/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/HardwareTemplateBuilder.App.csproj",
   "expectedPackageFiles": [
@@ -51,6 +51,8 @@
     "/home/paperclip/.nuget/packages/microsoft.extensions.options/8.0.2/microsoft.extensions.options.8.0.2.nupkg.sha512",
     "/home/paperclip/.nuget/packages/microsoft.extensions.primitives/8.0.0/microsoft.extensions.primitives.8.0.0.nupkg.sha512",
     "/home/paperclip/.nuget/packages/mono.texttemplating/2.2.1/mono.texttemplating.2.2.1.nupkg.sha512",
+    "/home/paperclip/.nuget/packages/pdfsharp/6.1.1/pdfsharp.6.1.1.nupkg.sha512",
+    "/home/paperclip/.nuget/packages/questpdf/2024.12.3/questpdf.2024.12.3.nupkg.sha512",
     "/home/paperclip/.nuget/packages/skiasharp/2.88.9/skiasharp.2.88.9.nupkg.sha512",
     "/home/paperclip/.nuget/packages/skiasharp.nativeassets.linux/2.88.9/skiasharp.nativeassets.linux.2.88.9.nupkg.sha512",
     "/home/paperclip/.nuget/packages/skiasharp.nativeassets.macos/2.88.9/skiasharp.nativeassets.macos.2.88.9.nupkg.sha512",

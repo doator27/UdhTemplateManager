@@ -1,4 +1,6 @@
+using System.Reflection;
 using Avalonia.Controls;
+using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.App.Navigation;
 using HardwareTemplateBuilder.App.Views;
 
@@ -48,6 +50,16 @@ public partial class MainWindow : Window
     /// <summary>Wires all menu item click events to their corresponding navigation targets.</summary>
     private void WireMenuItems()
     {
+        MenuFileAbout.Click += async (_, _) =>
+        {
+            var ver = Assembly.GetExecutingAssembly().GetName().Version;
+            var verStr = ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "1.0.0";
+            await DialogHelper.ShowInfoAsync(this,
+                $"Hardware Template Builder  v{verStr}\n\n" +
+                "Manages door hardware templates and generates PDF packages for job orders.\n\n" +
+                "Built with .NET 8 · Avalonia UI · PDFsharp · QuestPDF · SQLite",
+                "About Hardware Template Builder");
+        };
         MenuFileExit.Click += (_, _) => Close();
         MenuJobs.Click += (_, _) => NavigateTo("Jobs");
         MenuRefreshTemplates.Click += (_, _) => NavigateTo("RefreshTemplates");
