@@ -33,23 +33,23 @@ public partial class MainWindow : Window
             dashboard.NavigationRequested += NavigateTo;
             return dashboard;
         });
-        _router.Register("TemplateLookup", () => new TemplateLookupView());
+        _router.Register("TemplateLookup", () => { var v = new TemplateLookupView();   v.NavigationRequested += NavigateTo; return v; });
         _router.Register("Jobs", () =>
         {
             var jobsView = new JobsView();
             jobsView.NavigationRequested += NavigateTo;
             return jobsView;
         });
-        _router.Register("HardwareItems", () => new HardwareItemsView());
-        _router.Register("Templates", () => new IndividualTemplatesView());
-        _router.Register("Customers", () => new CustomersView());
-        _router.Register("Manufacturers", () => new ManufacturersView());
-        _router.Register("Descriptions", () => new DescriptionsView());
-        _router.Register("ProjectManagers", () => new ProjectManagersView());
-        _router.Register("UserProfiles", () => new UserProfilesView());
-        _router.Register("DoorMaterials", () => new DoorMaterialsView());
-        _router.Register("AppSettings", () => new AppSettingsView());
-        _router.Register("RefreshTemplates", () => new RefreshTemplatesView());
+        _router.Register("HardwareItems",    () => { var v = new HardwareItemsView();    v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("Templates",        () => { var v = new IndividualTemplatesView(); v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("Customers",        () => { var v = new CustomersView();        v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("Manufacturers",    () => { var v = new ManufacturersView();    v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("Descriptions",     () => { var v = new DescriptionsView();     v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("ProjectManagers",  () => { var v = new ProjectManagersView();  v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("UserProfiles",     () => { var v = new UserProfilesView();     v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("DoorMaterials",    () => { var v = new DoorMaterialsView();    v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("AppSettings",      () => { var v = new AppSettingsView();      v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("RefreshTemplates", () => { var v = new RefreshTemplatesView(); v.NavigationRequested += NavigateTo; return v; });
     }
 
     /// <summary>Wires all menu item click events to their corresponding navigation targets.</summary>

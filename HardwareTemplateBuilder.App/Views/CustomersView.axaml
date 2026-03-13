@@ -2,7 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="HardwareTemplateBuilder.App.Views.CustomersView">
     <DockPanel Margin="8">
-        <TextBlock DockPanel.Dock="Top" Text="Customers" FontSize="16" FontWeight="Bold" Margin="0,0,0,8" />
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,12,0"/>
+            <TextBlock Text="Customers" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
         <Grid ColumnDefinitions="250,*">
             <!-- Left: list panel -->
             <DockPanel Grid.Column="0" Margin="0,0,8,0">

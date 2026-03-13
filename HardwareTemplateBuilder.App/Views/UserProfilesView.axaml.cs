@@ -14,6 +14,9 @@ public partial class UserProfilesView : UserControl
     private UserProfileRepository? _repo;
     private int _selectedId;
 
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
+
     /// <summary>Initializes the view.</summary>
     public UserProfilesView()
     {
@@ -25,6 +28,7 @@ public partial class UserProfilesView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _repo = new UserProfileRepository(context);
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();

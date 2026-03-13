@@ -13,6 +13,9 @@ public partial class ProjectManagersView : UserControl
     private ProjectManagerRepository? _repo;
     private int _selectedId;
 
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
+
     /// <summary>Initializes the view.</summary>
     public ProjectManagersView()
     {
@@ -24,6 +27,7 @@ public partial class ProjectManagersView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _repo = new ProjectManagerRepository(context);
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();

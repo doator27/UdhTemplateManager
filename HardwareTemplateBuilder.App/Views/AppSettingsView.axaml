@@ -2,7 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="HardwareTemplateBuilder.App.Views.AppSettingsView">
     <DockPanel Margin="8">
-        <TextBlock DockPanel.Dock="Top" Text="App Settings" FontSize="16" FontWeight="Bold" Margin="0,0,0,8" />
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,12,0"/>
+            <TextBlock Text="App Settings" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
         <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="16">
             <StackPanel MaxWidth="600" HorizontalAlignment="Left">
                 <TextBlock Text="Shared Template Storage Location:" Margin="0,0,0,4" />

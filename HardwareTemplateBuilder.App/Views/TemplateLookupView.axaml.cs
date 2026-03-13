@@ -28,6 +28,10 @@ public partial class TemplateLookupView : UserControl
     private List<Manufacturer> _manufacturers = new();
     private List<Description> _descriptions = new();
     private CancellationTokenSource? _cts;
+    private bool _updatingDescCombo;
+
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event Action<string>? NavigationRequested;
 
     /// <summary>Initializes the view and wires events on load.</summary>
     public TemplateLookupView()
@@ -61,10 +65,12 @@ public partial class TemplateLookupView : UserControl
         DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
         DescCombo.SelectedIndex = 0;
 
-        // Wire search controls — auto-search on every change.
-        MfrCombo.SelectionChanged += (_, _) => SearchHardware();
-        DescCombo.SelectionChanged += (_, _) => SearchHardware();
-        ModelBox.TextChanged += (_, _) => SearchHardware();
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
+
+        // Wire search controls — manufacturer drives description cascade.
+        MfrCombo.SelectionChanged  += (_, _) => OnSearchMfrChanged();
+        DescCombo.SelectionChanged += (_, _) => { if (!_updatingDescCombo) SearchHardware(); };
+        ModelBox.TextChanged       += (_, _) => SearchHardware();
 
         ResultsList.SelectionChanged += (_, _) => OnResultSelected();
         GenerateButton.Click += async (_, e) => await OnGenerateClickedAsync(e);
@@ -74,6 +80,47 @@ public partial class TemplateLookupView : UserControl
     }
 
     // ---------- Search ----------
+
+    /// <summary>
+    /// Repopulates the Description combo to show only descriptions that have at least one
+    /// hardware item made by the selected manufacturer, then re-runs the search.
+    /// </summary>
+    private void OnSearchMfrChanged()
+    {
+        var mfr = MfrCombo.SelectedItem as Manufacturer;
+        var mfrId = mfr?.Id ?? 0;
+
+        var filtered = new List<Description> { new() { Id = 0, DescriptionText = "(Any)" } };
+
+        if (mfrId == 0)
+        {
+            filtered.AddRange(_descriptions);
+        }
+        else
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var descIds = ctx.HardwareItems
+                .Where(h => h.ManufacturerId == mfrId)
+                .Select(h => h.DescriptionId)
+                .Distinct()
+                .ToHashSet();
+            filtered.AddRange(_descriptions.Where(d => descIds.Contains(d.Id)));
+        }
+
+        _updatingDescCombo = true;
+        try
+        {
+            DescCombo.ItemsSource = filtered;
+            DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
+            DescCombo.SelectedIndex = 0;
+        }
+        finally
+        {
+            _updatingDescCombo = false;
+        }
+
+        SearchHardware();
+    }
 
     private void SearchHardware()
     {

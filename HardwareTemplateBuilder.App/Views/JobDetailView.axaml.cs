@@ -44,6 +44,7 @@ public partial class JobDetailView : UserControl
 
     private bool _isDragging;
     private Point _dragStartPoint;
+    private bool _updatingSearchDescCombo;
 
     /// <summary>Raised when the user requests navigation to a named view (e.g. "Jobs").</summary>
     public event Action<string>? NavigationRequested;
@@ -86,9 +87,10 @@ public partial class JobDetailView : UserControl
 
         LoadLinkedHardware();
 
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
-        SearchMfrCombo.SelectionChanged += (_, _) => SearchHardware();
-        SearchDescCombo.SelectionChanged += (_, _) => SearchHardware();
+        SearchMfrCombo.SelectionChanged += (_, _) => OnSearchMfrChanged();
+        SearchDescCombo.SelectionChanged += (_, _) => { if (!_updatingSearchDescCombo) SearchHardware(); };
         SearchModelBox.TextChanged += (_, _) => SearchHardware();
         AddHardwareButton.Click += (_, _) => AddHardwareToJob();
         RemoveHardwareButton.Click += (_, _) => RemoveHardwareFromJob();
@@ -145,6 +147,49 @@ public partial class JobDetailView : UserControl
         var index = (int)(position.Y / itemHeight);
         index = Math.Clamp(index, 0, _linkedHardware.Count - 1);
         return _linkedHardware[index];
+    }
+
+    // --- Search ---
+
+    /// <summary>
+    /// Repopulates the Description search combo to show only descriptions that have at least
+    /// one hardware item made by the selected manufacturer, then re-runs the search.
+    /// </summary>
+    private void OnSearchMfrChanged()
+    {
+        var mfr = SearchMfrCombo.SelectedItem as Manufacturer;
+        var mfrId = mfr?.Id ?? 0;
+
+        var filtered = new List<Description> { new() { Id = 0, DescriptionText = "(Any)" } };
+
+        if (mfrId == 0)
+        {
+            filtered.AddRange(_descriptions);
+        }
+        else
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var descIds = ctx.HardwareItems
+                .Where(h => h.ManufacturerId == mfrId)
+                .Select(h => h.DescriptionId)
+                .Distinct()
+                .ToHashSet();
+            filtered.AddRange(_descriptions.Where(d => descIds.Contains(d.Id)));
+        }
+
+        _updatingSearchDescCombo = true;
+        try
+        {
+            SearchDescCombo.ItemsSource = filtered;
+            SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
+            SearchDescCombo.SelectedIndex = 0;
+        }
+        finally
+        {
+            _updatingSearchDescCombo = false;
+        }
+
+        SearchHardware();
     }
 
     // --- Hardware management ---

@@ -2,7 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="HardwareTemplateBuilder.App.Views.DoorMaterialsView">
     <DockPanel Margin="8">
-        <TextBlock DockPanel.Dock="Top" Text="Door Materials" FontSize="16" FontWeight="Bold" Margin="0,0,0,8" />
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,12,0"/>
+            <TextBlock Text="Door Materials" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
         <TextBlock DockPanel.Dock="Top" Text="Door materials are fixed: Hollow Metal and Wood. These records are seeded automatically."
                    Foreground="#404040" Margin="0,0,0,12" TextWrapping="Wrap" />
         <ListBox Name="RecordList" MaxHeight="120" />

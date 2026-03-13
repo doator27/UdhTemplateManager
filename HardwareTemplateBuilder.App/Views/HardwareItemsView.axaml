@@ -2,7 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="HardwareTemplateBuilder.App.Views.HardwareItemsView">
     <DockPanel Margin="8">
-        <TextBlock DockPanel.Dock="Top" Text="Hardware Items" FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,12,0"/>
+            <TextBlock Text="Hardware Items" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
         <Grid ColumnDefinitions="260,*">
             <!-- Left: list -->
             <DockPanel Grid.Column="0" Margin="0,0,8,0">

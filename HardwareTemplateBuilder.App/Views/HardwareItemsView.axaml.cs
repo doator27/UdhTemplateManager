@@ -21,6 +21,10 @@ public partial class HardwareItemsView : UserControl
     private List<Manufacturer> _manufacturers = new();
     private List<Description> _descriptions = new();
     private int _selectedId;
+    private bool _updatingSearchDescCombo;
+
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
 
     /// <summary>Initializes the view.</summary>
     public HardwareItemsView()
@@ -56,6 +60,7 @@ public partial class HardwareItemsView : UserControl
         SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
         SearchDescCombo.SelectedIndex = 0;
 
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();
@@ -69,11 +74,52 @@ public partial class HardwareItemsView : UserControl
         };
 
         // Template search
-        SearchMfrCombo.SelectionChanged += (_, _) => SearchTemplates();
-        SearchDescCombo.SelectionChanged += (_, _) => SearchTemplates();
+        SearchMfrCombo.SelectionChanged += (_, _) => OnSearchMfrChanged();
+        SearchDescCombo.SelectionChanged += (_, _) => { if (!_updatingSearchDescCombo) SearchTemplates(); };
         SearchTemplateNumBox.TextChanged += (_, _) => SearchTemplates();
         LinkButton.Click += (_, _) => LinkTemplate();
         UnlinkButton.Click += (_, _) => UnlinkTemplate();
+    }
+
+    /// <summary>
+    /// Repopulates the Description search combo to show only descriptions that appear on at
+    /// least one template made by the selected manufacturer, then re-runs the template search.
+    /// </summary>
+    private void OnSearchMfrChanged()
+    {
+        var mfr = SearchMfrCombo.SelectedItem as Manufacturer;
+        var mfrId = mfr?.Id ?? 0;
+
+        var filtered = new List<Description> { new() { Id = 0, DescriptionText = "(Any)" } };
+
+        if (mfrId == 0)
+        {
+            filtered.AddRange(_descriptions);
+        }
+        else
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var descIds = ctx.IndividualTemplates
+                .Where(t => t.ManufacturerId == mfrId)
+                .Select(t => t.DescriptionId)
+                .Distinct()
+                .ToHashSet();
+            filtered.AddRange(_descriptions.Where(d => descIds.Contains(d.Id)));
+        }
+
+        _updatingSearchDescCombo = true;
+        try
+        {
+            SearchDescCombo.ItemsSource = filtered;
+            SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
+            SearchDescCombo.SelectedIndex = 0;
+        }
+        finally
+        {
+            _updatingSearchDescCombo = false;
+        }
+
+        SearchTemplates();
     }
 
     private void LoadList()

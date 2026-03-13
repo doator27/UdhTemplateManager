@@ -10,11 +10,18 @@ namespace HardwareTemplateBuilder.App.Views;
 /// </summary>
 public partial class DoorMaterialsView : UserControl
 {
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
+
     /// <summary>Initializes the view.</summary>
     public DoorMaterialsView()
     {
         InitializeComponent();
-        Loaded += (_, _) => LoadList();
+        Loaded += (_, _) =>
+        {
+            MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
+            LoadList();
+        };
     }
 
     private void LoadList()

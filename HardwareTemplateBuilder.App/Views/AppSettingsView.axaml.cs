@@ -13,6 +13,9 @@ public partial class AppSettingsView : UserControl
 {
     private AppSettingRepository? _repo;
 
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
+
     /// <summary>Initializes the view.</summary>
     public AppSettingsView()
     {
@@ -27,6 +30,7 @@ public partial class AppSettingsView : UserControl
 
         StorageLocationBox.Text = _repo.GetValue("TemplateStorageLocation");
 
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         SaveButton.Click += (_, _) => Save();
         BrowseButton.Click += async (_, _) => await BrowseFolderAsync();
     }

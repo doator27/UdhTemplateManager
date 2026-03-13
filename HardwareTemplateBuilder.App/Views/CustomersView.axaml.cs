@@ -13,6 +13,9 @@ public partial class CustomersView : UserControl
     private CustomerRepository? _repo;
     private int _selectedId;
 
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
+
     /// <summary>Initializes the view and loads data.</summary>
     public CustomersView()
     {
@@ -24,8 +27,8 @@ public partial class CustomersView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _repo = new CustomerRepository(context);
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
-
         FilterBox.TextChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();
         SaveButton.Click += (_, _) => Save();

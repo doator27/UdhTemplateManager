@@ -19,6 +19,9 @@ public partial class RefreshTemplatesView : UserControl
 {
     private CancellationTokenSource? _cts;
 
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
+
     /// <summary>Initializes the view and wires events on load.</summary>
     public RefreshTemplatesView()
     {
@@ -28,6 +31,7 @@ public partial class RefreshTemplatesView : UserControl
 
     private void Initialize()
     {
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         StartButton.Click  += async (_, _) => await OnStartRefreshAsync();
         CancelButton.Click += (_, _) => _cts?.Cancel();
     }

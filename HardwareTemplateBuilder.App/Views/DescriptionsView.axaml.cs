@@ -13,6 +13,9 @@ public partial class DescriptionsView : UserControl
 {
     private DescriptionRepository? _repo;
     private readonly WeightParser _weightParser = new();
+
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
     private int _selectedId;
 
     /// <summary>Initializes the view and loads data.</summary>
@@ -26,6 +29,7 @@ public partial class DescriptionsView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _repo = new DescriptionRepository(context);
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();

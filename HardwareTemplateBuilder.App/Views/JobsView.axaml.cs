@@ -44,6 +44,7 @@ public partial class JobsView : UserControl
 
         LoadJobList();
 
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         FilterBox.TextChanged += (_, _) => LoadJobList();
         JobList.SelectionChanged += (_, _) => OnJobSelected();
         SaveButton.Click += (_, _) => Save();

@@ -13,6 +13,9 @@ public partial class ManufacturersView : UserControl
     private ManufacturerRepository? _repo;
     private int _selectedId;
 
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
+
     /// <summary>Initializes the view and loads data.</summary>
     public ManufacturersView()
     {
@@ -24,6 +27,7 @@ public partial class ManufacturersView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _repo = new ManufacturerRepository(context);
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();

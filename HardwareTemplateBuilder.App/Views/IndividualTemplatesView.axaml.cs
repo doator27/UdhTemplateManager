@@ -24,6 +24,9 @@ public partial class IndividualTemplatesView : UserControl
     private readonly PageRangeParser _pageRangeParser = new();
     private int _selectedId;
 
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
+
     /// <summary>Initializes the view.</summary>
     public IndividualTemplatesView()
     {
@@ -53,6 +56,7 @@ public partial class IndividualTemplatesView : UserControl
         DoorMaterialFilterCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
         DoorMaterialFilterCombo.SelectedIndex = 0;
 
+        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         DoorMaterialFilterCombo.SelectionChanged += (_, _) => LoadList();
