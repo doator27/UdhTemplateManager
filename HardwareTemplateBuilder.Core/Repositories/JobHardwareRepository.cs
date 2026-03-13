@@ -11,8 +11,9 @@ public class JobHardwareRepository : RepositoryBase<JobHardware>
     public JobHardwareRepository(AppDbContext context) : base(context) { }
 
     /// <inheritdoc/>
-    protected override JobHardware? FindDuplicate(JobHardware entity) =>
-        _context.JobHardware.FirstOrDefault(jh =>
-            jh.JobId == entity.JobId &&
-            jh.HardwareItemId == entity.HardwareItemId);
+    /// <remarks>
+    /// Returns null — the same hardware item may appear multiple times on a job,
+    /// each with an independent <c>CustomDescription</c>.
+    /// </remarks>
+    protected override JobHardware? FindDuplicate(JobHardware entity) => null;
 }

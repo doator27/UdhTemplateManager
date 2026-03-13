@@ -34,7 +34,12 @@ public partial class MainWindow : Window
             return dashboard;
         });
         _router.Register("TemplateLookup", () => new TemplateLookupView());
-        _router.Register("Jobs", () => new JobsView());
+        _router.Register("Jobs", () =>
+        {
+            var jobsView = new JobsView();
+            jobsView.NavigationRequested += NavigateTo;
+            return jobsView;
+        });
         _router.Register("HardwareItems", () => new HardwareItemsView());
         _router.Register("Templates", () => new IndividualTemplatesView());
         _router.Register("Customers", () => new CustomersView());
@@ -42,8 +47,8 @@ public partial class MainWindow : Window
         _router.Register("Descriptions", () => new DescriptionsView());
         _router.Register("ProjectManagers", () => new ProjectManagersView());
         _router.Register("UserProfiles", () => new UserProfilesView());
-        _router.Register("Weights", () => new WeightsView());
         _router.Register("DoorMaterials", () => new DoorMaterialsView());
+        _router.Register("AppSettings", () => new AppSettingsView());
         _router.Register("RefreshTemplates", () => new RefreshTemplatesView());
     }
 
@@ -62,14 +67,15 @@ public partial class MainWindow : Window
         };
         MenuFileExit.Click += (_, _) => Close();
         MenuJobs.Click += (_, _) => NavigateTo("Jobs");
+        MenuTemplateLookup.Click += (_, _) => NavigateTo("TemplateLookup");
         MenuRefreshTemplates.Click += (_, _) => NavigateTo("RefreshTemplates");
         MenuHardwareItems.Click += (_, _) => NavigateTo("HardwareItems");
         MenuTemplates.Click += (_, _) => NavigateTo("Templates");
         MenuCustomers.Click += (_, _) => NavigateTo("Customers");
         MenuManufacturers.Click += (_, _) => NavigateTo("Manufacturers");
         MenuDescriptions.Click += (_, _) => NavigateTo("Descriptions");
+        MenuAppSettings.Click += (_, _) => NavigateTo("AppSettings");
         MenuDoorMaterials.Click += (_, _) => NavigateTo("DoorMaterials");
-        MenuWeights.Click += (_, _) => NavigateTo("Weights");
         MenuProjectManagers.Click += (_, _) => NavigateTo("ProjectManagers");
         MenuUserProfiles.Click += (_, _) => NavigateTo("UserProfiles");
     }
@@ -78,16 +84,29 @@ public partial class MainWindow : Window
     /// <param name="viewName">The name of the view to display.</param>
     private void NavigateTo(string viewName)
     {
+        // Parameterized route: "JobDetail:{id}"
+        if (viewName.StartsWith("JobDetail:") &&
+            int.TryParse(viewName.Substring("JobDetail:".Length), out var jobId))
+        {
+            var detail = new JobDetailView(jobId);
+            detail.NavigationRequested += NavigateTo;
+            ContentArea.Content = detail;
+            var user = SessionService.ActiveUserProfile?.UserName;
+            var suffix = user != null ? $"  —  {user}" : string.Empty;
+            StatusText.Text = $"Job Detail{suffix}";
+            return;
+        }
+
         _router.NavigateTo(viewName);
-        StatusText.Text = viewName == "Dashboard" ? "Ready" : viewName;
+        var u = SessionService.ActiveUserProfile?.UserName;
+        var sfx = u != null ? $"  —  {u}" : string.Empty;
+        StatusText.Text = viewName == "Dashboard" ? $"Ready{sfx}" : $"{viewName}{sfx}";
     }
 
-    /// <summary>
-    /// Navigates to the User Profiles view on first launch when no profiles exist.
-    /// </summary>
-    public void NavigateToFirstLaunch()
+    /// <summary>Updates the status bar to reflect the newly chosen active user.</summary>
+    /// <param name="userName">The user name to display.</param>
+    public void SetActiveUser(string userName)
     {
-        NavigateTo("UserProfiles");
-        StatusText.Text = "Welcome! Please create a User Profile before proceeding.";
+        StatusText.Text = $"Ready  —  {userName}";
     }
 }

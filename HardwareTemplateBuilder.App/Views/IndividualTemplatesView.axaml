@@ -7,14 +7,16 @@
             <!-- Left: list -->
             <DockPanel Grid.Column="0" Margin="0,0,8,0">
                 <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2"/>
-                <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4"/>
+                <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Template number..." Margin="0,0,0,4"/>
+                <ComboBox DockPanel.Dock="Top" Name="DoorMaterialFilterCombo"
+                          HorizontalAlignment="Stretch" Margin="0,0,0,4"/>
                 <ListBox Name="RecordList"/>
             </DockPanel>
             <!-- Right: form -->
             <ScrollViewer Grid.Column="1">
                 <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
                     <StackPanel>
-                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer:" Margin="0,0,8,2"/>
                             <ComboBox Grid.Row="1" Grid.Column="0" Name="ManufacturerCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="Description:" Margin="0,0,0,2"/>
@@ -36,13 +38,10 @@
                             <TextBlock Grid.Row="6" Grid.Column="1" Text="Door Material:" Margin="0,0,0,2"/>
                             <ComboBox Grid.Row="7" Grid.Column="1" Name="DoorMaterialCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
 
-                            <TextBlock Grid.Row="8" Grid.Column="0" Text="Weight:" Margin="0,0,8,2"/>
-                            <ComboBox Grid.Row="9" Grid.Column="0" Name="WeightCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
-
-                            <TextBlock Grid.Row="10" Grid.Column="0" Text="Online Link (URL):" Margin="0,0,8,2"/>
-                            <TextBox Grid.Row="11" Grid.Column="0" Name="OnlineLinkBox" Watermark="https://..." Margin="0,0,8,8"/>
-                            <TextBlock Grid.Row="10" Grid.Column="1" Text="Local Link (file path):" Margin="0,0,0,2"/>
-                            <Grid Grid.Row="11" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                            <TextBlock Grid.Row="8" Grid.Column="0" Text="Online Link (URL):" Margin="0,0,8,2"/>
+                            <TextBox Grid.Row="9" Grid.Column="0" Name="OnlineLinkBox" Watermark="https://..." Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="8" Grid.Column="1" Text="Local Link (file path):" Margin="0,0,0,2"/>
+                            <Grid Grid.Row="9" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
                                 <TextBox Grid.Column="0" Name="LocalLinkBox"/>
                                 <Button Grid.Column="1" Name="BrowseLocalLinkButton" Content="..." Width="30" Margin="4,0,0,0"/>
                             </Grid>

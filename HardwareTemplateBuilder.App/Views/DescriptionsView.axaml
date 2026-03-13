@@ -13,6 +13,8 @@
                 <StackPanel>
                     <TextBlock Text="Description:" Margin="0,0,0,2" />
                     <TextBox Name="DescriptionBox" Margin="0,0,0,10" />
+                    <TextBlock Text="Sort Weight (00.000.000):" Margin="0,0,0,2" />
+                    <TextBox Name="WeightValueBox" Watermark="e.g. 01.002.015" Margin="0,0,0,10" />
                     <StackPanel Orientation="Horizontal">
                         <Button Name="SaveButton" Content="Save" Margin="0,0,8,0" />
                         <Button Name="NewButton" Content="New" Margin="0,0,8,0" />

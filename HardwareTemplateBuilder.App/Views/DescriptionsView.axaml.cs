@@ -3,6 +3,7 @@ using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
+using HardwareTemplateBuilder.Core.Services;
 using System.Linq;
 
 namespace HardwareTemplateBuilder.App.Views;
@@ -11,6 +12,7 @@ namespace HardwareTemplateBuilder.App.Views;
 public partial class DescriptionsView : UserControl
 {
     private DescriptionRepository? _repo;
+    private readonly WeightParser _weightParser = new();
     private int _selectedId;
 
     /// <summary>Initializes the view and loads data.</summary>
@@ -54,6 +56,7 @@ public partial class DescriptionsView : UserControl
         {
             _selectedId = d.Id;
             DescriptionBox.Text = d.DescriptionText;
+            WeightValueBox.Text = d.WeightValue;
             StatusLabel.Text = "";
         }
     }
@@ -62,12 +65,23 @@ public partial class DescriptionsView : UserControl
     {
         var text = DescriptionBox.Text?.Trim();
         if (string.IsNullOrEmpty(text)) { StatusLabel.Text = "Description is required."; return; }
+
+        var weightValue = WeightValueBox.Text?.Trim();
+        if (string.IsNullOrEmpty(weightValue)) { StatusLabel.Text = "Sort Weight is required."; return; }
+        try { _weightParser.Parse(weightValue); }
+        catch { StatusLabel.Text = "Invalid weight format. Use 00.000.000 (e.g. 01.002.015)."; return; }
+
         if (_selectedId == 0)
-            _repo!.Add(new Description { DescriptionText = text });
+            _repo!.Add(new Description { DescriptionText = text, WeightValue = weightValue });
         else
         {
             var existing = _repo!.GetById(_selectedId);
-            if (existing != null) { existing.DescriptionText = text; _repo.Update(existing); }
+            if (existing != null)
+            {
+                existing.DescriptionText = text;
+                existing.WeightValue = weightValue;
+                _repo.Update(existing);
+            }
         }
         StatusLabel.Text = "Saved.";
         LoadList();
@@ -85,6 +99,7 @@ public partial class DescriptionsView : UserControl
     {
         _selectedId = 0;
         DescriptionBox.Text = "";
+        WeightValueBox.Text = "";
         StatusLabel.Text = "";
         RecordList.SelectedItem = null;
     }

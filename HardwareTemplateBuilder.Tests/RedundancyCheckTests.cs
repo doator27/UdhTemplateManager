@@ -67,21 +67,6 @@ public class RedundancyCheckTests : IDisposable
     }
 
     [Fact]
-    public void WeightRepository_Add_ReturnsDuplicateExisting()
-    {
-        // Need a Description first
-        var descRepo = new DescriptionRepository(_context);
-        var desc = descRepo.Add(new Description { DescriptionText = "Lockset" });
-
-        var repo = new WeightRepository(_context);
-        var first = repo.Add(new Weight { WeightValue = "01.001.001", DescriptionId = desc.Id });
-        var second = repo.Add(new Weight { WeightValue = "01.001.001", DescriptionId = desc.Id });
-
-        Assert.Equal(first.Id, second.Id);
-        Assert.Single(_context.Weights);
-    }
-
-    [Fact]
     public void HardwareItemRepository_Add_ReturnsDuplicateExisting()
     {
         var mfr = new ManufacturerRepository(_context)

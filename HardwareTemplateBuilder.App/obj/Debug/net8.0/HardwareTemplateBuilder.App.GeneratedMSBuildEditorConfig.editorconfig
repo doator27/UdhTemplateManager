@@ -32,6 +32,9 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Styles/Win98Theme.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
+[/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/AppSettingsView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/CustomersView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
@@ -50,10 +53,16 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/IndividualTemplatesView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
+[/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/JobDetailView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/JobsView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/ManufacturersView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/ProfilePickerDialog.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/ProjectManagersView.axaml]
@@ -69,7 +78,4 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/UserProfilesView.axaml]
-build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
-
-[/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/WeightsView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml

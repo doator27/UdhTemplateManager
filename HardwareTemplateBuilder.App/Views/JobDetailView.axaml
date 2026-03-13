@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.JobDetailView">
+    <DockPanel Margin="8">
+        <!-- Top: back button + job title -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left" Name="BackButton" Content="← Back to Jobs" Margin="0,0,12,0"/>
+            <TextBlock Name="JobTitleLabel" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <ScrollViewer>
+            <StackPanel>
+                <!-- Linked Hardware Items sub-panel -->
+                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="Linked Hardware Items" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <TextBlock Text="(Drag items to reorder)" Foreground="#606060" FontSize="11" Margin="0,0,0,4"/>
+                        <ListBox Name="LinkedHardwareList" Height="120" Margin="0,0,0,8"/>
+                        <Button Name="RemoveHardwareButton" Content="Remove from Job" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+
+                        <TextBlock Text="Search Hardware Items to Add:" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,4">
+                            <ComboBox Grid.Column="0" Name="SearchMfrCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
+                            <ComboBox Grid.Column="1" Name="SearchDescCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
+                            <TextBox  Grid.Column="2" Name="SearchModelBox" Watermark="Model #"/>
+                        </Grid>
+                        <ListBox Name="HardwareSearchList" Height="120" Margin="0,0,0,8"/>
+                        <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                            <TextBlock Grid.Column="0" Text="Custom label (optional):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox   Grid.Column="1" Name="CustomDescBox" Watermark="Leave blank to use model number"/>
+                        </Grid>
+                        <Button Name="AddHardwareButton" Content="Add to Job" HorizontalAlignment="Left"/>
+                        <TextBlock Name="LinkStatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- PDF Package Generation sub-panel -->
+                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+                    <StackPanel>
+                        <TextBlock Text="PDF Package Generation" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Button Name="GeneratePackageButton" Content="Generate Package"
+                                HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                        <ProgressBar Name="PackageProgress"
+                                     IsIndeterminate="True" IsVisible="False"
+                                     Height="14" Margin="0,0,0,4"/>
+                        <TextBlock Name="PackageStatusLabel"
+                                   Foreground="#800000" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

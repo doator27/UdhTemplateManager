@@ -60,8 +60,12 @@ public class PdfAssemblyService
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // Deduplicate: the same IndividualTemplate may be linked to multiple hardware items;
+        // it should appear only once in the merged PDF.
         var allTemplates = request.Hardware
             .SelectMany(h => h.Templates)
+            .GroupBy(t => t.Id)
+            .Select(g => g.First())
             .ToList();
 
         if (allTemplates.Count == 0)
@@ -204,7 +208,9 @@ public class PdfAssemblyService
             {
                 Manufacturer = item.Manufacturer?.ManufacturerName ?? string.Empty,
                 HardwareType = item.Description?.DescriptionText ?? string.Empty,
-                HardwareDescription = item.ModelNumber,
+                HardwareDescription = !string.IsNullOrWhiteSpace(hwt.CustomDescription)
+                    ? hwt.CustomDescription
+                    : item.ModelNumber,
                 TemplateNumbers = templateNumbers,
                 PageNumbers = pageRange,
                 Remarks = item.Remarks

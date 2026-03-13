@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using HardwareTemplateBuilder.App;
 
 namespace HardwareTemplateBuilder.App.Views;
 
@@ -12,22 +13,29 @@ public partial class DashboardView : UserControl
     public DashboardView()
     {
         InitializeComponent();
+        Loaded += (_, _) => OnLoaded();
         WireButtons();
+    }
+
+    private void OnLoaded()
+    {
+        var user = SessionService.ActiveUserProfile?.UserName;
+        WelcomeLabel.Text = user != null ? $"Welcome, {user}." : string.Empty;
     }
 
     private void WireButtons()
     {
-        BtnTemplateLookup.Click += (_, _) => NavigationRequested?.Invoke("TemplateLookup");
-        BtnJobs.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
-        BtnHardwareItems.Click += (_, _) => NavigationRequested?.Invoke("HardwareItems");
-        BtnTemplates.Click += (_, _) => NavigationRequested?.Invoke("Templates");
-        BtnCustomers.Click += (_, _) => NavigationRequested?.Invoke("Customers");
-        BtnManufacturers.Click += (_, _) => NavigationRequested?.Invoke("Manufacturers");
-        BtnDescriptions.Click += (_, _) => NavigationRequested?.Invoke("Descriptions");
-        BtnProjectManagers.Click += (_, _) => NavigationRequested?.Invoke("ProjectManagers");
-        BtnUserProfiles.Click += (_, _) => NavigationRequested?.Invoke("UserProfiles");
-        BtnWeights.Click += (_, _) => NavigationRequested?.Invoke("Weights");
-        BtnDoorMaterials.Click += (_, _) => NavigationRequested?.Invoke("DoorMaterials");
-        BtnRefreshTemplates.Click += (_, _) => NavigationRequested?.Invoke("RefreshTemplates");
+        BtnJobs.Click              += (_, _) => NavigationRequested?.Invoke("Jobs");
+        BtnTemplateLookup.Click    += (_, _) => NavigationRequested?.Invoke("TemplateLookup");
+        BtnHardwareItems.Click     += (_, _) => NavigationRequested?.Invoke("HardwareItems");
+        BtnTemplates.Click         += (_, _) => NavigationRequested?.Invoke("Templates");
+        BtnCustomers.Click         += (_, _) => NavigationRequested?.Invoke("Customers");
+        BtnManufacturers.Click     += (_, _) => NavigationRequested?.Invoke("Manufacturers");
+        BtnDescriptions.Click      += (_, _) => NavigationRequested?.Invoke("Descriptions");
+        BtnProjectManagers.Click   += (_, _) => NavigationRequested?.Invoke("ProjectManagers");
+        BtnUserProfiles.Click      += (_, _) => NavigationRequested?.Invoke("UserProfiles");
+        BtnDoorMaterials.Click     += (_, _) => NavigationRequested?.Invoke("DoorMaterials");
+        BtnAppSettings.Click       += (_, _) => NavigationRequested?.Invoke("AppSettings");
+        BtnRefreshTemplates.Click  += (_, _) => NavigationRequested?.Invoke("RefreshTemplates");
     }
 }

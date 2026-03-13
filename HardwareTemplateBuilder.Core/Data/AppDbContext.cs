@@ -27,8 +27,8 @@ public class AppDbContext : DbContext
     /// <summary>Gets or sets the door materials table.</summary>
     public DbSet<DoorMaterial> DoorMaterials => Set<DoorMaterial>();
 
-    /// <summary>Gets or sets the weights table.</summary>
-    public DbSet<Weight> Weights => Set<Weight>();
+    /// <summary>Gets or sets the application settings table.</summary>
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
 
     /// <summary>Gets or sets the project managers table.</summary>
     public DbSet<ProjectManager> ProjectManagers => Set<ProjectManager>();
@@ -56,6 +56,16 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // AppSetting: unique index on Key
+        modelBuilder.Entity<AppSetting>()
+            .HasIndex(s => s.Key)
+            .IsUnique();
+
+        // Seed the default app settings
+        modelBuilder.Entity<AppSetting>().HasData(
+            new AppSetting { Id = 1, Key = "TemplateStorageLocation", Value = "" }
+        );
+
         // DoorMaterial: constrain Material to only "Hollow Metal" or "Wood"
         modelBuilder.Entity<DoorMaterial>()
             .ToTable(t => t.HasCheckConstraint("CK_DoorMaterial_Material",
@@ -76,13 +86,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<JobTemplateSnapshot>()
             .Property(s => s.SnapshotDate)
             .HasDefaultValueSql("datetime('now')");
-
-        // Weight → Description FK
-        modelBuilder.Entity<Weight>()
-            .HasOne(w => w.Description)
-            .WithMany(d => d.Weights)
-            .HasForeignKey(w => w.DescriptionId)
-            .OnDelete(DeleteBehavior.Restrict);
 
         // HardwareItem → Manufacturer
         modelBuilder.Entity<HardwareItem>()
@@ -110,13 +113,6 @@ public class AppDbContext : DbContext
             .HasOne(t => t.Description)
             .WithMany(d => d.Templates)
             .HasForeignKey(t => t.DescriptionId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // IndividualTemplate → Weight
-        modelBuilder.Entity<IndividualTemplate>()
-            .HasOne(t => t.Weight)
-            .WithMany(w => w.Templates)
-            .HasForeignKey(t => t.WeightId)
             .OnDelete(DeleteBehavior.Restrict);
 
         // IndividualTemplate → DoorMaterial

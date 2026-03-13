@@ -29,11 +29,11 @@ public class WeightTemplateSortStrategy : ITemplateSortStrategy
             .Select(g =>
             {
                 var sortedTemplates = g
-                    .OrderBy(t => _weightParser.Parse(t.Weight.WeightValue))
+                    .OrderBy(t => _weightParser.Parse(t.Description.WeightValue))
                     .ToList();
 
                 var minWeight = sortedTemplates
-                    .Select(t => _weightParser.Parse(t.Weight.WeightValue))
+                    .Select(t => _weightParser.Parse(t.Description.WeightValue))
                     .Min();
 
                 return new

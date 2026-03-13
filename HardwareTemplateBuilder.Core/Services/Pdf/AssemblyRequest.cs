@@ -12,9 +12,15 @@ public class HardwareWithTemplates
 
     /// <summary>
     /// Gets or sets the templates linked to this item, with their navigation properties loaded
-    /// (<c>Manufacturer</c>, <c>Weight.WeightValue</c>).
+    /// (<c>Manufacturer</c>, <c>Description.WeightValue</c>).
     /// </summary>
     public IReadOnlyList<IndividualTemplate> Templates { get; init; } = Array.Empty<IndividualTemplate>();
+
+    /// <summary>
+    /// Gets or sets the optional custom label for this hardware row on the cover sheet.
+    /// When set, overrides the item's model number in the <c>HardwareDescription</c> column.
+    /// </summary>
+    public string? CustomDescription { get; init; }
 }
 
 /// <summary>

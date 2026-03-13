@@ -50,12 +50,6 @@ public class IndividualTemplate
     /// </summary>
     public int RotationDirection { get; set; }
 
-    /// <summary>Gets or sets the foreign key to the weight used for sorting.</summary>
-    public int WeightId { get; set; }
-
-    /// <summary>Gets or sets the weight record used to sort this template within a PDF package.</summary>
-    public Weight Weight { get; set; } = null!;
-
     /// <summary>Gets or sets the foreign key to the door material.</summary>
     public int DoorMaterialId { get; set; }
 

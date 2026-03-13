@@ -17,6 +17,7 @@
             <MenuItem Header="_Jobs">
                 <MenuItem Header="_Jobs" Name="MenuJobs" />
             </MenuItem>
+            <MenuItem Header="_Template Lookup" Name="MenuTemplateLookup" />
             <MenuItem Header="_Maintenance">
                 <MenuItem Header="_Refresh Templates" Name="MenuRefreshTemplates" />
             </MenuItem>
@@ -24,11 +25,12 @@
                 <MenuItem Header="_Hardware Items" Name="MenuHardwareItems" />
                 <MenuItem Header="_Templates" Name="MenuTemplates" />
                 <Separator />
+                <MenuItem Header="_App Settings" Name="MenuAppSettings" />
+                <Separator />
                 <MenuItem Header="_Customers" Name="MenuCustomers" />
                 <MenuItem Header="_Manufacturers" Name="MenuManufacturers" />
                 <MenuItem Header="_Descriptions" Name="MenuDescriptions" />
                 <MenuItem Header="_Door Materials" Name="MenuDoorMaterials" />
-                <MenuItem Header="_Weights" Name="MenuWeights" />
                 <MenuItem Header="_Project Managers" Name="MenuProjectManagers" />
                 <MenuItem Header="_User Profiles" Name="MenuUserProfiles" />
             </MenuItem>

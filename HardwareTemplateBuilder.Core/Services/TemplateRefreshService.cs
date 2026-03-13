@@ -156,6 +156,34 @@ public class TemplateRefreshService
         };
     }
 
+    /// <summary>
+    /// Downloads and updates a single template by its ID.
+    /// Does nothing and returns false if the template has no <c>OnlineLink</c>.
+    /// </summary>
+    /// <param name="templateId">Primary key of the template to refresh.</param>
+    /// <param name="saveLocation">Directory where the downloaded file is saved.</param>
+    /// <param name="cancellationToken">Token to cancel the download.</param>
+    /// <returns>True if the file was downloaded and <c>LocalLink</c> was updated; false otherwise.</returns>
+    public async Task<bool> RefreshSingleAsync(
+        int templateId,
+        string saveLocation,
+        CancellationToken cancellationToken = default)
+    {
+        var template = _context.IndividualTemplates
+            .Include(t => t.Manufacturer)
+            .FirstOrDefault(t => t.Id == templateId);
+
+        if (template == null || string.IsNullOrWhiteSpace(template.OnlineLink))
+            return false;
+
+        Directory.CreateDirectory(saveLocation);
+        var destPath = Path.Combine(saveLocation, BuildFileName(template));
+        await DownloadAsync(template.OnlineLink!, destPath, cancellationToken);
+        template.LocalLink = destPath;
+        _context.SaveChanges();
+        return true;
+    }
+
     // ---------- Private helpers ----------
 
     /// <summary>

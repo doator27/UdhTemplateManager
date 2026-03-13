@@ -1,12 +1,16 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
 using HardwareTemplateBuilder.Core.Services;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace HardwareTemplateBuilder.App.Views;
 
@@ -17,7 +21,6 @@ public partial class IndividualTemplatesView : UserControl
     private List<Manufacturer> _manufacturers = new();
     private List<Description> _descriptions = new();
     private List<DoorMaterial> _doorMaterials = new();
-    private List<Weight> _weights = new();
     private readonly PageRangeParser _pageRangeParser = new();
     private int _selectedId;
 
@@ -35,7 +38,6 @@ public partial class IndividualTemplatesView : UserControl
         _manufacturers = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
         _descriptions = new DescriptionRepository(context).GetAll().OrderBy(d => d.DescriptionText).ToList();
         _doorMaterials = new DoorMaterialRepository(context).GetAll().ToList();
-        _weights = new WeightRepository(context).GetAll().OrderBy(w => w.WeightValue).ToList();
 
         ManufacturerCombo.ItemsSource = _manufacturers;
         ManufacturerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
@@ -43,11 +45,17 @@ public partial class IndividualTemplatesView : UserControl
         DescriptionCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
         DoorMaterialCombo.ItemsSource = _doorMaterials;
         DoorMaterialCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
-        WeightCombo.ItemsSource = _weights;
-        WeightCombo.DisplayMemberBinding = new Avalonia.Data.Binding("WeightValue");
+
+        // Filter combo: "(Any)" sentinel + all door materials.
+        var anyMaterial = new List<DoorMaterial> { new DoorMaterial { Id = 0, Material = "(Any)" } };
+        anyMaterial.AddRange(_doorMaterials);
+        DoorMaterialFilterCombo.ItemsSource = anyMaterial;
+        DoorMaterialFilterCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
+        DoorMaterialFilterCombo.SelectedIndex = 0;
 
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
+        DoorMaterialFilterCombo.SelectionChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();
         SaveButton.Click += (_, _) => Save();
         NewButton.Click += (_, _) => ClearForm();
@@ -77,8 +85,12 @@ public partial class IndividualTemplatesView : UserControl
     private void LoadList()
     {
         var filter = FilterBox.Text?.ToLower() ?? "";
+        var matFilter = DoorMaterialFilterCombo.SelectedItem as DoorMaterial;
+        var matId = matFilter?.Id ?? 0;
+
         var items = _repo!.GetAll()
             .Where(t => string.IsNullOrEmpty(filter) || t.TemplateNumber.ToLower().Contains(filter))
+            .Where(t => matId == 0 || t.DoorMaterialId == matId)
             .OrderBy(t => t.TemplateNumber)
             .ToList();
         RecordList.ItemsSource = items;
@@ -98,7 +110,6 @@ public partial class IndividualTemplatesView : UserControl
             PagesToRotateBox.Text = t.PagesToRotate ?? "";
             RotationDirectionBox.Text = t.RotationDirection.ToString();
             DoorMaterialCombo.SelectedItem = _doorMaterials.FirstOrDefault(dm => dm.Id == t.DoorMaterialId);
-            WeightCombo.SelectedItem = _weights.FirstOrDefault(w => w.Id == t.WeightId);
             OnlineLinkBox.Text = t.OnlineLink ?? "";
             LocalLinkBox.Text = t.LocalLink ?? "";
             StatusLabel.Text = "";
@@ -110,7 +121,6 @@ public partial class IndividualTemplatesView : UserControl
         if (ManufacturerCombo.SelectedItem is not Manufacturer mfr) { StatusLabel.Text = "Manufacturer is required."; return; }
         if (DescriptionCombo.SelectedItem is not Description desc) { StatusLabel.Text = "Description is required."; return; }
         if (DoorMaterialCombo.SelectedItem is not DoorMaterial dm) { StatusLabel.Text = "Door Material is required."; return; }
-        if (WeightCombo.SelectedItem is not Weight wt) { StatusLabel.Text = "Weight is required."; return; }
 
         var templateNumber = TemplateNumberBox.Text?.Trim();
         if (string.IsNullOrEmpty(templateNumber)) { StatusLabel.Text = "Template Number is required."; return; }
@@ -143,17 +153,19 @@ public partial class IndividualTemplatesView : UserControl
             PagesToRotate = string.IsNullOrEmpty(pagesToRotate) ? null : pagesToRotate,
             RotationDirection = rotation,
             DoorMaterialId = dm.Id,
-            WeightId = wt.Id,
             OnlineLink = string.IsNullOrEmpty(OnlineLinkBox.Text?.Trim()) ? null : OnlineLinkBox.Text.Trim(),
             LocalLink = string.IsNullOrEmpty(LocalLinkBox.Text?.Trim()) ? null : LocalLinkBox.Text.Trim()
         };
 
+        int savedId;
         if (_selectedId == 0)
         {
-            _repo!.Add(entity);
+            var saved = _repo!.Add(entity);
+            savedId = saved.Id;
         }
         else
         {
+            savedId = _selectedId;
             var existing = _repo!.GetById(_selectedId);
             if (existing != null)
             {
@@ -165,14 +177,56 @@ public partial class IndividualTemplatesView : UserControl
                 existing.PagesToRotate = entity.PagesToRotate;
                 existing.RotationDirection = entity.RotationDirection;
                 existing.DoorMaterialId = entity.DoorMaterialId;
-                existing.WeightId = entity.WeightId;
                 existing.OnlineLink = entity.OnlineLink;
                 existing.LocalLink = entity.LocalLink;
                 _repo.Update(existing);
             }
         }
-        StatusLabel.Text = "Saved.";
+
         LoadList();
+
+        if (!string.IsNullOrWhiteSpace(entity.OnlineLink))
+        {
+            StatusLabel.Text = "Saved. Downloading template file...";
+            _ = DownloadTemplateAsync(savedId);
+        }
+        else
+        {
+            StatusLabel.Text = "Saved.";
+        }
+    }
+
+    /// <summary>
+    /// Downloads a single template's PDF in the background and updates the status label.
+    /// Reads the save location from AppSettings.
+    /// </summary>
+    private async Task DownloadTemplateAsync(int templateId)
+    {
+        try
+        {
+            string saveLocation;
+            using (var ctx = DatabaseInitializer.CreateContext())
+            {
+                var settings = new AppSettingRepository(ctx);
+                var configured = settings.GetValue("TemplateStorageLocation");
+                saveLocation = !string.IsNullOrWhiteSpace(configured)
+                    ? configured
+                    : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            }
+
+            using var refreshCtx = DatabaseInitializer.CreateContext();
+            var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+            var service = new TemplateRefreshService(refreshCtx, http);
+            var success = await service.RefreshSingleAsync(templateId, saveLocation);
+
+            Dispatcher.UIThread.Post(() =>
+                StatusLabel.Text = success ? "Saved. Template downloaded." : "Saved.");
+        }
+        catch (Exception ex)
+        {
+            Dispatcher.UIThread.Post(() =>
+                StatusLabel.Text = $"Saved. Download failed: {ex.Message}");
+        }
     }
 
     private void DeleteSelected()
@@ -194,7 +248,6 @@ public partial class IndividualTemplatesView : UserControl
         PagesToRotateBox.Text = "";
         RotationDirectionBox.Text = "0";
         DoorMaterialCombo.SelectedItem = null;
-        WeightCombo.SelectedItem = null;
         OnlineLinkBox.Text = "";
         LocalLinkBox.Text = "";
         StatusLabel.Text = "";

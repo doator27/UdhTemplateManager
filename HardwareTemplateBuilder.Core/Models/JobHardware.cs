@@ -21,4 +21,19 @@ public class JobHardware
 
     /// <summary>Gets or sets the associated hardware item.</summary>
     public HardwareItem HardwareItem { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets an optional custom label for this hardware item on this job.
+    /// When set, it overrides the item's model number on the cover sheet.
+    /// </summary>
+    public string? CustomDescription { get; set; }
+
+    /// <summary>
+    /// Returns the custom description if set; otherwise the linked item's model number.
+    /// Used as the display label in the UI linked-hardware list.
+    /// </summary>
+    public string DisplayLabel =>
+        !string.IsNullOrWhiteSpace(CustomDescription)
+            ? CustomDescription
+            : HardwareItem?.ModelNumber ?? $"Item #{HardwareItemId}";
 }

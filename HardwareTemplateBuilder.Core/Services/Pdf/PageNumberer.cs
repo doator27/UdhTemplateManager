@@ -5,8 +5,8 @@ using PdfSharp.Pdf.IO;
 namespace HardwareTemplateBuilder.Core.Services.Pdf;
 
 /// <summary>
-/// Stamps sequential page numbers (bottom-center) onto a PDF, with a configurable number
-/// of leading pages to skip (e.g. to leave a cover sheet unnumbered).
+/// Stamps sequential page numbers (bottom-right, bold red, size 25) onto a PDF, with a
+/// configurable number of leading pages to skip (e.g. to leave a cover sheet unnumbered).
 /// </summary>
 public class PageNumberer
 {
@@ -42,13 +42,13 @@ public class PageNumberer
 
             using var gfx = XGraphics.FromPdfPage(page);
 
-            var rect = new XRect(0, page.Height.Point - 24, page.Width.Point, 24);
-            gfx.DrawString(
-                pageNumber.ToString(),
-                font,
-                XBrushes.Black,
-                rect,
-                XStringFormats.BottomCenter);
+            const double rightMargin = 16;
+            const double bottomMargin = 16;
+            var label = pageNumber.ToString();
+            var textSize = gfx.MeasureString(label, font);
+            var x = page.Width.Point - rightMargin - textSize.Width;
+            var y = page.Height.Point - bottomMargin - textSize.Height;
+            gfx.DrawString(label, font, XBrushes.Red, x, y + textSize.Height);
 
             pageNumber++;
         }
@@ -69,7 +69,7 @@ public class PageNumberer
         {
             try
             {
-                return new XFont(name, 9, XFontStyleEx.Regular);
+                return new XFont(name, 25, XFontStyleEx.Bold);
             }
             catch
             {

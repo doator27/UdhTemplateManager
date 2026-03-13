@@ -28,8 +28,8 @@ context.Customers.Add(customer);
 var manufacturer = new Manufacturer { ManufacturerName = "Test Mfr Co." };
 context.Manufacturers.Add(manufacturer);
 
-// Description
-var description = new Description { DescriptionText = "Test Lockset" };
+// Description (WeightValue is now stored directly on Description)
+var description = new Description { DescriptionText = "Test Lockset", WeightValue = "01.001.001" };
 context.Descriptions.Add(description);
 
 // ProjectManager
@@ -38,13 +38,6 @@ context.ProjectManagers.Add(pm);
 
 context.SaveChanges();
 Console.WriteLine("  Saved: UserProfile, Customer, Manufacturer, Description, ProjectManager");
-
-// Weight (needs Description)
-var weight = new Weight { WeightValue = "01.001.001", DescriptionId = description.Id };
-context.Weights.Add(weight);
-
-context.SaveChanges();
-Console.WriteLine("  Saved: Weight");
 
 // DoorMaterial — already seeded, just read
 var hollowMetal = context.DoorMaterials.First(dm => dm.Material == "Hollow Metal");
@@ -62,7 +55,7 @@ var hardwareItem = new HardwareItem
 };
 context.HardwareItems.Add(hardwareItem);
 
-// IndividualTemplate (needs Manufacturer + Description + Weight + DoorMaterial)
+// IndividualTemplate (needs Manufacturer + Description + DoorMaterial; weight is on Description)
 var template = new IndividualTemplate
 {
     ManufacturerId = manufacturer.Id,
@@ -72,7 +65,6 @@ var template = new IndividualTemplate
     PagesToPrint = "1-2",
     PagesToRotate = null,
     RotationDirection = 0,
-    WeightId = weight.Id,
     DoorMaterialId = hollowMetal.Id,
     OnlineLink = null,
     LocalLink = null
@@ -134,9 +126,8 @@ Console.WriteLine("Reading back records...");
 Console.WriteLine($"  UserProfile: {context.UserProfiles.Find(user.Id)?.UserName}");
 Console.WriteLine($"  Customer: {context.Customers.Find(customer.Id)?.CustomerName}");
 Console.WriteLine($"  Manufacturer: {context.Manufacturers.Find(manufacturer.Id)?.ManufacturerName}");
-Console.WriteLine($"  Description: {context.Descriptions.Find(description.Id)?.DescriptionText}");
+Console.WriteLine($"  Description: {context.Descriptions.Find(description.Id)?.DescriptionText} (weight: {context.Descriptions.Find(description.Id)?.WeightValue})");
 Console.WriteLine($"  DoorMaterial(1): {context.DoorMaterials.Find(1)?.Material}");
-Console.WriteLine($"  Weight: {context.Weights.Find(weight.Id)?.WeightValue}");
 Console.WriteLine($"  ProjectManager: {context.ProjectManagers.Find(pm.Id)?.ProjectManagerName}");
 Console.WriteLine($"  HardwareItem: {context.HardwareItems.Find(hardwareItem.Id)?.ModelNumber}");
 Console.WriteLine($"  IndividualTemplate: {context.IndividualTemplates.Find(template.Id)?.TemplateNumber}");
@@ -154,7 +145,6 @@ context.Jobs.Remove(job);
 context.HardwareItemTemplates.Remove(hit);
 context.IndividualTemplates.Remove(template);
 context.HardwareItems.Remove(hardwareItem);
-context.Weights.Remove(weight);
 context.ProjectManagers.Remove(pm);
 context.Descriptions.Remove(description);
 context.Manufacturers.Remove(manufacturer);

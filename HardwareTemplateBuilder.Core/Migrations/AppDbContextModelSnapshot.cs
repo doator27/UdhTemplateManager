@@ -17,6 +17,36 @@ namespace HardwareTemplateBuilder.Core.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.25");
 
+            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.AppSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("AppSettings");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Key = "TemplateStorageLocation",
+                            Value = ""
+                        });
+                });
+
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.Customer", b =>
                 {
                     b.Property<int>("Id")
@@ -39,6 +69,10 @@ namespace HardwareTemplateBuilder.Core.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("DescriptionText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WeightValue")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -169,9 +203,6 @@ namespace HardwareTemplateBuilder.Core.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("WeightId")
-                        .HasColumnType("INTEGER");
-
                     b.HasKey("Id");
 
                     b.HasIndex("DescriptionId");
@@ -179,8 +210,6 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.HasIndex("DoorMaterialId");
 
                     b.HasIndex("ManufacturerId");
-
-                    b.HasIndex("WeightId");
 
                     b.ToTable("IndividualTemplates");
                 });
@@ -224,6 +253,9 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("CustomDescription")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("HardwareItemId")
                         .HasColumnType("INTEGER");
@@ -329,26 +361,6 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.ToTable("UserProfiles");
                 });
 
-            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.Weight", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("DescriptionId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("WeightValue")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DescriptionId");
-
-                    b.ToTable("Weights");
-                });
-
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.HardwareItem", b =>
                 {
                     b.HasOne("HardwareTemplateBuilder.Core.Models.Description", "Description")
@@ -407,19 +419,11 @@ namespace HardwareTemplateBuilder.Core.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("HardwareTemplateBuilder.Core.Models.Weight", "Weight")
-                        .WithMany("Templates")
-                        .HasForeignKey("WeightId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.Navigation("Description");
 
                     b.Navigation("DoorMaterial");
 
                     b.Navigation("Manufacturer");
-
-                    b.Navigation("Weight");
                 });
 
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.Job", b =>
@@ -487,17 +491,6 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.Navigation("Job");
                 });
 
-            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.Weight", b =>
-                {
-                    b.HasOne("HardwareTemplateBuilder.Core.Models.Description", "Description")
-                        .WithMany("Weights")
-                        .HasForeignKey("DescriptionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Description");
-                });
-
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.Customer", b =>
                 {
                     b.Navigation("Jobs");
@@ -508,8 +501,6 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.Navigation("HardwareItems");
 
                     b.Navigation("Templates");
-
-                    b.Navigation("Weights");
                 });
 
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.DoorMaterial", b =>
@@ -553,11 +544,6 @@ namespace HardwareTemplateBuilder.Core.Migrations
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.UserProfile", b =>
                 {
                     b.Navigation("Jobs");
-                });
-
-            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.Weight", b =>
-                {
-                    b.Navigation("Templates");
                 });
 #pragma warning restore 612, 618
         }

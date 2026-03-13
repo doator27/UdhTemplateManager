@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using HardwareTemplateBuilder.Core.Data;
+using HardwareTemplateBuilder.Core.Repositories;
 using HardwareTemplateBuilder.Core.Services;
 
 namespace HardwareTemplateBuilder.App.Views;
@@ -39,14 +40,15 @@ public partial class RefreshTemplatesView : UserControl
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
 
-        // Resolve save location from the active user profile.
+        // Resolve save location from global App Settings.
         string saveLocation;
         int templateCount;
         using (var ctx = DatabaseInitializer.CreateContext())
         {
-            var profile = ctx.UserProfiles.FirstOrDefault();
-            saveLocation = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
-                ? profile.DefaultTemplateSaveLocation
+            var settingsRepo = new AppSettingRepository(ctx);
+            var configured = settingsRepo.GetValue("TemplateStorageLocation");
+            saveLocation = !string.IsNullOrWhiteSpace(configured)
+                ? configured
                 : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
             templateCount = ctx.IndividualTemplates

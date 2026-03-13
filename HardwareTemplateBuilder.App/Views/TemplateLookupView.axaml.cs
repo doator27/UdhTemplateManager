@@ -231,7 +231,7 @@ public partial class TemplateLookupView : UserControl
                 .Include(hit => hit.IndividualTemplate)
                     .ThenInclude(t => t.Manufacturer)
                 .Include(hit => hit.IndividualTemplate)
-                    .ThenInclude(t => t.Weight)
+                    .ThenInclude(t => t.Description)
                 .Where(hit => hit.HardwareItemId == item.Id)
                 .Select(hit => hit.IndividualTemplate)
                 .ToList();

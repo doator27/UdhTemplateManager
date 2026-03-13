@@ -118,6 +118,15 @@
         <Setter Property="Margin" Value="8" />
     </Style>
 
+    <!-- Primary dashboard buttons — Jobs and Template Lookup -->
+    <Style Selector="Button.dashboard-primary">
+        <Setter Property="Width" Value="200" />
+        <Setter Property="Height" Value="80" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Margin" Value="8" />
+    </Style>
+
     <!-- Menu styling -->
     <Style Selector="Menu">
         <Setter Property="Background" Value="#C0C0C0" />

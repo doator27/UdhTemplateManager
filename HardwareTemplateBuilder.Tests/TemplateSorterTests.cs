@@ -20,18 +20,14 @@ public class TemplateSorterTests
     private static Manufacturer MakeManufacturer(int id, string name) =>
         new Manufacturer { Id = id, ManufacturerName = name };
 
-    private static Weight MakeWeight(int id, string value) =>
-        new Weight { Id = id, WeightValue = value };
-
     private static IndividualTemplate MakeTemplate(
-        int id, Manufacturer manufacturer, Weight weight, string templateNumber = "T") =>
+        int id, Manufacturer manufacturer, string weightValue, string templateNumber = "T") =>
         new IndividualTemplate
         {
             Id = id,
             ManufacturerId = manufacturer.Id,
             Manufacturer = manufacturer,
-            WeightId = weight.Id,
-            Weight = weight,
+            Description = new Description { WeightValue = weightValue },
             TemplateNumber = templateNumber,
             PagesToPrint = "1"
         };
@@ -44,9 +40,9 @@ public class TemplateSorterTests
         var mfr = MakeManufacturer(1, "Alpha");
         var templates = new[]
         {
-            MakeTemplate(1, mfr, MakeWeight(3, "02.001.001"), "T3"),
-            MakeTemplate(2, mfr, MakeWeight(1, "01.001.001"), "T1"),
-            MakeTemplate(3, mfr, MakeWeight(2, "01.002.001"), "T2"),
+            MakeTemplate(1, mfr, "02.001.001", "T3"),
+            MakeTemplate(2, mfr, "01.001.001", "T1"),
+            MakeTemplate(3, mfr, "01.002.001", "T2"),
         };
 
         var result = _sorter.Sort(templates);
@@ -62,9 +58,9 @@ public class TemplateSorterTests
 
         var templates = new[]
         {
-            MakeTemplate(1, mfrA, MakeWeight(1, "02.001.001"), "A1"),
-            MakeTemplate(2, mfrB, MakeWeight(2, "01.001.001"), "B1"),
-            MakeTemplate(3, mfrB, MakeWeight(3, "01.002.001"), "B2"),
+            MakeTemplate(1, mfrA, "02.001.001", "A1"),
+            MakeTemplate(2, mfrB, "01.001.001", "B1"),
+            MakeTemplate(3, mfrB, "01.002.001", "B2"),
         };
 
         var result = _sorter.Sort(templates);
@@ -84,8 +80,8 @@ public class TemplateSorterTests
 
         var templates = new[]
         {
-            MakeTemplate(1, mfrZ, MakeWeight(1, sharedWeight), "Z1"),
-            MakeTemplate(2, mfrA, MakeWeight(2, sharedWeight), "A1"),
+            MakeTemplate(1, mfrZ, sharedWeight, "Z1"),
+            MakeTemplate(2, mfrA, sharedWeight, "A1"),
         };
 
         var result = _sorter.Sort(templates);
@@ -102,9 +98,9 @@ public class TemplateSorterTests
 
         var templates = new[]
         {
-            MakeTemplate(1, mfrA, MakeWeight(1, "01.005.001"), "A-High"),
-            MakeTemplate(2, mfrA, MakeWeight(2, "01.001.001"), "A-Low"),
-            MakeTemplate(3, mfrB, MakeWeight(3, "02.001.001"), "B1"),
+            MakeTemplate(1, mfrA, "01.005.001", "A-High"),
+            MakeTemplate(2, mfrA, "01.001.001", "A-Low"),
+            MakeTemplate(3, mfrB, "02.001.001", "B1"),
         };
 
         var result = _sorter.Sort(templates);

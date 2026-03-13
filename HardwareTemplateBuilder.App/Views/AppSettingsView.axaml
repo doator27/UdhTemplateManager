@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.AppSettingsView">
+    <DockPanel Margin="8">
+        <TextBlock DockPanel.Dock="Top" Text="App Settings" FontSize="16" FontWeight="Bold" Margin="0,0,0,8" />
+        <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="16">
+            <StackPanel MaxWidth="600" HorizontalAlignment="Left">
+                <TextBlock Text="Shared Template Storage Location:" Margin="0,0,0,4" />
+                <TextBlock TextWrapping="Wrap" Foreground="#444444" FontSize="11"
+                           Text="All downloaded template files are stored here. This folder should be a shared network path so every user has access to the same master copies."
+                           Margin="0,0,0,8" />
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+                    <TextBox Grid.Column="0" Name="StorageLocationBox" Watermark="e.g. \\server\templates or /mnt/shared/templates" />
+                    <Button Grid.Column="1" Name="BrowseButton" Content="Browse..." Width="80" Margin="6,0,0,0" />
+                </Grid>
+                <StackPanel Orientation="Horizontal">
+                    <Button Name="SaveButton" Content="Save" Margin="0,0,8,0" />
+                </StackPanel>
+                <TextBlock Name="StatusLabel" Margin="0,10,0,0" Foreground="#800000" />
+            </StackPanel>
+        </Border>
+    </DockPanel>
+</UserControl>
