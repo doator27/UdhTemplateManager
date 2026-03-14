@@ -34,14 +34,9 @@ public partial class JobsView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _repo = new JobRepository(context);
-        _customers = new CustomerRepository(context).GetAll().OrderBy(c => c.CustomerName).ToList();
-        _projectManagers = new ProjectManagerRepository(context).GetAll().OrderBy(pm => pm.ProjectManagerName).ToList();
 
-        CustomerCombo.ItemsSource = _customers;
-        CustomerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("CustomerName");
-        ProjectManagerCombo.ItemsSource = _projectManagers;
-        ProjectManagerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ProjectManagerName");
-
+        LoadCustomers();
+        LoadProjectManagers();
         LoadJobList();
 
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
@@ -60,6 +55,68 @@ public partial class JobsView : UserControl
             if (_selectedJobId == 0) { StatusLabel.Text = "Select a job to open."; return; }
             NavigationRequested?.Invoke($"JobDetail:{_selectedJobId}");
         };
+
+        AddCustomerButton.Click        += (_, _) => TogglePanel(NewCustomerPanel, NewCustomerBox);
+        CancelCustomerButton.Click     += (_, _) => HidePanel(NewCustomerPanel, NewCustomerBox);
+        SaveCustomerButton.Click       += (_, _) => AddCustomer();
+
+        AddProjectManagerButton.Click      += (_, _) => TogglePanel(NewProjectManagerPanel, NewProjectManagerBox);
+        CancelProjectManagerButton.Click   += (_, _) => HidePanel(NewProjectManagerPanel, NewProjectManagerBox);
+        SaveProjectManagerButton.Click     += (_, _) => AddProjectManager();
+    }
+
+    private void LoadCustomers(Customer? selectAfter = null)
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        _customers = new CustomerRepository(ctx).GetAll().OrderBy(c => c.CustomerName).ToList();
+        CustomerCombo.ItemsSource = _customers;
+        CustomerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("CustomerName");
+        if (selectAfter != null)
+            CustomerCombo.SelectedItem = _customers.FirstOrDefault(c => c.Id == selectAfter.Id);
+    }
+
+    private void LoadProjectManagers(ProjectManager? selectAfter = null)
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        _projectManagers = new ProjectManagerRepository(ctx).GetAll().OrderBy(pm => pm.ProjectManagerName).ToList();
+        ProjectManagerCombo.ItemsSource = _projectManagers;
+        ProjectManagerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ProjectManagerName");
+        if (selectAfter != null)
+            ProjectManagerCombo.SelectedItem = _projectManagers.FirstOrDefault(pm => pm.Id == selectAfter.Id);
+    }
+
+    private void AddCustomer()
+    {
+        var name = NewCustomerBox.Text?.Trim();
+        if (string.IsNullOrEmpty(name)) { StatusLabel.Text = "Enter a customer name."; return; }
+        using var ctx = DatabaseInitializer.CreateContext();
+        var saved = new CustomerRepository(ctx).Add(new Customer { CustomerName = name });
+        HidePanel(NewCustomerPanel, NewCustomerBox);
+        LoadCustomers(saved);
+        StatusLabel.Text = $"Customer \"{saved.CustomerName}\" added.";
+    }
+
+    private void AddProjectManager()
+    {
+        var name = NewProjectManagerBox.Text?.Trim();
+        if (string.IsNullOrEmpty(name)) { StatusLabel.Text = "Enter a project manager name."; return; }
+        using var ctx = DatabaseInitializer.CreateContext();
+        var saved = new ProjectManagerRepository(ctx).Add(new ProjectManager { ProjectManagerName = name });
+        HidePanel(NewProjectManagerPanel, NewProjectManagerBox);
+        LoadProjectManagers(saved);
+        StatusLabel.Text = $"Project manager \"{saved.ProjectManagerName}\" added.";
+    }
+
+    private static void TogglePanel(Avalonia.Controls.Control panel, TextBox box)
+    {
+        panel.IsVisible = !panel.IsVisible;
+        if (panel.IsVisible) box.Focus();
+    }
+
+    private static void HidePanel(Avalonia.Controls.Control panel, TextBox box)
+    {
+        panel.IsVisible = false;
+        box.Text = "";
     }
 
     private void LoadJobList()

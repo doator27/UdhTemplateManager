@@ -88,8 +88,10 @@ public class PdfAssemblyService
         var bodyPdfs = new List<string>();
         var snapshotInfos = new List<TemplateSnapshotInfo>();
         // Tracks which body pages (1-based) each hardware item occupies.
+        // Use Distinct on item ID so duplicate job entries don't cause a duplicate-key exception.
         var itemBodyPages = request.Hardware
-            .ToDictionary(h => h.Item.Id, _ => new List<int>());
+            .GroupBy(h => h.Item.Id)
+            .ToDictionary(g => g.Key, _ => new List<int>());
         int bodyPageCursor = 1;
 
         foreach (var template in sortedTemplates)
@@ -192,30 +194,41 @@ public class PdfAssemblyService
     /// <summary>
     /// Builds a <see cref="CoverSheetData"/> from the assembly request and the
     /// computed per-item body page lists.
+    /// Each job entry becomes its own row. When the same hardware item appears multiple times
+    /// (different custom descriptions), those rows are sorted alphabetically by description
+    /// and all reference the same page range. Row order across distinct items follows the
+    /// first occurrence of each item in the job list.
     /// </summary>
     private static CoverSheetData BuildCoverSheetData(
         AssemblyRequest request,
         Dictionary<int, List<int>> itemBodyPages)
     {
-        var rows = request.Hardware.Select(hwt =>
-        {
-            var item = hwt.Item;
-            var pages = itemBodyPages.TryGetValue(item.Id, out var p) ? p : new List<int>();
-            var templateNumbers = string.Join(", ", hwt.Templates.Select(t => t.TemplateNumber));
-            var pageRange = FormatPageList(pages);
-
-            return new CoverSheetRow
-            {
-                Manufacturer = item.Manufacturer?.ManufacturerName ?? string.Empty,
-                HardwareType = item.Description?.DescriptionText ?? string.Empty,
-                HardwareDescription = !string.IsNullOrWhiteSpace(hwt.CustomDescription)
+        var rows = request.Hardware
+            // Group to preserve first-occurrence order across distinct items, then sort
+            // the entries within each group alphabetically by their display description.
+            .GroupBy(hwt => hwt.Item.Id)
+            .SelectMany(group => group.OrderBy(
+                hwt => !string.IsNullOrWhiteSpace(hwt.CustomDescription)
                     ? hwt.CustomDescription
-                    : item.ModelNumber,
-                TemplateNumbers = templateNumbers,
-                PageNumbers = pageRange,
-                Remarks = item.Remarks
-            };
-        }).ToList();
+                    : hwt.Item.ModelNumber,
+                StringComparer.OrdinalIgnoreCase))
+            .Select(hwt =>
+            {
+                var item  = hwt.Item;
+                var pages = itemBodyPages.TryGetValue(item.Id, out var p) ? p : new List<int>();
+
+                return new CoverSheetRow
+                {
+                    Manufacturer        = item.Manufacturer?.ManufacturerName ?? string.Empty,
+                    HardwareType        = item.Description?.DescriptionText   ?? string.Empty,
+                    HardwareDescription = !string.IsNullOrWhiteSpace(hwt.CustomDescription)
+                        ? hwt.CustomDescription!
+                        : item.ModelNumber,
+                    TemplateNumbers     = string.Join(", ", hwt.Templates.Select(t => t.TemplateNumber)),
+                    PageNumbers         = FormatPageList(pages),
+                    Remarks             = item.Remarks
+                };
+            }).ToList();
 
         return new CoverSheetData
         {
