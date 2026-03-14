@@ -26,7 +26,7 @@ namespace HardwareTemplateBuilder.App.Views;
 public partial class TemplateLookupView : UserControl
 {
     private List<Manufacturer> _manufacturers = new();
-    private List<Description> _descriptions = new();
+    private List<DescriptionComboItem> _descComboItems = new();
     private CancellationTokenSource? _cts;
     private bool _updatingDescCombo;
 
@@ -48,8 +48,7 @@ public partial class TemplateLookupView : UserControl
 
         _manufacturers = new ManufacturerRepository(context)
             .GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _descriptions = new DescriptionRepository(context)
-            .GetAll().OrderBy(d => d.DescriptionText).ToList();
+        _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
 
         // Populate Manufacturer combo with "(Any)" sentinel at index 0.
         var anyMfr = new List<Manufacturer> { new() { Id = 0, ManufacturerName = "(Any)" } };
@@ -59,10 +58,10 @@ public partial class TemplateLookupView : UserControl
         MfrCombo.SelectedIndex = 0;
 
         // Populate Description combo with "(Any)" sentinel at index 0.
-        var anyDesc = new List<Description> { new() { Id = 0, DescriptionText = "(Any)" } };
-        anyDesc.AddRange(_descriptions);
+        var anyDesc = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
+        anyDesc.AddRange(_descComboItems);
         DescCombo.ItemsSource = anyDesc;
-        DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
+        DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
         DescCombo.SelectedIndex = 0;
 
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
@@ -90,11 +89,11 @@ public partial class TemplateLookupView : UserControl
         var mfr = MfrCombo.SelectedItem as Manufacturer;
         var mfrId = mfr?.Id ?? 0;
 
-        var filtered = new List<Description> { new() { Id = 0, DescriptionText = "(Any)" } };
+        var filtered = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
 
         if (mfrId == 0)
         {
-            filtered.AddRange(_descriptions);
+            filtered.AddRange(_descComboItems);
         }
         else
         {
@@ -104,14 +103,14 @@ public partial class TemplateLookupView : UserControl
                 .Select(h => h.DescriptionId)
                 .Distinct()
                 .ToHashSet();
-            filtered.AddRange(_descriptions.Where(d => descIds.Contains(d.Id)));
+            filtered.AddRange(_descComboItems.Where(d => descIds.Contains(d.Id)));
         }
 
         _updatingDescCombo = true;
         try
         {
             DescCombo.ItemsSource = filtered;
-            DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
+            DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
             DescCombo.SelectedIndex = 0;
         }
         finally
@@ -124,16 +123,16 @@ public partial class TemplateLookupView : UserControl
 
     private void SearchHardware()
     {
-        var mfr = MfrCombo.SelectedItem as Manufacturer;
-        var desc = DescCombo.SelectedItem as Description;
-        var model = ModelBox.Text?.Trim();
+        var mfr      = MfrCombo.SelectedItem as Manufacturer;
+        var descItem = DescCombo.SelectedItem as DescriptionComboItem;
+        var model    = ModelBox.Text?.Trim();
 
-        var mfrName  = (mfr  == null || mfr.Id  == 0) ? null : mfr.ManufacturerName;
-        var descText = (desc == null || desc.Id == 0) ? null : desc.DescriptionText;
+        var mfrName = (mfr      == null || mfr.Id      == 0) ? null : mfr.ManufacturerName;
+        var descId  = (descItem == null || descItem.Id == 0) ? (int?)null : descItem.Id;
 
         using var context = DatabaseInitializer.CreateContext();
         var results = new HardwareItemRepository(context)
-            .Search(mfrName, descText, model)
+            .Search(mfrName, descId, model)
             .Select(h => new HardwareItemDisplay(h))
             .ToList();
 
@@ -294,8 +293,12 @@ public partial class TemplateLookupView : UserControl
                 "This hardware item has no linked templates. Link templates via the Hardware Items screen.");
 
         // Sort by description sort order.
+        Dictionary<int, Description> allDescriptions;
+        using (var ctx = DatabaseInitializer.CreateContext())
+            allDescriptions = ctx.Descriptions.ToDictionary(d => d.Id);
+
         var sortedTemplates = new TemplateSorter(
-            new WeightTemplateSortStrategy()).Sort(templates);
+            new WeightTemplateSortStrategy()).Sort(templates, allDescriptions);
 
         // Run heavy PDF work on a thread-pool thread to keep the UI responsive.
         return await Task.Run(async () =>

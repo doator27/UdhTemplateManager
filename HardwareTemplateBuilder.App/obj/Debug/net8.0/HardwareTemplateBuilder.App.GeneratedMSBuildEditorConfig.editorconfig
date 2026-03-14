@@ -47,6 +47,9 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/DoorMaterialsView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
+[/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/HardwareItemDetailView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/HardwareItemsView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 

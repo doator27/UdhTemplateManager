@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.HardwareItemDetailView">
+    <DockPanel Margin="8">
+        <!-- Top: nav buttons + item title -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Left" Name="BackButton" Content="← Back to Hardware" Margin="0,0,12,0"/>
+            <TextBlock Name="ItemTitleLabel" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <ScrollViewer>
+            <StackPanel>
+
+                <!-- Linked Templates list -->
+                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="Linked Templates" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <ListBox Name="LinkedTemplatesList" Height="120" Margin="0,0,0,8"/>
+                        <Button Name="RemoveTemplateButton" Content="Remove Selected" HorizontalAlignment="Left"/>
+                        <TextBlock Name="RemoveStatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Quick-Add Template (primary) -->
+                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="Add Template" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Template #:" Margin="0,0,8,2"/>
+                            <TextBox   Grid.Row="1" Grid.Column="0" Name="AddTemplateNumBox" Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Manufacturer:" Margin="0,0,0,2"/>
+                            <ComboBox  Grid.Row="1" Grid.Column="1" Name="AddMfrCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Description:" Margin="0,0,8,2"/>
+                            <ComboBox  Grid.Row="3" Grid.Column="0" Name="AddDescCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Door Material:" Margin="0,0,0,2"/>
+                            <ComboBox  Grid.Row="3" Grid.Column="1" Name="AddDoorMatCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Pages To Print:" Margin="0,0,8,2"/>
+                            <TextBox   Grid.Row="5" Grid.Column="0" Name="AddPagesToPrintBox" Text="1" Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Online Link (optional):" Margin="0,0,0,2"/>
+                            <TextBox   Grid.Row="5" Grid.Column="1" Name="AddOnlineLinkBox" Watermark="https://..." Margin="0,0,0,8"/>
+                        </Grid>
+                        <Button Name="AddTemplateButton" Content="Add / Link Template" HorizontalAlignment="Left"/>
+                        <TextBlock Name="AddStatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Search and Link (secondary) -->
+                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+                    <StackPanel>
+                        <TextBlock Text="Search Existing Templates to Link" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,4">
+                            <ComboBox Grid.Column="0" Name="SearchMfrCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
+                            <ComboBox Grid.Column="1" Name="SearchDescCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
+                            <TextBox  Grid.Column="2" Name="SearchTemplateNumBox" Watermark="Template #"/>
+                        </Grid>
+                        <ListBox Name="TemplateSearchList" Height="120" Margin="0,4,0,8"/>
+                        <Button Name="LinkButton" Content="Link Selected" HorizontalAlignment="Left"/>
+                        <TextBlock Name="LinkStatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

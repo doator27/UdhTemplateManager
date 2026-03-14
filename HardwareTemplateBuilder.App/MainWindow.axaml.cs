@@ -97,6 +97,19 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Parameterized route: "HardwareItemDetail:{id}"
+        if (viewName.StartsWith("HardwareItemDetail:") &&
+            int.TryParse(viewName.Substring("HardwareItemDetail:".Length), out var itemId))
+        {
+            var detail = new HardwareItemDetailView(itemId);
+            detail.NavigationRequested += NavigateTo;
+            ContentArea.Content = detail;
+            var user = SessionService.ActiveUserProfile?.UserName;
+            var suffix = user != null ? $"  —  {user}" : string.Empty;
+            StatusText.Text = $"Hardware Item Detail{suffix}";
+            return;
+        }
+
         _router.NavigateTo(viewName);
         var u = SessionService.ActiveUserProfile?.UserName;
         var sfx = u != null ? $"  —  {u}" : string.Empty;

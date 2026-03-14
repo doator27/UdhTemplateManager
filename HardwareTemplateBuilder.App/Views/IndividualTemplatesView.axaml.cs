@@ -19,7 +19,7 @@ public partial class IndividualTemplatesView : UserControl
 {
     private IndividualTemplateRepository? _repo;
     private List<Manufacturer> _manufacturers = new();
-    private List<Description> _descriptions = new();
+    private List<DescriptionComboItem> _descComboItems = new();
     private List<DoorMaterial> _doorMaterials = new();
     private readonly PageRangeParser _pageRangeParser = new();
     private int _selectedId;
@@ -39,13 +39,13 @@ public partial class IndividualTemplatesView : UserControl
         var context = DatabaseInitializer.CreateContext();
         _repo = new IndividualTemplateRepository(context);
         _manufacturers = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _descriptions = new DescriptionRepository(context).GetAll().OrderBy(d => d.DescriptionText).ToList();
+        _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
         _doorMaterials = new DoorMaterialRepository(context).GetAll().ToList();
 
         ManufacturerCombo.ItemsSource = _manufacturers;
         ManufacturerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
-        DescriptionCombo.ItemsSource = _descriptions;
-        DescriptionCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
+        DescriptionCombo.ItemsSource = _descComboItems;
+        DescriptionCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
         DoorMaterialCombo.ItemsSource = _doorMaterials;
         DoorMaterialCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
 
@@ -107,7 +107,7 @@ public partial class IndividualTemplatesView : UserControl
         {
             _selectedId = t.Id;
             ManufacturerCombo.SelectedItem = _manufacturers.FirstOrDefault(m => m.Id == t.ManufacturerId);
-            DescriptionCombo.SelectedItem = _descriptions.FirstOrDefault(d => d.Id == t.DescriptionId);
+            DescriptionCombo.SelectedItem = _descComboItems.FirstOrDefault(d => d.Id == t.DescriptionId);
             TemplateNumberBox.Text = t.TemplateNumber;
             NumPagesBox.Text = t.NumPages.ToString();
             PagesToPrintBox.Text = t.PagesToPrint;
@@ -123,7 +123,7 @@ public partial class IndividualTemplatesView : UserControl
     private void Save()
     {
         if (ManufacturerCombo.SelectedItem is not Manufacturer mfr) { StatusLabel.Text = "Manufacturer is required."; return; }
-        if (DescriptionCombo.SelectedItem is not Description desc) { StatusLabel.Text = "Description is required."; return; }
+        if (DescriptionCombo.SelectedItem is not DescriptionComboItem desc) { StatusLabel.Text = "Description is required."; return; }
         if (DoorMaterialCombo.SelectedItem is not DoorMaterial dm) { StatusLabel.Text = "Door Material is required."; return; }
 
         var templateNumber = TemplateNumberBox.Text?.Trim();
@@ -150,7 +150,7 @@ public partial class IndividualTemplatesView : UserControl
         var entity = new IndividualTemplate
         {
             ManufacturerId = mfr.Id,
-            DescriptionId = desc.Id,
+            DescriptionId = desc.Id, // DescriptionComboItem.Id
             TemplateNumber = templateNumber,
             NumPages = numPages,
             PagesToPrint = pagesToPrint,

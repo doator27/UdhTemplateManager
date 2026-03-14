@@ -1,4 +1,5 @@
 using HardwareTemplateBuilder.Core.Models;
+using System.Collections.Generic;
 
 namespace HardwareTemplateBuilder.Core.Services.Pdf;
 
@@ -22,11 +23,13 @@ public class TemplateSorter
     /// <summary>
     /// Returns the templates sorted according to the configured strategy.
     /// </summary>
-    /// <param name="templates">
-    /// The templates to sort. Navigation properties
-    /// <c>Weight.WeightValue</c> and <c>Manufacturer.ManufacturerName</c> must be loaded.
+    /// <param name="templates">The templates to sort. <c>Manufacturer</c> navigation must be loaded.</param>
+    /// <param name="allDescriptions">
+    /// Flat dictionary of every description keyed by ID, used to resolve ancestor sort paths.
     /// </param>
     /// <returns>A sorted, read-only list of templates.</returns>
-    public IReadOnlyList<IndividualTemplate> Sort(IEnumerable<IndividualTemplate> templates)
-        => _strategy.Sort(templates);
+    public IReadOnlyList<IndividualTemplate> Sort(
+        IEnumerable<IndividualTemplate> templates,
+        IReadOnlyDictionary<int, Description> allDescriptions)
+        => _strategy.Sort(templates, allDescriptions);
 }

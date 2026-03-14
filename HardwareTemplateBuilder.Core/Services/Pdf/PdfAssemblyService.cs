@@ -82,7 +82,7 @@ public class PdfAssemblyService
 
         // ----- Step 1: Sort templates -----
         progress?.Report("Sorting templates...");
-        var sortedTemplates = _sorter.Sort(allTemplates);
+        var sortedTemplates = _sorter.Sort(allTemplates, request.AllDescriptions);
 
         // ----- Step 2 & 3: Acquire, extract, and rotate each template -----
         var bodyPdfs = new List<string>();

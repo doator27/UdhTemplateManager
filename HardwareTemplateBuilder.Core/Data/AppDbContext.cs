@@ -87,6 +87,13 @@ public class AppDbContext : DbContext
             .Property(s => s.SnapshotDate)
             .HasDefaultValueSql("datetime('now')");
 
+        // Description self-referential hierarchy (parent → children)
+        modelBuilder.Entity<Description>()
+            .HasOne(d => d.Parent)
+            .WithMany(d => d.Children)
+            .HasForeignKey(d => d.ParentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // HardwareItem → Manufacturer
         modelBuilder.Entity<HardwareItem>()
             .HasOne(h => h.Manufacturer)

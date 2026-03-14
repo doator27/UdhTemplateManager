@@ -43,6 +43,13 @@ public class AssemblyRequest
     /// Gets or sets the directory under which the job subfolder and final PDF are written.
     /// </summary>
     public string OutputDirectory { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a flat dictionary of every <see cref="Description"/> record keyed by ID.
+    /// Used by the sort strategy to compute full ancestor-path sort keys.
+    /// </summary>
+    public IReadOnlyDictionary<int, Description> AllDescriptions { get; init; } =
+        new Dictionary<int, Description>();
 }
 
 /// <summary>

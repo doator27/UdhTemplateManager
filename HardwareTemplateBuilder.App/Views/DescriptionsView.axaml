@@ -1,31 +1,41 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="HardwareTemplateBuilder.App.Views.DescriptionsView">
+             x:Class="HardwareTemplateBuilder.App.Views.DescriptionsView"
+             x:CompileBindings="False">
     <DockPanel Margin="8">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,12,0"/>
             <TextBlock Text="Descriptions" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
-        <Grid ColumnDefinitions="250,*">
+        <Grid ColumnDefinitions="300,*">
+            <!-- Left: tree + reorder buttons -->
             <DockPanel Grid.Column="0" Margin="0,0,8,0">
-                <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2" />
-                <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4" />
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
-                    <Button Name="MoveUpButton" Content="▲ Up" Margin="0,0,4,0" />
-                    <Button Name="MoveDownButton" Content="▼ Down" />
+                    <Button Name="MoveUpButton"   Content="▲ Up"   Margin="0,0,4,0"/>
+                    <Button Name="MoveDownButton" Content="▼ Down" Margin="0,0,4,0"/>
+                    <Button Name="IndentButton"   Content="→ Indent"   Margin="0,0,4,0"/>
+                    <Button Name="UnindentButton" Content="← Unindent"/>
                 </StackPanel>
-                <ListBox Name="RecordList" />
+                <TreeView Name="DescTree" MinHeight="200">
+                    <TreeView.ItemTemplate>
+                        <TreeDataTemplate ItemsSource="{Binding Children}">
+                            <TextBlock Text="{Binding DescriptionText}"/>
+                        </TreeDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
             </DockPanel>
+            <!-- Right: form -->
             <Border Grid.Column="1" Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
                 <StackPanel>
-                    <TextBlock Text="Description:" Margin="0,0,0,2" />
-                    <TextBox Name="DescriptionBox" Margin="0,0,0,10" />
-                    <StackPanel Orientation="Horizontal">
-                        <Button Name="SaveButton" Content="Save" Margin="0,0,8,0" />
-                        <Button Name="NewButton" Content="New" Margin="0,0,8,0" />
-                        <Button Name="DeleteButton" Content="Delete" />
+                    <TextBlock Text="Name:" Margin="0,0,0,2"/>
+                    <TextBox Name="DescriptionBox" Margin="0,0,0,10"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
+                        <Button Name="SaveButton"        Content="Save"           Margin="0,0,8,0"/>
+                        <Button Name="AddRootButton"     Content="+ Root Item"    Margin="0,0,8,0"/>
+                        <Button Name="AddChildButton"    Content="+ Child"        Margin="0,0,8,0"/>
+                        <Button Name="DeleteButton"      Content="Delete"/>
                     </StackPanel>
-                    <TextBlock Name="StatusLabel" Margin="0,10,0,0" Foreground="#800000" />
+                    <TextBlock Name="StatusLabel" Margin="0,10,0,0" Foreground="#800000" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
         </Grid>

@@ -22,7 +22,7 @@ public class HardwareItemRepository : RepositoryBase<HardwareItem>, IHardwareIte
             h.ModelNumber == entity.ModelNumber);
 
     /// <inheritdoc/>
-    public IEnumerable<HardwareItem> Search(string? manufacturerName, string? descriptionText, string? modelNumber)
+    public IEnumerable<HardwareItem> Search(string? manufacturerName, int? descriptionId, string? modelNumber)
     {
         var query = _context.HardwareItems
             .Include(h => h.Manufacturer)
@@ -32,8 +32,8 @@ public class HardwareItemRepository : RepositoryBase<HardwareItem>, IHardwareIte
         if (!string.IsNullOrWhiteSpace(manufacturerName))
             query = query.Where(h => h.Manufacturer.ManufacturerName.Contains(manufacturerName));
 
-        if (!string.IsNullOrWhiteSpace(descriptionText))
-            query = query.Where(h => h.Description.DescriptionText.Contains(descriptionText));
+        if (descriptionId.HasValue)
+            query = query.Where(h => h.DescriptionId == descriptionId.Value);
 
         if (!string.IsNullOrWhiteSpace(modelNumber))
             query = query.Where(h => h.ModelNumber.Contains(modelNumber));

@@ -12,5 +12,7 @@ public class DescriptionRepository : RepositoryBase<Description>
 
     /// <inheritdoc/>
     protected override Description? FindDuplicate(Description entity) =>
-        _context.Descriptions.FirstOrDefault(d => d.DescriptionText == entity.DescriptionText);
+        _context.Descriptions.FirstOrDefault(d =>
+            d.DescriptionText == entity.DescriptionText &&
+            d.ParentId == entity.ParentId);
 }

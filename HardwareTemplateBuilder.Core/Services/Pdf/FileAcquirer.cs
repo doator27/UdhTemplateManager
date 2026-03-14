@@ -99,7 +99,11 @@ public class FileAcquirer
     /// <summary>Downloads the file at <paramref name="url"/> to <paramref name="destinationPath"/>.</summary>
     private async Task DownloadAsync(string url, string destinationPath)
     {
-        using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.TryAddWithoutValidation("User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
 
         await using var fileStream = File.Create(destinationPath);

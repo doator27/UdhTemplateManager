@@ -31,7 +31,7 @@ public partial class JobDetailView : UserControl
     private readonly int _jobId;
     private JobHardwareRepository? _jobHardwareRepo;
     private List<Manufacturer> _manufacturers = new();
-    private List<Description> _descriptions = new();
+    private List<DescriptionComboItem> _descComboItems = new();
 
     /// <summary>The observable collection backing the linked hardware listbox, enabling drag-and-drop reorder.</summary>
     private readonly ObservableCollection<JobHardware> _linkedHardware = new();
@@ -62,8 +62,8 @@ public partial class JobDetailView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _jobHardwareRepo = new JobHardwareRepository(context);
-        _manufacturers = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _descriptions = new DescriptionRepository(context).GetAll().OrderBy(d => d.DescriptionText).ToList();
+        _manufacturers  = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
+        _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
 
         // Show job header
         var job = context.Jobs.Find(_jobId);
@@ -76,10 +76,10 @@ public partial class JobDetailView : UserControl
         SearchMfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
         SearchMfrCombo.SelectedIndex = 0;
 
-        var anyDesc = new List<Description> { new Description { Id = 0, DescriptionText = "(Any)" } };
-        anyDesc.AddRange(_descriptions);
+        var anyDesc = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
+        anyDesc.AddRange(_descComboItems);
         SearchDescCombo.ItemsSource = anyDesc;
-        SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
+        SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
         SearchDescCombo.SelectedIndex = 0;
 
         LinkedHardwareList.ItemsSource = _linkedHardware;
@@ -160,11 +160,11 @@ public partial class JobDetailView : UserControl
         var mfr = SearchMfrCombo.SelectedItem as Manufacturer;
         var mfrId = mfr?.Id ?? 0;
 
-        var filtered = new List<Description> { new() { Id = 0, DescriptionText = "(Any)" } };
+        var filtered = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
 
         if (mfrId == 0)
         {
-            filtered.AddRange(_descriptions);
+            filtered.AddRange(_descComboItems);
         }
         else
         {
@@ -174,14 +174,14 @@ public partial class JobDetailView : UserControl
                 .Select(h => h.DescriptionId)
                 .Distinct()
                 .ToHashSet();
-            filtered.AddRange(_descriptions.Where(d => descIds.Contains(d.Id)));
+            filtered.AddRange(_descComboItems.Where(d => descIds.Contains(d.Id)));
         }
 
         _updatingSearchDescCombo = true;
         try
         {
             SearchDescCombo.ItemsSource = filtered;
-            SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DescriptionText");
+            SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
             SearchDescCombo.SelectedIndex = 0;
         }
         finally
@@ -209,16 +209,16 @@ public partial class JobDetailView : UserControl
 
     private void SearchHardware()
     {
-        var mfr = SearchMfrCombo.SelectedItem as Manufacturer;
-        var desc = SearchDescCombo.SelectedItem as Description;
-        var model = SearchModelBox.Text?.Trim();
+        var mfr      = SearchMfrCombo.SelectedItem as Manufacturer;
+        var descItem = SearchDescCombo.SelectedItem as DescriptionComboItem;
+        var model    = SearchModelBox.Text?.Trim();
 
-        var mfrName = (mfr == null || mfr.Id == 0) ? null : mfr.ManufacturerName;
-        var descText = (desc == null || desc.Id == 0) ? null : desc.DescriptionText;
+        var mfrName = (mfr      == null || mfr.Id      == 0) ? null : mfr.ManufacturerName;
+        var descId  = (descItem == null || descItem.Id == 0) ? (int?)null : descItem.Id;
 
         using var context = DatabaseInitializer.CreateContext();
         var repo = new HardwareItemRepository(context);
-        var results = repo.Search(mfrName, descText, model).ToList();
+        var results = repo.Search(mfrName, descId, model).ToList();
 
         HardwareSearchList.ItemsSource = results;
         HardwareSearchList.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
@@ -312,23 +312,6 @@ public partial class JobDetailView : UserControl
              + "\n\nSet a Local Link or Online Link for each template, then retry.";
     }
 
-    /// <summary>
-    /// Returns the expected final output path for the job package without creating any files.
-    /// </summary>
-    private string? GetExpectedOutputPath()
-    {
-        using var context = DatabaseInitializer.CreateContext();
-        var job = context.Jobs.Find(_jobId);
-        if (job == null) return null;
-
-        var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
-        var saveDir = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
-            ? profile.DefaultTemplateSaveLocation
-            : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-
-        return Path.Combine(saveDir, job.JobNumber, $"{job.JobNumber}_templates.pdf");
-    }
-
     private async Task OnGeneratePackageAsync()
     {
         if (_linkedHardware.Count == 0)
@@ -346,19 +329,6 @@ public partial class JobDetailView : UserControl
             else
                 PackageStatusLabel.Text = "Some templates are missing file links. Fix them before generating.";
             return;
-        }
-
-        var expectedPath = GetExpectedOutputPath();
-        if (expectedPath != null && File.Exists(expectedPath))
-        {
-            var win = TopLevel.GetTopLevel(this) as Window;
-            if (win != null)
-            {
-                var overwrite = await DialogHelper.ConfirmAsync(win,
-                    $"A package already exists:\n{Path.GetFileName(expectedPath)}\n\nOverwrite it?",
-                    "File Already Exists");
-                if (!overwrite) return;
-            }
         }
 
         _packageCts?.Cancel();
@@ -422,12 +392,26 @@ public partial class JobDetailView : UserControl
                     ? profile.DefaultTemplateSaveLocation
                     : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
+                var allDescriptions = context.Descriptions
+                    .ToDictionary(d => d.Id);
+
                 var request = new AssemblyRequest
                 {
                     Job             = job,
                     Hardware        = hardware,
-                    OutputDirectory = saveDir
+                    OutputDirectory = saveDir,
+                    AllDescriptions = allDescriptions
                 };
+
+                // Back up any existing package before overwriting.
+                var existingPath = Path.Combine(saveDir, job.JobNumber, $"{job.JobNumber}_templates.pdf");
+                if (File.Exists(existingPath))
+                {
+                    var backupDir = Path.Combine(saveDir, $"{job.JobNumber}_{DateTime.Now:yyyyMMdd_HHmmss}");
+                    Directory.CreateDirectory(backupDir);
+                    File.Move(existingPath, Path.Combine(backupDir, Path.GetFileName(existingPath)));
+                    Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = "Backed up previous package...");
+                }
 
                 var progress = new Progress<string>(msg =>
                     Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = msg));

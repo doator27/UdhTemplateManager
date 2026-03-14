@@ -3,6 +3,7 @@ using System;
 using HardwareTemplateBuilder.Core.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HardwareTemplateBuilder.Core.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260314020011_DescriptionCategory")]
+    partial class DescriptionCategory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.25");
@@ -68,19 +71,17 @@ namespace HardwareTemplateBuilder.Core.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("Category")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("DescriptionText")
                         .IsRequired()
                         .HasColumnType("TEXT");
-
-                    b.Property<int?>("ParentId")
-                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ParentId");
 
                     b.ToTable("Descriptions");
                 });
@@ -365,16 +366,6 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.ToTable("UserProfiles");
                 });
 
-            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.Description", b =>
-                {
-                    b.HasOne("HardwareTemplateBuilder.Core.Models.Description", "Parent")
-                        .WithMany("Children")
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Parent");
-                });
-
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.HardwareItem", b =>
                 {
                     b.HasOne("HardwareTemplateBuilder.Core.Models.Description", "Description")
@@ -512,8 +503,6 @@ namespace HardwareTemplateBuilder.Core.Migrations
 
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.Description", b =>
                 {
-                    b.Navigation("Children");
-
                     b.Navigation("HardwareItems");
 
                     b.Navigation("Templates");

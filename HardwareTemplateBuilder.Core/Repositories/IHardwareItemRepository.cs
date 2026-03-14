@@ -10,13 +10,13 @@ namespace HardwareTemplateBuilder.Core.Repositories;
 public interface IHardwareItemRepository : IRepository<HardwareItem>
 {
     /// <summary>
-    /// Searches hardware items by manufacturer name, description text, and model number.
+    /// Searches hardware items by manufacturer name, description ID, and model number.
     /// Any parameter may be null or empty to skip that filter.
     /// Results are sorted by <see cref="HardwareItem.Frequency"/> descending (most-used first).
     /// </summary>
     /// <param name="manufacturerName">Optional manufacturer name filter (partial match).</param>
-    /// <param name="descriptionText">Optional description text filter (partial match).</param>
+    /// <param name="descriptionId">Optional description ID filter (exact match).</param>
     /// <param name="modelNumber">Optional model number filter (partial match).</param>
     /// <returns>Matching hardware items ordered by frequency descending.</returns>
-    IEnumerable<HardwareItem> Search(string? manufacturerName, string? descriptionText, string? modelNumber);
+    IEnumerable<HardwareItem> Search(string? manufacturerName, int? descriptionId, string? modelNumber);
 }

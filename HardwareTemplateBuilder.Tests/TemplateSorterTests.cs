@@ -1,5 +1,6 @@
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Services.Pdf;
+using System.Collections.Generic;
 
 namespace HardwareTemplateBuilder.Tests;
 
@@ -13,112 +14,133 @@ public class TemplateSorterTests
     private static Manufacturer MakeManufacturer(int id, string name) =>
         new Manufacturer { Id = id, ManufacturerName = name };
 
+    /// <summary>
+    /// Creates a description with an optional parent to represent a position in the tree.
+    /// </summary>
+    private static Description MakeDesc(int id, int sortOrder, int? parentId = null) =>
+        new Description { Id = id, SortOrder = sortOrder, ParentId = parentId, DescriptionText = $"Desc{id}" };
+
     private static IndividualTemplate MakeTemplate(
-        int id, Manufacturer manufacturer, int sortOrder, string templateNumber = "T") =>
+        int id,
+        Manufacturer manufacturer,
+        int descriptionId,
+        string templateNumber = "T") =>
         new IndividualTemplate
         {
-            Id = id,
+            Id             = id,
             ManufacturerId = manufacturer.Id,
-            Manufacturer = manufacturer,
-            Description = new Description { SortOrder = sortOrder },
+            Manufacturer   = manufacturer,
+            DescriptionId  = descriptionId,
             TemplateNumber = templateNumber,
-            PagesToPrint = "1"
+            PagesToPrint   = "1"
         };
 
-    // ---------- Tests ----------
+    // ---------- Within-group ordering ----------
 
     [Fact]
-    public void Sort_SingleGroup_OrdersBySortOrderAscending()
+    public void Sort_SingleGroup_OrdersByDescriptionPath()
     {
+        // Descriptions: root A(sort=0), root B(sort=1), child of A: CA(sort=0), CB(sort=1)
+        // Paths: CA=[0,0], CB=[0,1], A=[0], B=[1]
         var mfr = MakeManufacturer(1, "Alpha");
-        var templates = new[]
+        var descA  = MakeDesc(1, sortOrder: 0);
+        var descB  = MakeDesc(2, sortOrder: 1);
+        var descCA = MakeDesc(3, sortOrder: 0, parentId: 1);  // path [0,0]
+        var descCB = MakeDesc(4, sortOrder: 1, parentId: 1);  // path [0,1]
+
+        var allDescs = new Dictionary<int, Description>
         {
-            MakeTemplate(1, mfr, 20, "T3"),
-            MakeTemplate(2, mfr, 10, "T1"),
-            MakeTemplate(3, mfr, 15, "T2"),
+            [descA.Id]  = descA,
+            [descB.Id]  = descB,
+            [descCA.Id] = descCA,
+            [descCB.Id] = descCB,
         };
 
-        var result = _sorter.Sort(templates);
+        var templates = new[]
+        {
+            MakeTemplate(1, mfr, descCB.Id,  "T-CB"),  // path [0,1]
+            MakeTemplate(2, mfr, descB.Id,   "T-B"),   // path [1]
+            MakeTemplate(3, mfr, descCA.Id,  "T-CA"),  // path [0,0]
+            MakeTemplate(4, mfr, descA.Id,   "T-A"),   // path [0]
+        };
 
-        Assert.Equal(new[] { "T1", "T2", "T3" }, result.Select(t => t.TemplateNumber));
+        var result = _sorter.Sort(templates, allDescs);
+
+        // [0] < [0,0] < [0,1] < [1]
+        Assert.Equal(new[] { "T-A", "T-CA", "T-CB", "T-B" },
+            result.Select(t => t.TemplateNumber));
     }
 
     [Fact]
-    public void Sort_MultipleGroups_OrdersByGroupMinSortOrderAscending()
+    public void Sort_EqualPath_TiebrokenByTemplateNumberAlpha()
     {
-        var mfrA = MakeManufacturer(1, "Alpha");  // min sort order 20
-        var mfrB = MakeManufacturer(2, "Beta");   // min sort order 10
+        var mfr  = MakeManufacturer(1, "Alpha");
+        var desc = MakeDesc(1, sortOrder: 5);
+        var allDescs = new Dictionary<int, Description> { [desc.Id] = desc };
 
         var templates = new[]
         {
-            MakeTemplate(1, mfrA, 20, "A1"),
-            MakeTemplate(2, mfrB, 10, "B1"),
-            MakeTemplate(3, mfrB, 15, "B2"),
+            MakeTemplate(1, mfr, desc.Id, "T-Zebra"),
+            MakeTemplate(2, mfr, desc.Id, "T-Acme"),
         };
 
-        var result = _sorter.Sort(templates);
+        var result = _sorter.Sort(templates, allDescs);
+        Assert.Equal(new[] { "T-Acme", "T-Zebra" }, result.Select(t => t.TemplateNumber));
+    }
 
-        // Beta group (lower min sort order) should come before Alpha group.
+    // ---------- Cross-group ordering ----------
+
+    [Fact]
+    public void Sort_MultipleGroups_OrdersByGroupMinPath()
+    {
+        var mfrA = MakeManufacturer(1, "Alpha");  // min path: [1]
+        var mfrB = MakeManufacturer(2, "Beta");   // min path: [0]  → should come first
+
+        var descLow  = MakeDesc(1, sortOrder: 0);  // path [0]
+        var descHigh = MakeDesc(2, sortOrder: 1);  // path [1]
+
+        var allDescs = new Dictionary<int, Description>
+        {
+            [descLow.Id]  = descLow,
+            [descHigh.Id] = descHigh,
+        };
+
+        var templates = new[]
+        {
+            MakeTemplate(1, mfrA, descHigh.Id, "A1"),
+            MakeTemplate(2, mfrB, descLow.Id,  "B1"),
+            MakeTemplate(3, mfrB, descHigh.Id, "B2"),
+        };
+
+        var result = _sorter.Sort(templates, allDescs);
         Assert.Equal(new[] { "B1", "B2", "A1" }, result.Select(t => t.TemplateNumber));
     }
 
     [Fact]
-    public void Sort_TiedGroupMinSortOrder_TiebrokenByManufacturerNameAlphabetically()
+    public void Sort_TiedGroupMinKey_TiebrokenByManufacturerNameAlpha()
     {
         var mfrZ = MakeManufacturer(1, "Zebra");
         var mfrA = MakeManufacturer(2, "Acme");
 
-        // Both groups have the same minimum sort order.
+        var desc    = MakeDesc(1, sortOrder: 0);
+        var allDescs = new Dictionary<int, Description> { [desc.Id] = desc };
+
         var templates = new[]
         {
-            MakeTemplate(1, mfrZ, 5, "Z1"),
-            MakeTemplate(2, mfrA, 5, "A1"),
+            MakeTemplate(1, mfrZ, desc.Id, "Z1"),
+            MakeTemplate(2, mfrA, desc.Id, "A1"),
         };
 
-        var result = _sorter.Sort(templates);
-
-        // Alphabetical tiebreak: Acme before Zebra.
+        var result = _sorter.Sort(templates, allDescs);
         Assert.Equal(new[] { "A1", "Z1" }, result.Select(t => t.TemplateNumber));
-    }
-
-    [Fact]
-    public void Sort_WithinGroupOrderedBySortOrder_CrossGroupOrderByMinSortOrder()
-    {
-        var mfrA = MakeManufacturer(1, "Alpha");
-        var mfrB = MakeManufacturer(2, "Beta");
-
-        var templates = new[]
-        {
-            MakeTemplate(1, mfrA, 50, "A-High"),
-            MakeTemplate(2, mfrA, 10, "A-Low"),
-            MakeTemplate(3, mfrB, 20, "B1"),
-        };
-
-        var result = _sorter.Sort(templates);
-
-        // Alpha group has lower min sort order (10) — comes first, A-Low before A-High.
-        Assert.Equal(new[] { "A-Low", "A-High", "B1" }, result.Select(t => t.TemplateNumber));
-    }
-
-    [Fact]
-    public void Sort_EqualSortOrder_TiebrokenByTemplateNumberAlphabetically()
-    {
-        var mfr = MakeManufacturer(1, "Alpha");
-        var templates = new[]
-        {
-            MakeTemplate(1, mfr, 5, "T-Zebra"),
-            MakeTemplate(2, mfr, 5, "T-Acme"),
-        };
-
-        var result = _sorter.Sort(templates);
-
-        Assert.Equal(new[] { "T-Acme", "T-Zebra" }, result.Select(t => t.TemplateNumber));
     }
 
     [Fact]
     public void Sort_EmptyInput_ReturnsEmptyList()
     {
-        var result = _sorter.Sort(Array.Empty<IndividualTemplate>());
+        var result = _sorter.Sort(
+            Array.Empty<IndividualTemplate>(),
+            new Dictionary<int, Description>());
         Assert.Empty(result);
     }
 }
