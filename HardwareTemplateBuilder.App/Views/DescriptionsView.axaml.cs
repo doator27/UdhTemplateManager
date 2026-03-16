@@ -3,6 +3,7 @@ using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
+using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -67,7 +68,8 @@ public partial class DescriptionsView : UserControl
 
     private void LoadTree()
     {
-        var all = _repo!.GetAll().ToList();
+        using var ctx = DatabaseInitializer.CreateContext();
+        var all = ctx.Descriptions.AsNoTracking().ToList();
         _roots.Clear();
         BuildNodes(all, null, _roots);
     }
