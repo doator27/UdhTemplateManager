@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Threading;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
@@ -32,6 +33,8 @@ public partial class DescriptionsView : UserControl
     private DescriptionRepository? _repo;
     /// <summary>Root nodes of the currently displayed tree.</summary>
     private readonly ObservableCollection<DescriptionNode> _roots = new();
+    /// <summary>IDs of nodes that were expanded before the last tree rebuild.</summary>
+    private readonly HashSet<int> _expandedIds = new();
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event System.Action<string>? NavigationRequested;
@@ -50,28 +53,136 @@ public partial class DescriptionsView : UserControl
 
         DescTree.ItemsSource = _roots;
 
-        MainMenuButton.Click   += (_, _) => NavigationRequested?.Invoke("Dashboard");
+        MainMenuButton.Click      += (_, _) => NavigationRequested?.Invoke("Dashboard");
         DescTree.SelectionChanged += (_, _) => OnTreeSelectionChanged();
-        SaveButton.Click       += (_, _) => Save();
-        AddRootButton.Click    += (_, _) => AddNode(parentId: null);
-        AddChildButton.Click   += (_, _) => AddChildToSelected();
-        DeleteButton.Click     += (_, _) => DeleteSelected();
-        MoveUpButton.Click     += (_, _) => MoveSelected(-1);
-        MoveDownButton.Click   += (_, _) => MoveSelected(1);
-        IndentButton.Click     += (_, _) => IndentSelected();
-        UnindentButton.Click   += (_, _) => UnindentSelected();
+        SaveButton.Click          += (_, _) => Save();
+        AddRootButton.Click       += (_, _) => AddNode(parentId: null);
+        AddChildButton.Click      += (_, _) => AddChildToSelected();
+        DeleteButton.Click        += (_, _) => DeleteSelected();
+        MoveUpButton.Click        += (_, _) => MoveSelected(-1);
+        MoveDownButton.Click      += (_, _) => MoveSelected(1);
+        IndentButton.Click        += (_, _) => IndentSelected();
+        UnindentButton.Click      += (_, _) => UnindentSelected();
 
         LoadTree();
     }
 
     // ── Tree build ────────────────────────────────────────────────────────
 
-    private void LoadTree()
+    /// <summary>
+    /// Rebuilds the tree from the database, then restores expansion state and optionally
+    /// re-selects a specific node. Pass <paramref name="keepSelectedId"/> to restore the
+    /// selection after the rebuild (e.g. after a move operation). Pass
+    /// <paramref name="forceExpandId"/> to ensure a newly-relevant parent is expanded
+    /// even if it was not expanded before (e.g. after an indent).
+    /// </summary>
+    private void LoadTree(int? keepSelectedId = null, int? forceExpandId = null)
     {
+        // Snapshot which nodes are currently expanded before wiping the collection.
+        _expandedIds.Clear();
+        CollectExpandedIds(_roots, DescTree);
+        if (forceExpandId.HasValue)
+            _expandedIds.Add(forceExpandId.Value);
+
         using var ctx = DatabaseInitializer.CreateContext();
         var all = ctx.Descriptions.AsNoTracking().ToList();
         _roots.Clear();
         BuildNodes(all, null, _roots);
+
+        // Avalonia creates TreeViewItem containers asynchronously after the collection
+        // changes; defer state restore until after the next layout pass.
+        Dispatcher.UIThread.Post(
+            () => RestoreTreeState(keepSelectedId),
+            DispatcherPriority.Background);
+    }
+
+    /// <summary>Recursively collects the IDs of all currently expanded nodes.</summary>
+    private void CollectExpandedIds(IEnumerable<DescriptionNode> nodes, ItemsControl parent)
+    {
+        foreach (var node in nodes)
+        {
+            if (parent.ContainerFromItem(node) is TreeViewItem tvi && tvi.IsExpanded)
+            {
+                _expandedIds.Add(node.Id);
+                CollectExpandedIds(node.Children, tvi);
+            }
+        }
+    }
+
+    /// <summary>Re-expands previously expanded nodes and optionally re-selects one.</summary>
+    private void RestoreTreeState(int? selectId)
+    {
+        RestoreExpanded(_roots, DescTree, onComplete: selectId.HasValue
+            ? () => SelectNode(selectId.Value, _roots, DescTree)
+            : null);
+    }
+
+    /// <summary>
+    /// Recursively expands any node whose ID is in <see cref="_expandedIds"/>.
+    /// Each level is deferred via <see cref="Dispatcher.UIThread"/> so Avalonia has a
+    /// layout pass to create child containers before we try to access them.
+    /// <paramref name="onComplete"/> is invoked after the full subtree has been processed.
+    /// </summary>
+    private void RestoreExpanded(
+        IEnumerable<DescriptionNode> nodes,
+        ItemsControl parent,
+        System.Action? onComplete = null)
+    {
+        var toExpand = new List<(TreeViewItem tvi, DescriptionNode node)>();
+
+        foreach (var node in nodes)
+        {
+            if (parent.ContainerFromItem(node) is TreeViewItem tvi && _expandedIds.Contains(node.Id))
+            {
+                tvi.IsExpanded = true;
+                toExpand.Add((tvi, node));
+            }
+        }
+
+        if (toExpand.Count == 0)
+        {
+            onComplete?.Invoke();
+            return;
+        }
+
+        // Defer child-level expansion so Avalonia can create the new containers first.
+        Dispatcher.UIThread.Post(() =>
+        {
+            int remaining = toExpand.Count;
+            foreach (var (tvi, node) in toExpand)
+            {
+                RestoreExpanded(node.Children, tvi, onComplete: () =>
+                {
+                    if (--remaining == 0)
+                        onComplete?.Invoke();
+                });
+            }
+        }, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// Finds the node with the given <paramref name="id"/>, selects it in the tree,
+    /// and scrolls it into view. Returns <c>true</c> if found.
+    /// </summary>
+    private bool SelectNode(int id, IEnumerable<DescriptionNode> nodes, ItemsControl parent)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.Id == id)
+            {
+                DescTree.SelectedItem = node;
+                if (parent.ContainerFromItem(node) is TreeViewItem tvi)
+                    tvi.BringIntoView();
+                return true;
+            }
+
+            if (parent.ContainerFromItem(node) is TreeViewItem container)
+            {
+                if (SelectNode(id, node.Children, container))
+                    return true;
+            }
+        }
+        return false;
     }
 
     private static void BuildNodes(
@@ -123,7 +234,7 @@ public partial class DescriptionsView : UserControl
         existing.DescriptionText = text;
         _repo.Update(existing);
         StatusLabel.Text = "Saved.";
-        LoadTree();
+        LoadTree(node.Id);
     }
 
     private void AddNode(int? parentId)
@@ -135,7 +246,7 @@ public partial class DescriptionsView : UserControl
         var siblings = ctx.Descriptions.Where(d => d.ParentId == parentId).ToList();
         var maxOrder = siblings.Any() ? siblings.Max(d => d.SortOrder) : -1;
 
-        _repo!.Add(new Description
+        var added = _repo!.Add(new Description
         {
             DescriptionText = text,
             ParentId = parentId,
@@ -144,7 +255,8 @@ public partial class DescriptionsView : UserControl
 
         StatusLabel.Text = "Added.";
         DescriptionBox.Text = "";
-        LoadTree();
+        // Expand the parent so the new child is visible, then select it.
+        LoadTree(added.Id, forceExpandId: parentId);
     }
 
     private void AddChildToSelected()
@@ -205,7 +317,7 @@ public partial class DescriptionsView : UserControl
             (siblings[swapIdx].SortOrder, siblings[idx].SortOrder);
 
         ctx.SaveChanges();
-        LoadTree();
+        LoadTree(node.Id);
     }
 
     /// <summary>
@@ -235,7 +347,9 @@ public partial class DescriptionsView : UserControl
         entity.ParentId = newParent.Id;
         entity.SortOrder = maxOrder + 1;
         ctx.SaveChanges();
-        LoadTree();
+
+        // forceExpandId ensures the new parent is open so the moved item is visible.
+        LoadTree(node.Id, forceExpandId: newParent.Id);
     }
 
     /// <summary>
@@ -273,6 +387,6 @@ public partial class DescriptionsView : UserControl
                 s.SortOrder += 2;
         }
         ctx.SaveChanges();
-        LoadTree();
+        LoadTree(node.Id);
     }
 }
