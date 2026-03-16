@@ -52,4 +52,10 @@ public class CoverSheetRow
 
     /// <summary>Gets or sets optional remarks for this hardware item.</summary>
     public string? Remarks { get; set; }
+
+    /// <summary>
+    /// When <c>true</c> this row is a blank spacer inserted between manufacturer groups.
+    /// All other properties are ignored for separator rows.
+    /// </summary>
+    public bool IsGroupSeparator { get; init; }
 }

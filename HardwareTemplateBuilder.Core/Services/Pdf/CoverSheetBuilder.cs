@@ -128,6 +128,15 @@ public class CoverSheetBuilder
                     int rowIndex = 0;
                     foreach (var row in data.Rows)
                     {
+                        if (row.IsGroupSeparator)
+                        {
+                            // Blank spacer row — 6 empty cells with vertical padding to
+                            // visually separate manufacturer groups.
+                            for (int c = 0; c < 6; c++)
+                                table.Cell().PaddingVertical(5).Text(string.Empty);
+                            continue;
+                        }
+
                         var bg = (rowIndex % 2 == 1) ? AltRowBackground : "#ffffff";
                         rowIndex++;
 

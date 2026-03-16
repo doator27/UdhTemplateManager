@@ -201,51 +201,76 @@ public class PdfAssemblyService
     /// <summary>
     /// Builds a <see cref="CoverSheetData"/> from the assembly request and the
     /// computed per-item body page lists.
-    /// Rows are sorted by the hardware item's full description path (root → leaf sort orders),
-    /// then by manufacturer name, then by custom description / model number.  When the same
-    /// hardware item appears multiple times with different custom descriptions each entry gets
-    /// its own row, all pointing to the same page range.
+    /// Hardware items are grouped by manufacturer. Within each group they are sorted by
+    /// description hierarchy path then by model/custom description — mirroring the PDF body
+    /// order. Manufacturer groups are ordered by the minimum (highest-priority) path found
+    /// in the group, with alphabetical name as a tiebreaker. A blank separator row is
+    /// inserted between each manufacturer group for readability.
     /// </summary>
     private static CoverSheetData BuildCoverSheetData(
         AssemblyRequest request,
         Dictionary<int, List<int>> itemBodyPages)
     {
-        var rows = request.Hardware
-            .OrderBy(
-                hwt => WeightTemplateSortStrategy.GetSortPath(
-                    hwt.Item.DescriptionId, request.AllDescriptions),
-                PathComparer.Instance)
-            .ThenBy(
-                hwt => hwt.Item.Manufacturer?.ManufacturerName ?? string.Empty,
-                StringComparer.OrdinalIgnoreCase)
-            .ThenBy(
-                hwt => !string.IsNullOrWhiteSpace(hwt.CustomDescription)
-                    ? hwt.CustomDescription
-                    : hwt.Item.ModelNumber,
-                StringComparer.OrdinalIgnoreCase)
-            .Select(hwt =>
+        var manufacturerGroups = request.Hardware
+            .GroupBy(hwt => hwt.Item.ManufacturerId)
+            .Select(g =>
+            {
+                var sortedItems = g
+                    .OrderBy(hwt => WeightTemplateSortStrategy.GetSortPath(
+                                hwt.Item.DescriptionId, request.AllDescriptions),
+                             PathComparer.Instance)
+                    .ThenBy(hwt => !string.IsNullOrWhiteSpace(hwt.CustomDescription)
+                                ? hwt.CustomDescription
+                                : hwt.Item.ModelNumber,
+                             StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                var minPath = sortedItems
+                    .Select(hwt => WeightTemplateSortStrategy.GetSortPath(
+                                hwt.Item.DescriptionId, request.AllDescriptions))
+                    .Min(PathComparer.Instance)!;
+
+                return new
+                {
+                    ManufacturerName = g.First().Item.Manufacturer?.ManufacturerName ?? string.Empty,
+                    Items            = sortedItems,
+                    MinPath          = minPath
+                };
+            })
+            .OrderBy(g => g.MinPath, PathComparer.Instance)
+            .ThenBy(g => g.ManufacturerName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var rows = new List<CoverSheetRow>();
+        for (int gi = 0; gi < manufacturerGroups.Count; gi++)
+        {
+            if (gi > 0)
+                rows.Add(new CoverSheetRow { IsGroupSeparator = true });
+
+            foreach (var hwt in manufacturerGroups[gi].Items)
             {
                 var item  = hwt.Item;
                 var pages = itemBodyPages.TryGetValue(item.Id, out var p) ? p : new List<int>();
 
-                return new CoverSheetRow
+                rows.Add(new CoverSheetRow
                 {
                     Manufacturer        = item.Manufacturer?.ManufacturerName ?? string.Empty,
                     HardwareType        = item.Description?.DescriptionText   ?? string.Empty,
                     HardwareDescription = !string.IsNullOrWhiteSpace(hwt.CustomDescription)
-                        ? hwt.CustomDescription!
-                        : item.ModelNumber,
+                                            ? hwt.CustomDescription!
+                                            : item.ModelNumber,
                     TemplateNumbers     = string.Join(", ", hwt.Templates.Select(t => t.TemplateNumber)),
                     PageNumbers         = FormatPageList(pages),
                     Remarks             = item.Remarks
-                };
-            }).ToList();
+                });
+            }
+        }
 
         return new CoverSheetData
         {
             JobNumber          = request.Job.JobNumber,
             JobName            = request.Job.JobName,
-            CustomerName       = request.Job.Customer?.CustomerName       ?? string.Empty,
+            CustomerName       = request.Job.Customer?.CustomerName             ?? string.Empty,
             ProjectManagerName = request.Job.ProjectManager?.ProjectManagerName ?? string.Empty,
             DateCreated        = DateTime.Now,
             PreparedBy         = request.PreparedByName,
