@@ -1,7 +1,10 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using HardwareTemplateBuilder.App.Views;
@@ -20,29 +23,74 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        DatabaseInitializer.Initialize();
-
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var mainWindow = new MainWindow();
             desktop.MainWindow = mainWindow;
 
-            // Show the profile picker as soon as the main window opens.
-            // The picker cannot be dismissed without selecting or creating a profile.
             mainWindow.Opened += async (_, _) =>
             {
-                var picker = new ProfilePickerDialog();
-                await picker.ShowDialog(mainWindow);
+                // Step 1: Resolve database file location (may show DatabaseSetupDialog).
+                await ResolveDatabaseLocationAsync(mainWindow);
 
-                // Update the status bar with the chosen user.
+                // Step 2: Apply migrations / create schema at the now-confirmed location.
+                DatabaseInitializer.Initialize();
+
+                // Step 3: Auto-select the profile bound to this machine, or show picker.
+                var machineId = MachineIdentityService.GetMachineId();
+
+                using (var ctx = DatabaseInitializer.CreateContext())
+                {
+                    var bound = ctx.UserProfiles.FirstOrDefault(u => u.MachineId == machineId);
+                    if (bound != null)
+                        SessionService.ActiveUserProfile = bound;
+                }
+
+                if (SessionService.ActiveUserProfile == null)
+                {
+                    var picker = new ProfilePickerDialog(machineId);
+                    await picker.ShowDialog(mainWindow);
+                }
+
+                // Step 4: Update the status bar and kick off background refresh.
                 mainWindow.SetActiveUser(SessionService.ActiveUserProfile?.UserName ?? "Unknown");
-
-                // Auto-refresh: silently download all templates if >7 days since last refresh.
                 _ = RunStartupRefreshAsync();
             };
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Ensures a valid, reachable database path is configured before the app tries to use it.
+    /// <list type="bullet">
+    ///   <item>No pointer file + default DB exists → proceeds immediately.</item>
+    ///   <item>No pointer file + no default DB → shows <see cref="DatabaseSetupDialog"/> (required).</item>
+    ///   <item>Pointer file exists + file reachable → proceeds immediately.</item>
+    ///   <item>Pointer file exists + file unreachable → shows <see cref="DatabaseSetupDialog"/>
+    ///     with an error banner explaining the previous path (required).</item>
+    /// </list>
+    /// </summary>
+    private static async Task ResolveDatabaseLocationAsync(Window owner)
+    {
+        while (true)
+        {
+            var configuredPath = DatabaseLocationService.GetConfiguredPath();
+
+            if (configuredPath == null)
+            {
+                // No custom location set — default AppData path is always valid on first run.
+                return;
+            }
+
+            if (File.Exists(configuredPath))
+                return; // Configured path is reachable.
+
+            // Pointer file exists but the file is gone (network share offline, path moved, etc.).
+            var reconnectDialog = new DatabaseSetupDialog(unreachablePath: configuredPath, required: true);
+            await reconnectDialog.ShowDialog(owner);
+            // Dialog may write a new path; loop to re-check.
+        }
     }
 
     /// <summary>
@@ -78,7 +126,6 @@ public partial class App : Application
             var service = new TemplateRefreshService(refreshCtx, http);
             await service.RefreshAsync(saveLocation);
 
-            // Record the timestamp so the next launch skips the auto-refresh.
             using var tsCtx = DatabaseInitializer.CreateContext();
             new AppSettingRepository(tsCtx).SetValue(
                 "LastRefreshTimestamp", DateTime.UtcNow.ToString("O"));

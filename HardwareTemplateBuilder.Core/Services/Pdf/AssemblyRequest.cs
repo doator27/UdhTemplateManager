@@ -50,6 +50,12 @@ public class AssemblyRequest
     /// </summary>
     public IReadOnlyDictionary<int, Description> AllDescriptions { get; init; } =
         new Dictionary<int, Description>();
+
+    /// <summary>
+    /// Gets or sets the display name of the user generating this package,
+    /// printed on the cover sheet as "Templates by: {name}".
+    /// </summary>
+    public string PreparedByName { get; init; } = string.Empty;
 }
 
 /// <summary>

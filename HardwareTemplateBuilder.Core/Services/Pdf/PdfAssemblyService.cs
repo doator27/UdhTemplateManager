@@ -194,24 +194,28 @@ public class PdfAssemblyService
     /// <summary>
     /// Builds a <see cref="CoverSheetData"/> from the assembly request and the
     /// computed per-item body page lists.
-    /// Each job entry becomes its own row. When the same hardware item appears multiple times
-    /// (different custom descriptions), those rows are sorted alphabetically by description
-    /// and all reference the same page range. Row order across distinct items follows the
-    /// first occurrence of each item in the job list.
+    /// Rows are sorted by the hardware item's full description path (root → leaf sort orders),
+    /// then by manufacturer name, then by custom description / model number.  When the same
+    /// hardware item appears multiple times with different custom descriptions each entry gets
+    /// its own row, all pointing to the same page range.
     /// </summary>
     private static CoverSheetData BuildCoverSheetData(
         AssemblyRequest request,
         Dictionary<int, List<int>> itemBodyPages)
     {
         var rows = request.Hardware
-            // Group to preserve first-occurrence order across distinct items, then sort
-            // the entries within each group alphabetically by their display description.
-            .GroupBy(hwt => hwt.Item.Id)
-            .SelectMany(group => group.OrderBy(
+            .OrderBy(
+                hwt => WeightTemplateSortStrategy.GetSortPath(
+                    hwt.Item.DescriptionId, request.AllDescriptions),
+                PathComparer.Instance)
+            .ThenBy(
+                hwt => hwt.Item.Manufacturer?.ManufacturerName ?? string.Empty,
+                StringComparer.OrdinalIgnoreCase)
+            .ThenBy(
                 hwt => !string.IsNullOrWhiteSpace(hwt.CustomDescription)
                     ? hwt.CustomDescription
                     : hwt.Item.ModelNumber,
-                StringComparer.OrdinalIgnoreCase))
+                StringComparer.OrdinalIgnoreCase)
             .Select(hwt =>
             {
                 var item  = hwt.Item;
@@ -232,12 +236,13 @@ public class PdfAssemblyService
 
         return new CoverSheetData
         {
-            JobNumber = request.Job.JobNumber,
-            JobName = request.Job.JobName,
-            CustomerName = request.Job.Customer?.CustomerName ?? string.Empty,
+            JobNumber          = request.Job.JobNumber,
+            JobName            = request.Job.JobName,
+            CustomerName       = request.Job.Customer?.CustomerName       ?? string.Empty,
             ProjectManagerName = request.Job.ProjectManager?.ProjectManagerName ?? string.Empty,
-            DateCreated = DateTime.Now,
-            Rows = rows.AsReadOnly()
+            DateCreated        = DateTime.Now,
+            PreparedBy         = request.PreparedByName,
+            Rows               = rows.AsReadOnly()
         };
     }
 

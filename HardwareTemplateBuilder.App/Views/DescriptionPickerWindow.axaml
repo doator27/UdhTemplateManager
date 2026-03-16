@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="HardwareTemplateBuilder.App.Views.DescriptionPickerWindow"
+        x:CompileBindings="False"
+        Title="Select Description"
+        Width="420" Height="520"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True">
+    <DockPanel Margin="8">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Name="SelectButton" Content="Select" Width="80" Margin="0,0,8,0"/>
+            <Button Name="CancelButton" Content="Cancel" Width="80"/>
+        </StackPanel>
+        <TextBlock DockPanel.Dock="Top" Text="Double-click or select and click Select:" Margin="0,0,0,6"/>
+        <TreeView Name="DescTree">
+            <TreeView.ItemTemplate>
+                <TreeDataTemplate ItemsSource="{Binding Children}">
+                    <TextBlock Text="{Binding DescriptionText}"/>
+                </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+        </TreeView>
+    </DockPanel>
+</Window>

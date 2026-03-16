@@ -1,3 +1,5 @@
+using System.IO;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using HardwareTemplateBuilder.Core.Data;
@@ -7,7 +9,7 @@ namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
 /// Admin view for managing global application settings, such as the shared
-/// template storage location used by all template refresh operations.
+/// template storage location and the active database file location.
 /// </summary>
 public partial class AppSettingsView : UserControl
 {
@@ -29,13 +31,16 @@ public partial class AppSettingsView : UserControl
         _repo = new AppSettingRepository(context);
 
         StorageLocationBox.Text = _repo.GetValue("TemplateStorageLocation");
+        CurrentDbPathLabel.Text = DatabaseInitializer.GetDatabasePath();
 
-        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
-        SaveButton.Click += (_, _) => Save();
-        BrowseButton.Click += async (_, _) => await BrowseFolderAsync();
+        MainMenuButton.Click     += (_, _) => NavigationRequested?.Invoke("Dashboard");
+        SaveButton.Click         += (_, _) => Save();
+        BrowseButton.Click       += async (_, _) => await BrowseStorageFolderAsync();
+        DbMoveBrowseButton.Click += async (_, _) => await BrowseDbTargetFolderAsync();
+        MoveDbButton.Click       += (_, _) => MoveDatabase();
     }
 
-    private async System.Threading.Tasks.Task BrowseFolderAsync()
+    private async Task BrowseStorageFolderAsync()
     {
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel == null) return;
@@ -47,10 +52,64 @@ public partial class AppSettingsView : UserControl
             StorageLocationBox.Text = folders[0].Path.LocalPath;
     }
 
+    private async Task BrowseDbTargetFolderAsync()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(
+            new FolderPickerOpenOptions { Title = "Select Target Folder for Database", AllowMultiple = false });
+
+        if (folders.Count > 0)
+            DbMoveTargetBox.Text = folders[0].Path.LocalPath;
+    }
+
     private void Save()
     {
         var path = StorageLocationBox.Text?.Trim() ?? string.Empty;
         _repo!.SetValue("TemplateStorageLocation", path);
         StatusLabel.Text = "Saved.";
+    }
+
+    private void MoveDatabase()
+    {
+        DbStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+        DbStatusLabel.Text = string.Empty;
+
+        var targetFolder = DbMoveTargetBox.Text?.Trim();
+        if (string.IsNullOrEmpty(targetFolder))
+        {
+            DbStatusLabel.Text = "Choose a target folder first.";
+            return;
+        }
+
+        if (!Directory.Exists(targetFolder))
+        {
+            DbStatusLabel.Text = "Folder does not exist or is not accessible.";
+            return;
+        }
+
+        var sourcePath = DatabaseInitializer.GetDatabasePath();
+        var destPath   = Path.Combine(targetFolder, "hardware_templates.db");
+
+        if (sourcePath.Equals(destPath, System.StringComparison.OrdinalIgnoreCase))
+        {
+            DbStatusLabel.Text = "The database is already at that location.";
+            return;
+        }
+
+        try
+        {
+            File.Copy(sourcePath, destPath, overwrite: true);
+            DatabaseLocationService.SetConfiguredPath(destPath);
+            CurrentDbPathLabel.Text = destPath;
+            DbMoveTargetBox.Text    = string.Empty;
+            DbStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+            DbStatusLabel.Text = $"Database moved to {destPath}";
+        }
+        catch (System.Exception ex)
+        {
+            DbStatusLabel.Text = $"Error moving database: {ex.Message}";
+        }
     }
 }

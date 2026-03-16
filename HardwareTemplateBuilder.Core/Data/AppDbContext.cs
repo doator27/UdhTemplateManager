@@ -66,15 +66,16 @@ public class AppDbContext : DbContext
             new AppSetting { Id = 1, Key = "TemplateStorageLocation", Value = "" }
         );
 
-        // DoorMaterial: constrain Material to only "Hollow Metal" or "Wood"
+        // DoorMaterial: constrain Material to only "Metal", "Wood", or "Both"
         modelBuilder.Entity<DoorMaterial>()
             .ToTable(t => t.HasCheckConstraint("CK_DoorMaterial_Material",
-                "\"Material\" IN ('Hollow Metal', 'Wood')"));
+                "\"Material\" IN ('Metal', 'Wood', 'Both')"));
 
-        // Seed the two valid DoorMaterial values
+        // Seed the three valid DoorMaterial values
         modelBuilder.Entity<DoorMaterial>().HasData(
-            new DoorMaterial { Id = 1, Material = "Hollow Metal" },
-            new DoorMaterial { Id = 2, Material = "Wood" }
+            new DoorMaterial { Id = 1, Material = "Metal" },
+            new DoorMaterial { Id = 2, Material = "Wood" },
+            new DoorMaterial { Id = 3, Material = "Both" }
         );
 
         // HardwareItem: default Frequency to 0

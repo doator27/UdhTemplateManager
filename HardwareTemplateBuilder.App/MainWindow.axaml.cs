@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.App.Navigation;
 using HardwareTemplateBuilder.App.Views;
+using HardwareTemplateBuilder.Core.Data;
 
 namespace HardwareTemplateBuilder.App;
 
@@ -64,6 +65,21 @@ public partial class MainWindow : Window
                 "Manages door hardware templates and generates PDF packages for job orders.\n\n" +
                 "Built with .NET 8 · Avalonia UI · PDFsharp · QuestPDF · SQLite",
                 "About Hardware Template Builder");
+        };
+        MenuFileChangeUser.Click += async (_, _) =>
+        {
+            var machineId = MachineIdentityService.GetMachineId();
+            // Temporarily clear active profile so the picker cannot be dismissed without re-selecting.
+            SessionService.ActiveUserProfile = null;
+            var picker = new ProfilePickerDialog(machineId);
+            await picker.ShowDialog(this);
+            SetActiveUser(SessionService.ActiveUserProfile?.UserName ?? "Unknown");
+        };
+        MenuFileDatabaseLocation.Click += async (_, _) =>
+        {
+            // Not required — user can cancel without changing the location.
+            var dialog = new DatabaseSetupDialog(unreachablePath: null, required: false);
+            await dialog.ShowDialog(this);
         };
         MenuFileExit.Click += (_, _) => Close();
         MenuJobs.Click += (_, _) => NavigateTo("Jobs");

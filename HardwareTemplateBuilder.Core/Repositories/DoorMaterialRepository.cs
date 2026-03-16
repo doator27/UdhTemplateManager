@@ -6,7 +6,7 @@ namespace HardwareTemplateBuilder.Core.Repositories;
 
 /// <summary>
 /// Repository for <see cref="DoorMaterial"/> entities.
-/// DoorMaterial values are seeded and constrained to "Hollow Metal" and "Wood" only.
+/// DoorMaterial values are seeded and constrained to "Metal", "Wood", and "Both" only.
 /// </summary>
 public class DoorMaterialRepository : RepositoryBase<DoorMaterial>
 {

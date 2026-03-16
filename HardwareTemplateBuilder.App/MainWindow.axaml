@@ -12,6 +12,9 @@
             <MenuItem Header="_File">
                 <MenuItem Header="_About" Name="MenuFileAbout" />
                 <Separator />
+                <MenuItem Header="_Change User Profile" Name="MenuFileChangeUser" />
+                <MenuItem Header="_Database Location..." Name="MenuFileDatabaseLocation" />
+                <Separator />
                 <MenuItem Header="_Exit" Name="MenuFileExit" />
             </MenuItem>
             <MenuItem Header="_Jobs">

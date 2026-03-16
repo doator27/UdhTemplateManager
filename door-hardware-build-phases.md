@@ -263,6 +263,258 @@ Application is stable, validated, and ready for real-world use.
 
 ---
 
+---
+
+## Phase 13 — Template-Add Panel Refinements & Door Material Values
+
+**Goal:** Streamline the add-template workflow inside `HardwareItemDetailView` and correct the `DoorMaterial` value set.
+
+### Tasks
+
+**Add-Template Panel (HardwareItemDetailView):**
+- Remove the Manufacturer combobox from the add-template search panel entirely — it is always the same manufacturer as the parent hardware item
+- Pre-filter the template search results server-side so only templates whose `ManufacturerId` matches the hardware item's `ManufacturerId` are shown
+- Pre-filter the Description combobox to show only descriptions that are descendants (children, grandchildren, etc.) of the hardware item's own `DescriptionId`:
+  - Implement (or reuse) a BFS/DFS `GetDescendantIds(int rootId, IEnumerable<Description> allDescs)` helper that returns the root plus all transitive children
+  - Load that filtered set into the Description combo when the detail view opens
+- Filter the template search results further so only templates whose `DescriptionId` is in the descendant set are displayed
+- Existing linked templates list: apply the same manufacturer + descendant-description filter so unrelated templates are never shown as candidates
+
+**Template file source — local path support:**
+- When creating or editing an `IndividualTemplate`, the user may supply either (or both) an `OnlineLink` URL and a `LocalLink` file path — these are already separate columns in the schema
+- Ensure the `IndividualTemplate` form (in `HardwareItemDetailView`'s add-template panel and in the standalone `IndividualTemplatesView`) shows both fields clearly:
+  - `OnlineLink` — text input for a URL
+  - `LocalLink` — text input with an adjacent "Browse…" file-picker button that opens a native open-file dialog filtered to `*.pdf`
+- `FileAcquirer` priority logic: if `LocalLink` is set and the file exists on disk, use it directly (no download); fall back to `OnlineLink` if the local file is missing or the path is empty
+- During template refresh (Phase 11 / Phase 16), only re-download templates that have an `OnlineLink`; templates with only a `LocalLink` are skipped (the file is managed by the user)
+- Validation: at least one of `OnlineLink` or `LocalLink` must be non-empty before the template can be saved
+
+**Door Material values:**
+- Change the allowed `DoorMaterial` values from `"Hollow Metal"` / `"Wood"` to: **`"Metal"`**, **`"Wood"`**, **`"Both"`**
+- Update the `DoorMaterial` seed data / constraint in Phase 1's `DatabaseInitializer` (and any EF migration) to use the new values
+- Update the `DoorMaterial` CRUD form combobox (Phase 4) to offer `Metal`, `Wood`, `Both`
+- Update any existing database records (migration script) that contain `"Hollow Metal"` → `"Metal"`
+
+### Deliverable
+The add-template panel no longer shows irrelevant manufacturers or unrelated descriptions. `DoorMaterial` reflects the correct three-value set throughout the application and database.
+
+---
+
+## Phase 14 — Job Backup Folder Restructuring
+
+**Goal:** Previous versions of a job package are stored in a clearly organized sub-folder rather than cluttering the root save directory.
+
+### Tasks
+- When generating a new PDF package for a job that already has an existing output file, move the existing file into:
+  ```
+  {OutputDirectory}/{JobNumber}/Old versions/{original_creation_datetime}/
+  ```
+  where `original_creation_datetime` is formatted as `yyyy-MM-dd HH-mm-ss` (filesystem-safe)
+- The `original_creation_datetime` should come from the file's last-write timestamp (or the `DateCreated` field on the previous `JobTemplateSnapshot` batch if available)
+- Create the `Old versions` sub-folder and datetime-named folder automatically; never overwrite files within an existing datetime folder
+- Update `PdfAssemblyService` (and the job generation trigger in `JobDetailView`) to perform the backup move before writing the new output file
+- Ensure the backup step is skipped cleanly if no previous file exists (first-time generation)
+- Add a "Browse Old Versions" button to the Job screen that opens the `Old versions` folder in the OS file explorer (if it exists)
+
+### Deliverable
+Every re-generation automatically archives the previous package in a dated sub-folder. Old versions are easy to find without polluting the main save location.
+
+---
+
+## Phase 15 — Job-Centric Add-Anything Workflow
+
+**Goal:** All entity creation (hardware items, templates, manufacturers, descriptions, customers, project managers) is accessible directly from within the Job screen without leaving the job context.
+
+### Tasks
+- Add a toolbar or action panel to `JobDetailView` (or its linked hardware sub-panel) with quick-access buttons:
+  - **New Hardware Item** — opens `HardwareItemsView` in a modal/side-panel pre-filtered to the job's context; on save, optionally adds the new item to the job automatically
+  - **New Template** — opens `IndividualTemplatesView` in a modal; on save, optionally links the new template to the currently selected hardware item
+  - **New Manufacturer** — inline dialog (single text field) or navigates to `ManufacturersView`; newly created manufacturer is immediately available in all FK combos
+  - **New Description** — opens `DescriptionsView` (or a simplified add-description dialog); new description is immediately available in all FK combos
+  - **New Customer** — inline add panel (already implemented as of Phase 12+); ensure it is consistent here
+  - **New Project Manager** — inline add panel (already implemented); ensure it is consistent here
+- All modals/dialogs must refresh their parent FK comboboxes upon close so newly created records are immediately selectable without a full view reload
+- Navigation away from the job to perform these actions must preserve the current job state (unsaved changes prompt or auto-save draft)
+
+### Deliverable
+A user can build an entire job — including creating every referenced entity from scratch — without ever leaving the job screen.
+
+---
+
+## Phase 16 — Refresh Templates 403 Fix
+
+**Goal:** The Maintenance "Refresh Templates" feature successfully downloads templates from servers that block bare HTTP requests, matching the fix already applied to job package generation.
+
+### Tasks
+- In `FileAcquirer.DownloadAsync` (or the equivalent download path used by the refresh workflow), ensure every HTTP request sends a realistic browser `User-Agent` header:
+  ```
+  User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+  ```
+- Use `HttpRequestMessage` with `request.Headers.TryAddWithoutValidation("User-Agent", ...)` rather than setting it on the `HttpClient` default headers (avoids InvalidOperationException on shared clients)
+- Verify this same header is present in all code paths that download a template file:
+  1. Job package generation (`PdfAssemblyService` → `FileAcquirer`)
+  2. Individual template lookup generation (`TemplateLookupView` → `FileAcquirer`)
+  3. Maintenance refresh (`MaintenanceView` → `FileAcquirer` or equivalent)
+- Add the fix to the shared `FileAcquirer` so all three paths benefit from a single change
+- Regression test: confirm that a template with a known `OnlineLink` downloads without error via the refresh path
+
+### Deliverable
+Maintenance refresh no longer returns 403 errors. All three download paths (job package, individual lookup, maintenance refresh) share a single download implementation with the correct User-Agent.
+
+---
+
+## Phase 17 — Machine-Bound User Profile & Auto-Select
+
+**Goal:** A user only picks their profile once per machine; subsequent launches auto-select the correct profile. Switching profiles remains possible via Settings.
+
+### Tasks
+
+**Machine identity:**
+- On first launch, generate a stable machine identifier (e.g. hash of hostname + username, or a GUID written to a local config file in `ApplicationData`) and store it in the `UserProfile` table as a new `MachineId` column (nullable, added via EF migration)
+- When a `UserProfile` is selected/created, write the current machine's identifier into that profile's `MachineId` field
+
+**Auto-select on launch:**
+- On every subsequent launch, query for a `UserProfile` whose `MachineId` matches the current machine
+- If exactly one match is found: auto-select it silently and proceed directly to the Dashboard — no profile picker is shown
+- If no match is found (first run on this machine, or the profile was deleted): show the profile picker listing all existing profiles plus a "New Profile" option
+
+**Profile picker UX:**
+- List all existing `UserProfile` records with name + machine association shown (e.g. "Alice (this machine)", "Bob (WORKSTATION-2)")
+- Allow creating a new profile inline
+- On selecting an existing profile from another machine, update its `MachineId` to the current machine (re-binds the profile)
+
+**Settings override:**
+- Add a "Change User Profile" entry under the `File` menu (or a dedicated `Settings` view)
+- Triggering it shows the profile picker, allowing the user to switch to a different profile or create a new one
+- After switching, the new profile's `MachineId` is updated to the current machine
+
+### Deliverable
+Single-machine users never see the profile picker after initial setup. Multi-machine teams can easily re-bind profiles. Profile switching is always accessible but never in the way.
+
+---
+
+---
+
+## Phase 18 — Shared Database Location Setup
+
+**Goal:** On first run on any machine, the app asks the user where the SQLite database lives (or where to create it). This single database is shared across all users on the team via a network path; each machine stores only a small local pointer file pointing at it.
+
+### Background & rationale
+The SQLite database contains all hardware items, templates, jobs, descriptions, and user profiles — it is the single source of truth for the whole team. Rather than each machine maintaining its own isolated database, the file should live on a shared network location (e.g. a mapped drive, NAS, or UNC path) so all team members see the same data. The per-machine pointer file is stored in `AppData/HardwareTemplateBuilder/db_location.txt` and is never committed to source control or distributed with the installer.
+
+### Tasks
+
+**Local pointer file (`db_location.txt`):**
+- Create `DatabaseLocationService` (alongside `MachineIdentityService`) that:
+  - Reads `AppData/HardwareTemplateBuilder/db_location.txt` for the database path
+  - Returns `null` if the file does not exist or the stored path is blank
+  - Writes a validated path to the file when the user completes setup
+- Update `DatabaseInitializer.GetDatabasePath()` to call `DatabaseLocationService.GetConfiguredPath()` and fall back to the existing `AppData` default only for legacy / single-user scenarios (i.e., if a database already exists at the old location, use it and write its path to the pointer file automatically so existing installs are not disrupted)
+
+**`DatabaseSetupDialog` (new `Window`):**
+- Shown on startup before `DatabaseInitializer.Initialize()` when `db_location.txt` does not exist and no database is found at the legacy default path
+- Two options presented to the user:
+
+  | Option | Description |
+  |--------|-------------|
+  | **Create new database** | Folder picker selects the target folder; the app creates `hardware_templates.db` there and runs all migrations |
+  | **Connect to existing database** | File picker (filter: `*.db`) selects an existing database file; the app validates it (attempts to open and query the schema version) before accepting |
+
+- On confirmation, the chosen path is written to `db_location.txt`
+- The dialog cannot be dismissed without making a valid selection (same pattern as `ProfilePickerDialog`)
+- Display the resolved path in a read-only text field so the user can verify it before confirming
+- If validation fails (file not found, schema mismatch, corrupt file), show an inline error and keep the dialog open
+
+**`App.axaml.cs` startup sequence:**
+```
+1. DatabaseLocationService.GetConfiguredPath() → path?
+2. If null AND no database at legacy path → show DatabaseSetupDialog
+3. If null AND database EXISTS at legacy path → migrate silently (write legacy path to db_location.txt)
+4. DatabaseInitializer.Initialize() (migrate / create schema at the configured path)
+5. MachineIdentityService.GetMachineId()
+6. Auto-select profile or show ProfilePickerDialog
+7. Show MainWindow / Dashboard
+```
+
+**Relocate database (Settings):**
+- Add a "Database Location…" entry to the `File` menu (or under `Admin`)
+- Opens a simplified version of `DatabaseSetupDialog` that only shows the "Connect to existing" option (moving the database file itself is the user's responsibility — the app just re-points to the new location)
+- After re-pointing, the app re-runs `DatabaseInitializer.Initialize()` against the new path and refreshes the active session
+
+**Error handling:**
+- If `db_location.txt` points to a path that no longer exists (e.g. network share unavailable), show a clear "Cannot reach database" dialog on startup with options: Retry, Choose different location, or Exit
+- Never silently fall back to the local `AppData` path if a configured path exists but is unreachable — this would result in the user working against an empty local database and not realising it
+
+### Deliverable
+On first run, every team member is guided to connect to (or create) the shared database in one step. Subsequent launches go straight to profile selection with no friction. The database file location is visible and changeable from the File menu.
+
+---
+
+## Phase 19 — Organized Local Template Storage
+
+**Goal:** Template PDF files stored on disk are organized into a folder hierarchy that mirrors the manufacturer and description tree, making the storage folder human-navigable without the app.
+
+### Background & rationale
+Currently all downloaded template files land flat in the configured `TemplateStorageLocation`. With hundreds of templates from dozens of manufacturers this becomes unmanageable. Organizing by manufacturer and then by description hierarchy makes it easy for users to find a specific PDF by hand, and also makes the folder structure self-documenting.
+
+### Target folder structure
+```
+{TemplateStorageLocation}/
+  {ManufacturerName}/
+    {RootDescription}/
+      {ChildDescription}/
+        {GrandchildDescription}/
+          {TemplateNumber}.pdf
+    (templates with no description go directly under {ManufacturerName}/)
+```
+
+Example:
+```
+Templates/
+  Allegion/
+    Hinges/
+      Butt Hinges/
+        FBB179 4.5x4.5.pdf
+    Closers/
+      Surface Mounted/
+        LCN 4040XP.pdf
+  Von Duprin/
+    Exit Devices/
+      Rim/
+        99 Series.pdf
+```
+
+### Tasks
+
+**`DescriptionPathService` (new, Core):**
+- `GetFolderPath(int? descriptionId, IReadOnlyList<Description> allDescriptions) → string`
+  - Walks the `ParentId` chain from the given description up to the root, collecting names
+  - Returns the names joined as a relative path (e.g. `"Hinges/Butt Hinges"`) using `Path.Combine`
+  - Returns an empty string if `descriptionId` is null (template goes directly under manufacturer folder)
+  - Sanitizes each segment with `SanitizeFolderName()` (replaces characters illegal on Windows/Linux: `\ / : * ? " < > |` with `_`)
+
+**Update `TemplateRefreshService`:**
+- After downloading a template PDF, derive its save path as:
+  `Path.Combine(saveLocation, manufacturerName, descriptionPath, templateNumber + ".pdf")`
+- Create all intermediate directories with `Directory.CreateDirectory`
+- Store the resulting absolute path in `IndividualTemplate.LocalLink` (updates existing record if already set)
+- Load all `Description` records once before the refresh loop to avoid repeated DB queries
+
+**Update `FileAcquirer`:**
+- When looking for a local copy of a template, check `IndividualTemplate.LocalLink` first (already present)
+- If `LocalLink` is set and the file exists at that path, use it directly — no download needed
+- If `LocalLink` is null or the file is missing, fall back to downloading (existing behaviour)
+- After a successful download/copy, derive the organized path using `DescriptionPathService` and save it to `LocalLink`
+
+**Migration:**
+- No schema change required — `LocalLink` already exists on `IndividualTemplate`
+- Existing `LocalLink` values pointing to old flat paths remain valid; the app uses them as-is until the user triggers a refresh, at which point paths are updated to the new structure
+
+### Deliverable
+After a template refresh, all downloaded PDFs are stored in `{Manufacturer}/{Description hierarchy}/` subfolders. `FileAcquirer` finds templates via `LocalLink` without re-downloading. The storage folder is navigable by hand.
+
+---
+
 ## Dependency Map
 
 ```
@@ -278,6 +530,17 @@ Phase 1 (DB Schema)
                     └── Phase 10 (Job Package)       ← needs Phase 5 + 6
                           └── Phase 11 (Refresh)
                                 └── Phase 12 (Polish)
+                                      ├── Phase 13 (Template-Add Refinements + Door Material)
+                                      │     └── Phase 15 (Job-Centric Workflow)
+                                      ├── Phase 14 (Job Backup Folder)
+                                      │     └── Phase 15 (Job-Centric Workflow)
+                                      ├── Phase 16 (Refresh 403 Fix)  ← also needs Phase 11
+                                      ├── Phase 17 (Machine-Bound User Profile)
+                                      ├── Phase 18 (Shared Database Location)  ← must precede Phase 17
+                                      └── Phase 19 (Organized Template Storage) ← needs Phase 11 + 16
 ```
 
-> Phases 3–6 (UI) and Phases 7–8 (PDF engine) can be developed in parallel once Phase 2 is complete.
+> Phases 13–18 are independent post-polish features and can be developed in parallel once Phase 12 is complete.
+> Phase 18 should be implemented before Phase 17 in practice — database location must be resolved before the profile picker can query it.
+> Phase 16 can be targeted earlier (immediately after Phase 11) if the 403 error is blocking active use.
+> Phase 19 depends on Phase 11 (refresh service) and benefits from Phase 16 (403 fix) being in place first.

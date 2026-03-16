@@ -99,19 +99,24 @@ namespace HardwareTemplateBuilder.Core.Migrations
 
                     b.ToTable("DoorMaterials", t =>
                         {
-                            t.HasCheckConstraint("CK_DoorMaterial_Material", "\"Material\" IN ('Hollow Metal', 'Wood')");
+                            t.HasCheckConstraint("CK_DoorMaterial_Material", "\"Material\" IN ('Metal', 'Wood', 'Both')");
                         });
 
                     b.HasData(
                         new
                         {
                             Id = 1,
-                            Material = "Hollow Metal"
+                            Material = "Metal"
                         },
                         new
                         {
                             Id = 2,
                             Material = "Wood"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Material = "Both"
                         });
                 });
 
@@ -354,6 +359,9 @@ namespace HardwareTemplateBuilder.Core.Migrations
 
                     b.Property<string>("DefaultTemplateSaveLocation")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MachineId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("UserName")

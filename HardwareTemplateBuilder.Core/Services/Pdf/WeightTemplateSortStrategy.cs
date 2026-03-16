@@ -47,8 +47,10 @@ public class WeightTemplateSortStrategy : ITemplateSortStrategy
     /// <summary>
     /// Walks the ancestor chain of <paramref name="descriptionId"/> and returns the ordered
     /// list of <c>SortOrder</c> values from the root down to the node.
+    /// Exposed as <c>internal static</c> so other services (e.g. cover sheet sorting) can
+    /// reuse the same path-building logic without duplicating code.
     /// </summary>
-    private static IReadOnlyList<int> GetSortPath(
+    internal static IReadOnlyList<int> GetSortPath(
         int descriptionId,
         IReadOnlyDictionary<int, Description> allDescriptions)
     {

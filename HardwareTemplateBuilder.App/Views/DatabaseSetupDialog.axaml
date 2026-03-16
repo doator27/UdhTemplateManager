@@ -1,0 +1,79 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="HardwareTemplateBuilder.App.Views.DatabaseSetupDialog"
+        x:CompileBindings="False"
+        Title="Database Setup"
+        Width="530"
+        Height="510"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        Background="#C0C0C0">
+    <DockPanel Margin="16">
+
+        <!-- Error banner — shown only when previously configured path is unreachable -->
+        <Border Name="ErrorPanel"
+                DockPanel.Dock="Top"
+                Background="#fff0f0"
+                BorderBrush="#cc0000"
+                BorderThickness="1"
+                Padding="10"
+                Margin="0,0,0,10"
+                IsVisible="False">
+            <StackPanel>
+                <TextBlock Text="Database Unreachable" FontWeight="Bold" Foreground="#800000" Margin="0,0,0,4"/>
+                <TextBlock Name="UnreachablePathLabel" TextWrapping="Wrap" Foreground="#800000"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Heading -->
+        <TextBlock DockPanel.Dock="Top"
+                   Name="HeaderLabel"
+                   Text="Welcome — Set Up Your Shared Database"
+                   FontSize="13" FontWeight="Bold"
+                   Margin="0,0,0,4"/>
+        <TextBlock DockPanel.Dock="Top"
+                   Text="The database is shared across the team. Point every workstation at the same file."
+                   TextWrapping="Wrap"
+                   Foreground="#404040"
+                   Margin="0,0,0,12"/>
+
+        <!-- Option A: Create new database -->
+        <Border DockPanel.Dock="Top"
+                BorderBrush="#808080" BorderThickness="1"
+                Padding="10" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock Text="Create a new database" FontWeight="Bold" Margin="0,0,0,6"/>
+                <TextBlock Text="Choose a shared folder (e.g. a mapped network drive). The database file will be created there."
+                           TextWrapping="Wrap" Margin="0,0,0,6"/>
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                    <TextBox Grid.Column="0" Name="CreateFolderBox"
+                             Watermark="\\server\share  or  Z:\DatabaseFolder"/>
+                    <Button  Grid.Column="1" Name="BrowseCreateButton"
+                             Content="..." Width="32" Margin="4,0,0,0"/>
+                </Grid>
+                <Button Name="CreateButton" Content="Create Database Here" HorizontalAlignment="Left"/>
+                <TextBlock Name="CreateStatusLabel" Foreground="#800000"
+                           TextWrapping="Wrap" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Option B: Connect to existing database -->
+        <Border BorderBrush="#808080" BorderThickness="1" Padding="10">
+            <StackPanel>
+                <TextBlock Text="Connect to an existing database" FontWeight="Bold" Margin="0,0,0,6"/>
+                <TextBlock Text="Select the hardware_templates.db file already on your network share."
+                           TextWrapping="Wrap" Margin="0,0,0,6"/>
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                    <TextBox Grid.Column="0" Name="ConnectPathBox"
+                             Watermark="Path to existing .db file..."/>
+                    <Button  Grid.Column="1" Name="BrowseConnectButton"
+                             Content="..." Width="32" Margin="4,0,0,0"/>
+                </Grid>
+                <Button Name="ConnectButton" Content="Connect to This Database" HorizontalAlignment="Left"/>
+                <TextBlock Name="ConnectStatusLabel" Foreground="#800000"
+                           TextWrapping="Wrap" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
+
+    </DockPanel>
+</Window>

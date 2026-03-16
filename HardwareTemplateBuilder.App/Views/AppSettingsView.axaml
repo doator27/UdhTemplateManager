@@ -6,21 +6,46 @@
             <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,12,0"/>
             <TextBlock Text="App Settings" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
-        <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="16">
-            <StackPanel MaxWidth="600" HorizontalAlignment="Left">
-                <TextBlock Text="Shared Template Storage Location:" Margin="0,0,0,4" />
-                <TextBlock TextWrapping="Wrap" Foreground="#444444" FontSize="11"
-                           Text="All downloaded template files are stored here. This folder should be a shared network path so every user has access to the same master copies."
-                           Margin="0,0,0,8" />
-                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
-                    <TextBox Grid.Column="0" Name="StorageLocationBox" Watermark="e.g. \\server\templates or /mnt/shared/templates" />
-                    <Button Grid.Column="1" Name="BrowseButton" Content="Browse..." Width="80" Margin="6,0,0,0" />
-                </Grid>
-                <StackPanel Orientation="Horizontal">
-                    <Button Name="SaveButton" Content="Save" Margin="0,0,8,0" />
-                </StackPanel>
-                <TextBlock Name="StatusLabel" Margin="0,10,0,0" Foreground="#800000" />
+        <ScrollViewer>
+            <StackPanel MaxWidth="600" HorizontalAlignment="Left" Spacing="12">
+
+                <!-- Template storage location -->
+                <Border BorderBrush="#808080" BorderThickness="1" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Template Storage Location:" FontWeight="Bold" Margin="0,0,0,4" />
+                        <TextBlock TextWrapping="Wrap" Foreground="#444444" FontSize="11"
+                                   Text="All downloaded template files are stored here."
+                                   Margin="0,0,0,8" />
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                            <TextBox Grid.Column="0" Name="StorageLocationBox" Watermark="e.g. \\server\templates or /mnt/shared/templates" />
+                            <Button Grid.Column="1" Name="BrowseButton" Content="Browse..." Width="80" Margin="6,0,0,0" />
+                        </Grid>
+                        <Button Name="SaveButton" Content="Save" HorizontalAlignment="Left" />
+                        <TextBlock Name="StatusLabel" Margin="0,10,0,0" Foreground="#800000" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Database location / migrate -->
+                <Border BorderBrush="#808080" BorderThickness="1" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Database Location:" FontWeight="Bold" Margin="0,0,0,4" />
+                        <TextBlock TextWrapping="Wrap" Foreground="#444444" FontSize="11"
+                                   Text="The active SQLite database file. Use 'Move Database' to copy it to a new folder and switch to that location — useful for placing the database on a shared network drive."
+                                   Margin="0,0,0,8" />
+                        <TextBlock Text="Current location:" Margin="0,0,0,2" />
+                        <TextBlock Name="CurrentDbPathLabel" TextWrapping="Wrap" Foreground="#404040"
+                                   FontSize="11" Margin="0,0,0,12" />
+                        <TextBlock Text="Move to folder:" Margin="0,0,0,4" />
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                            <TextBox Grid.Column="0" Name="DbMoveTargetBox" Watermark="Target folder for database file" />
+                            <Button Grid.Column="1" Name="DbMoveBrowseButton" Content="Browse..." Width="80" Margin="6,0,0,0" />
+                        </Grid>
+                        <Button Name="MoveDbButton" Content="Move Database" HorizontalAlignment="Left" />
+                        <TextBlock Name="DbStatusLabel" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="#800000" />
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
-        </Border>
+        </ScrollViewer>
     </DockPanel>
 </UserControl>

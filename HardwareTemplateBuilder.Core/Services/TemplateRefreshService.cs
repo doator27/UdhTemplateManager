@@ -207,8 +207,12 @@ public class TemplateRefreshService
     /// <summary>Downloads the file at <paramref name="url"/> to <paramref name="destPath"/>.</summary>
     private async Task DownloadAsync(string url, string destPath, CancellationToken ct)
     {
-        using var response = await _httpClient.GetAsync(
-            url, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.TryAddWithoutValidation("User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+
+        using var response = await _httpClient.SendAsync(
+            request, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
 
         await using var fs = File.Create(destPath);

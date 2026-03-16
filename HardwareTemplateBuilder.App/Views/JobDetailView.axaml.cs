@@ -94,7 +94,8 @@ public partial class JobDetailView : UserControl
         SearchModelBox.TextChanged += (_, _) => SearchHardware();
         AddHardwareButton.Click += (_, _) => AddHardwareToJob();
         RemoveHardwareButton.Click += (_, _) => RemoveHardwareFromJob();
-        GeneratePackageButton.Click += async (_, _) => await OnGeneratePackageAsync();
+        GeneratePackageButton.Click    += async (_, _) => await OnGeneratePackageAsync();
+        BrowseOldVersionsButton.Click  += (_, _) => BrowseOldVersions();
 
         // Drag-and-drop reorder on linked hardware list
         LinkedHardwareList.AddHandler(PointerPressedEvent, OnLinkedListPointerPressed, RoutingStrategies.Tunnel);
@@ -400,14 +401,17 @@ public partial class JobDetailView : UserControl
                     Job             = job,
                     Hardware        = hardware,
                     OutputDirectory = saveDir,
-                    AllDescriptions = allDescriptions
+                    AllDescriptions = allDescriptions,
+                    PreparedByName  = profile?.UserName ?? string.Empty
                 };
 
                 // Back up any existing package before overwriting.
+                // Archive path: {saveDir}/{JobNumber}/Old versions/{file-last-write yyyy-MM-dd HH-mm-ss}/
                 var existingPath = Path.Combine(saveDir, job.JobNumber, $"{job.JobNumber}_templates.pdf");
                 if (File.Exists(existingPath))
                 {
-                    var backupDir = Path.Combine(saveDir, $"{job.JobNumber}_{DateTime.Now:yyyyMMdd_HHmmss}");
+                    var versionStamp = File.GetLastWriteTime(existingPath).ToString("yyyy-MM-dd HH-mm-ss");
+                    var backupDir    = Path.Combine(saveDir, job.JobNumber, "Old versions", versionStamp);
                     Directory.CreateDirectory(backupDir);
                     File.Move(existingPath, Path.Combine(backupDir, Path.GetFileName(existingPath)));
                     Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = "Backed up previous package...");
@@ -471,6 +475,40 @@ public partial class JobDetailView : UserControl
         catch
         {
             // Non-fatal: file was generated but couldn't be auto-opened.
+        }
+    }
+
+    /// <summary>
+    /// Opens the "Old versions" folder for this job in the OS file explorer, if it exists.
+    /// </summary>
+    private void BrowseOldVersions()
+    {
+        string saveDir;
+        string jobNumber;
+        using (var ctx = DatabaseInitializer.CreateContext())
+        {
+            var job     = ctx.Jobs.Find(_jobId);
+            jobNumber   = job?.JobNumber ?? string.Empty;
+            var profile = ctx.UserProfiles.FirstOrDefault(u => u.Id == (job != null ? job.UserProfileId : 0));
+            saveDir     = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
+                ? profile.DefaultTemplateSaveLocation
+                : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        }
+
+        var oldVersionsDir = Path.Combine(saveDir, jobNumber, "Old versions");
+        if (!Directory.Exists(oldVersionsDir))
+        {
+            PackageStatusLabel.Text = "No old versions folder found for this job.";
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(oldVersionsDir) { UseShellExecute = true });
+        }
+        catch
+        {
+            PackageStatusLabel.Text = $"Could not open folder: {oldVersionsDir}";
         }
     }
 

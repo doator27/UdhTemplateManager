@@ -312,7 +312,7 @@ public partial class TemplateLookupView : UserControl
             var extractor = new PageExtractor();
             var rotator   = new PageRotator();
             var merger    = new PdfMerger();
-            var numberer  = new PageNumberer();
+
 
             var processedPdfs = new List<string>();
 
@@ -359,11 +359,11 @@ public partial class TemplateLookupView : UserControl
             var merged = Path.Combine(workDir, "merged.pdf");
             merger.Merge(processedPdfs, merged);
 
-            PostStatus("Stamping page numbers...");
             Directory.CreateDirectory(saveLocation);
             var safeName = SanitizeFileName(item.ModelNumber);
             var outputPath = Path.Combine(saveLocation, $"{safeName}_templates.pdf");
-            numberer.StampPageNumbers(merged, skipPages: 0, outputPath);
+            // Individual template downloads are not numbered — copy merged PDF directly.
+            File.Copy(merged, outputPath, overwrite: true);
 
             return outputPath;
         }, ct);

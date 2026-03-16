@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 namespace HardwareTemplateBuilder.Core.Models;
 
 /// <summary>
-/// Represents a door material type. Only "Hollow Metal" or "Wood" are valid values.
+/// Represents a door material type. Only "Metal", "Wood", or "Both" are valid values.
 /// </summary>
 public class DoorMaterial
 {
@@ -12,7 +12,7 @@ public class DoorMaterial
     public int Id { get; set; }
 
     /// <summary>
-    /// Gets or sets the material name. Must be either "Hollow Metal" or "Wood".
+    /// Gets or sets the material name. Must be "Metal", "Wood", or "Both".
     /// </summary>
     [Required]
     public string Material { get; set; } = string.Empty;

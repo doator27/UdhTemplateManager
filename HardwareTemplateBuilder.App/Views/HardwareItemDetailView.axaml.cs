@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
@@ -6,6 +7,7 @@ using HardwareTemplateBuilder.Core.Repositories;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace HardwareTemplateBuilder.App.Views;
 
@@ -18,10 +20,10 @@ namespace HardwareTemplateBuilder.App.Views;
 public partial class HardwareItemDetailView : UserControl
 {
     private readonly int _itemId;
-    private List<Manufacturer> _manufacturers = new();
+    private int _itemManufacturerId;
+    private int _itemDescriptionId;
     private List<DescriptionComboItem> _descComboItems = new();
     private List<DoorMaterial> _doorMaterials = new();
-    private bool _updatingSearchDescCombo;
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event System.Action<string>? NavigationRequested;
@@ -47,39 +49,42 @@ public partial class HardwareItemDetailView : UserControl
             ? $"{item.Manufacturer?.ManufacturerName} — {item.ModelNumber}"
             : $"Item #{_itemId}";
 
-        _manufacturers  = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
+        _itemManufacturerId = item?.ManufacturerId ?? 0;
+        _itemDescriptionId  = item?.DescriptionId  ?? 0;
+
+        var allRawDescs = new DescriptionRepository(context).GetAll().ToList();
+        _descComboItems = DescriptionHelper.BuildComboItems(allRawDescs);
         _doorMaterials  = new DoorMaterialRepository(context).GetAll().OrderBy(d => d.Material).ToList();
 
-        // Quick-add combos
-        AddMfrCombo.ItemsSource = _manufacturers;
-        AddMfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
-        AddDescCombo.ItemsSource = _descComboItems;
+        // Quick-add combos — pre-filter descriptions to item's description subtree.
+        var descendantIds = _itemDescriptionId > 0
+            ? GetDescendantIds(_itemDescriptionId, allRawDescs)
+            : null;
+        var addDescItems = descendantIds != null
+            ? _descComboItems.Where(d => descendantIds.Contains(d.Id)).ToList()
+            : _descComboItems;
+        AddDescCombo.ItemsSource = addDescItems.Count > 0 ? addDescItems : _descComboItems;
         AddDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+
         AddDoorMatCombo.ItemsSource = _doorMaterials;
         AddDoorMatCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
 
-        // Search combos
-        var anyMfr = new List<Manufacturer> { new() { Id = 0, ManufacturerName = "(Any)" } };
-        anyMfr.AddRange(_manufacturers);
-        SearchMfrCombo.ItemsSource = anyMfr;
-        SearchMfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
-        SearchMfrCombo.SelectedIndex = 0;
-
-        var anyDesc = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
-        anyDesc.AddRange(_descComboItems);
-        SearchDescCombo.ItemsSource = anyDesc;
+        // Search desc combo — same descendant filter with "(Any)" sentinel.
+        var searchDescItems = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
+        searchDescItems.AddRange(addDescItems.Count > 0 ? addDescItems : _descComboItems);
+        SearchDescCombo.ItemsSource = searchDescItems;
         SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
         SearchDescCombo.SelectedIndex = 0;
 
         LoadLinkedTemplates();
+        SearchTemplates();
 
-        MainMenuButton.Click    += (_, _) => NavigationRequested?.Invoke("Dashboard");
-        BackButton.Click        += (_, _) => NavigationRequested?.Invoke("HardwareItems");
+        MainMenuButton.Click       += (_, _) => NavigationRequested?.Invoke("Dashboard");
+        BackButton.Click           += (_, _) => NavigationRequested?.Invoke("HardwareItems");
         RemoveTemplateButton.Click += (_, _) => RemoveTemplate();
         AddTemplateButton.Click    += (_, _) => AddLinkTemplate();
-        SearchMfrCombo.SelectionChanged  += (_, _) => OnSearchMfrChanged();
-        SearchDescCombo.SelectionChanged += (_, _) => { if (!_updatingSearchDescCombo) SearchTemplates(); };
+        BrowseLocalLinkButton.Click += async (_, _) => await BrowseLocalLinkAsync();
+        SearchDescCombo.SelectionChanged += (_, _) => SearchTemplates();
         SearchTemplateNumBox.TextChanged  += (_, _) => SearchTemplates();
         LinkButton.Click += (_, _) => LinkSearchResult();
     }
@@ -120,12 +125,13 @@ public partial class HardwareItemDetailView : UserControl
     /// <summary>
     /// Primary add path: finds or creates the template from the Quick-Add fields, then links
     /// it to this hardware item. Fully deduplicates — both the template record and the link.
+    /// Manufacturer is always inherited from the parent hardware item.
     /// </summary>
     private void AddLinkTemplate()
     {
-        if (AddMfrCombo.SelectedItem is not Manufacturer mfr)    { AddStatusLabel.Text = "Manufacturer is required."; return; }
+        if (_itemManufacturerId == 0)                              { AddStatusLabel.Text = "Hardware item has no manufacturer."; return; }
         if (AddDescCombo.SelectedItem is not DescriptionComboItem desc) { AddStatusLabel.Text = "Description is required."; return; }
-        if (AddDoorMatCombo.SelectedItem is not DoorMaterial mat) { AddStatusLabel.Text = "Door Material is required."; return; }
+        if (AddDoorMatCombo.SelectedItem is not DoorMaterial mat)  { AddStatusLabel.Text = "Door Material is required."; return; }
 
         var templateNum = AddTemplateNumBox.Text?.Trim();
         if (string.IsNullOrEmpty(templateNum)) { AddStatusLabel.Text = "Template # is required."; return; }
@@ -134,6 +140,13 @@ public partial class HardwareItemDetailView : UserControl
         if (string.IsNullOrEmpty(pagesToPrint)) pagesToPrint = "1";
 
         var onlineLink = AddOnlineLinkBox.Text?.Trim();
+        var localLink  = AddLocalLinkBox.Text?.Trim();
+
+        if (string.IsNullOrEmpty(onlineLink) && string.IsNullOrEmpty(localLink))
+        {
+            AddStatusLabel.Text = "Provide at least an Online Link or a Local File path.";
+            return;
+        }
 
         using var context = DatabaseInitializer.CreateContext();
         var templateRepo = new IndividualTemplateRepository(context);
@@ -141,13 +154,14 @@ public partial class HardwareItemDetailView : UserControl
 
         var candidate = new IndividualTemplate
         {
-            ManufacturerId = mfr.Id,
+            ManufacturerId = _itemManufacturerId,
             DescriptionId  = desc.Id,
             DoorMaterialId = mat.Id,
             TemplateNumber = templateNum,
             PagesToPrint   = pagesToPrint,
             NumPages       = 1,
             OnlineLink     = string.IsNullOrEmpty(onlineLink) ? null : onlineLink,
+            LocalLink      = string.IsNullOrEmpty(localLink)  ? null : localLink,
         };
 
         // Add() returns existing record if (Manufacturer, TemplateNumber, DoorMaterial) match.
@@ -170,51 +184,41 @@ public partial class HardwareItemDetailView : UserControl
         AddTemplateNumBox.Text  = "";
         AddPagesToPrintBox.Text = "1";
         AddOnlineLinkBox.Text   = "";
+        AddLocalLinkBox.Text    = "";
 
         LoadLinkedTemplates();
     }
 
-    // --- Search and link (secondary) ---
-
-    private void OnSearchMfrChanged()
+    /// <summary>Opens a file picker and populates the Local File path box.</summary>
+    private async Task BrowseLocalLinkAsync()
     {
-        var mfr   = SearchMfrCombo.SelectedItem as Manufacturer;
-        var mfrId = mfr?.Id ?? 0;
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
 
-        var filtered = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
-        if (mfrId == 0)
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            filtered.AddRange(_descComboItems);
-        }
-        else
-        {
-            using var ctx = DatabaseInitializer.CreateContext();
-            var descIds = ctx.IndividualTemplates
-                .Where(t => t.ManufacturerId == mfrId)
-                .Select(t => t.DescriptionId)
-                .Distinct()
-                .ToHashSet();
-            filtered.AddRange(_descComboItems.Where(d => descIds.Contains(d.Id)));
-        }
+            Title = "Select PDF File",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("PDF Files") { Patterns = new[] { "*.pdf" } }
+            }
+        });
 
-        _updatingSearchDescCombo = true;
-        try
-        {
-            SearchDescCombo.ItemsSource = filtered;
-            SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-            SearchDescCombo.SelectedIndex = 0;
-        }
-        finally { _updatingSearchDescCombo = false; }
-
-        SearchTemplates();
+        if (files.Count > 0)
+            AddLocalLinkBox.Text = files[0].Path.LocalPath;
     }
 
+    // --- Search and link (secondary) ---
+
+    /// <summary>
+    /// Searches for templates belonging to the same manufacturer as this hardware item,
+    /// optionally filtered by description subtree and template number substring.
+    /// </summary>
     private void SearchTemplates()
     {
-        var mfr      = SearchMfrCombo.SelectedItem as Manufacturer;
         var descItem = SearchDescCombo.SelectedItem as DescriptionComboItem;
         var num      = SearchTemplateNumBox.Text?.Trim();
-        var mfrName  = (mfr      == null || mfr.Id      == 0) ? null : mfr.ManufacturerName;
         var descId   = (descItem == null || descItem.Id == 0) ? (int?)null : descItem.Id;
 
         using var context = DatabaseInitializer.CreateContext();
@@ -223,13 +227,35 @@ public partial class HardwareItemDetailView : UserControl
             .Include(t => t.Description)
             .AsQueryable();
 
-        if (!string.IsNullOrEmpty(mfrName)) query = query.Where(t => t.Manufacturer.ManufacturerName.Contains(mfrName));
-        if (descId.HasValue)                query = query.Where(t => t.DescriptionId == descId.Value);
-        if (!string.IsNullOrEmpty(num))     query = query.Where(t => t.TemplateNumber.Contains(num));
+        // Always restrict to the same manufacturer as the hardware item.
+        if (_itemManufacturerId > 0)
+            query = query.Where(t => t.ManufacturerId == _itemManufacturerId);
+
+        if (descId.HasValue)            query = query.Where(t => t.DescriptionId == descId.Value);
+        if (!string.IsNullOrEmpty(num)) query = query.Where(t => t.TemplateNumber.Contains(num));
 
         var results = query.OrderBy(t => t.TemplateNumber).ToList();
         TemplateSearchList.ItemsSource = results;
         TemplateSearchList.DisplayMemberBinding = new Avalonia.Data.Binding("TemplateNumber");
+    }
+
+    /// <summary>
+    /// Returns the ID of <paramref name="rootId"/> plus all of its recursive descendants.
+    /// </summary>
+    private static HashSet<int> GetDescendantIds(int rootId, IEnumerable<Description> allDescs)
+    {
+        var lookup = allDescs.ToLookup(d => d.ParentId);
+        var result = new HashSet<int>();
+        var queue  = new Queue<int>();
+        queue.Enqueue(rootId);
+        while (queue.Count > 0)
+        {
+            var id = queue.Dequeue();
+            result.Add(id);
+            foreach (var child in lookup[(int?)id])
+                queue.Enqueue(child.Id);
+        }
+        return result;
     }
 
     private void LinkSearchResult()

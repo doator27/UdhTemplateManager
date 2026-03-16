@@ -84,7 +84,10 @@ public class CoverSheetBuilder
                         MetaCell("Project Manager:", bold: true); MetaCell(data.ProjectManagerName);
                         MetaCell("Date Created:", bold: true);
                         MetaCell(data.DateCreated.ToString("MMMM d, yyyy"));
-                        meta.Cell().ColumnSpan(2).Text(string.Empty); // spacer
+                        MetaCell("Templates by:", bold: true);
+                        MetaCell(data.PreparedBy);
+                        meta.Cell().ColumnSpan(2).Text(string.Empty); // right side of same row (empty)
+                        meta.Cell().ColumnSpan(4).Text(string.Empty); // spacer row
                     });
 
                     header.Item().PaddingTop(6).LineHorizontal(1).LineColor("#1a3a5c");

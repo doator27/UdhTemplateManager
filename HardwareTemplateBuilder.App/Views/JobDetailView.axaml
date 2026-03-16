@@ -39,8 +39,10 @@
                 <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
                     <StackPanel>
                         <TextBlock Text="PDF Package Generation" FontWeight="Bold" Margin="0,0,0,8"/>
-                        <Button Name="GeneratePackageButton" Content="Generate Package"
-                                HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <Button Name="GeneratePackageButton" Content="Generate Package" Margin="0,0,8,0"/>
+                            <Button Name="BrowseOldVersionsButton" Content="Browse Old Versions"/>
+                        </StackPanel>
                         <ProgressBar Name="PackageProgress"
                                      IsIndeterminate="True" IsVisible="False"
                                      Height="14" Margin="0,0,0,4"/>

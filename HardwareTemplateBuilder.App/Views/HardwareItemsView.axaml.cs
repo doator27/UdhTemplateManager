@@ -17,6 +17,8 @@ public partial class HardwareItemsView : UserControl
     private HardwareItemRepository? _repo;
     private List<Manufacturer> _manufacturers = new();
     private List<DescriptionComboItem> _descComboItems = new();
+    private List<Description> _allRawDescs = new();
+    private DescriptionComboItem? _selectedDescItem;
     private int _selectedId;
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
@@ -34,12 +36,11 @@ public partial class HardwareItemsView : UserControl
         var context = DatabaseInitializer.CreateContext();
         _repo = new HardwareItemRepository(context);
         _manufacturers = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
+        _allRawDescs   = new DescriptionRepository(context).GetAll().ToList();
+        _descComboItems = DescriptionHelper.BuildComboItems(_allRawDescs);
 
         ManufacturerCombo.ItemsSource = _manufacturers;
         ManufacturerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
-        DescriptionCombo.ItemsSource = _descComboItems;
-        DescriptionCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
 
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
@@ -48,12 +49,23 @@ public partial class HardwareItemsView : UserControl
         SaveButton.Click += (_, _) => Save();
         NewButton.Click += (_, _) => ClearForm();
         OpenItemButton.Click += (_, _) => OpenItem();
+        PickDescriptionButton.Click += async (_, _) => await PickDescriptionAsync();
         DeleteButton.Click += async (_, _) =>
         {
             var window = TopLevel.GetTopLevel(this) as Window;
             if (window != null && await DialogHelper.ConfirmAsync(window, "Delete this hardware item?"))
                 DeleteSelected();
         };
+    }
+
+    private async System.Threading.Tasks.Task PickDescriptionAsync()
+    {
+        var window = TopLevel.GetTopLevel(this) as Window;
+        if (window == null) return;
+        var selectedId = await new DescriptionPickerWindow(_allRawDescs).ShowDialog<int?>(window);
+        if (selectedId == null) return;
+        _selectedDescItem = _descComboItems.FirstOrDefault(d => d.Id == selectedId.Value);
+        DescriptionLabel.Text = _selectedDescItem?.DisplayText ?? "(none)";
     }
 
     private void LoadList()
@@ -73,7 +85,8 @@ public partial class HardwareItemsView : UserControl
         {
             _selectedId = h.Id;
             ManufacturerCombo.SelectedItem = _manufacturers.FirstOrDefault(m => m.Id == h.ManufacturerId);
-            DescriptionCombo.SelectedItem = _descComboItems.FirstOrDefault(d => d.Id == h.DescriptionId);
+            _selectedDescItem = _descComboItems.FirstOrDefault(d => d.Id == h.DescriptionId);
+            DescriptionLabel.Text = _selectedDescItem?.DisplayText ?? "(none)";
             ModelNumberBox.Text = h.ModelNumber;
             RemarksBox.Text = h.Remarks ?? "";
             FrequencyBox.Text = h.Frequency.ToString();
@@ -90,7 +103,8 @@ public partial class HardwareItemsView : UserControl
     private void Save()
     {
         if (ManufacturerCombo.SelectedItem is not Manufacturer mfr) { StatusLabel.Text = "Manufacturer is required."; return; }
-        if (DescriptionCombo.SelectedItem is not DescriptionComboItem desc) { StatusLabel.Text = "Description is required."; return; }
+        if (_selectedDescItem == null) { StatusLabel.Text = "Description is required."; return; }
+        var desc = _selectedDescItem;
         var modelNumber = ModelNumberBox.Text?.Trim();
         if (string.IsNullOrEmpty(modelNumber)) { StatusLabel.Text = "Model Number is required."; return; }
 
@@ -132,7 +146,8 @@ public partial class HardwareItemsView : UserControl
     {
         _selectedId = 0;
         ManufacturerCombo.SelectedItem = null;
-        DescriptionCombo.SelectedItem = null;
+        _selectedDescItem = null;
+        DescriptionLabel.Text = "(none)";
         ModelNumberBox.Text = "";
         RemarksBox.Text = "";
         FrequencyBox.Text = "";

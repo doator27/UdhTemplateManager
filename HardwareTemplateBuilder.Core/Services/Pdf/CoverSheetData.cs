@@ -20,6 +20,9 @@ public class CoverSheetData
     /// <summary>Gets or sets the date the package was generated.</summary>
     public DateTime DateCreated { get; set; }
 
+    /// <summary>Gets or sets the name of the user who generated the package.</summary>
+    public string PreparedBy { get; set; } = string.Empty;
+
     /// <summary>Gets or sets one row per hardware item on the job.</summary>
     public IReadOnlyList<CoverSheetRow> Rows { get; set; } = Array.Empty<CoverSheetRow>();
 }

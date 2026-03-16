@@ -19,6 +19,12 @@ public class UserProfile
     [Required]
     public string DefaultTemplateSaveLocation { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Gets or sets the stable machine identifier this profile is bound to.
+    /// Null until the profile has been used on at least one machine.
+    /// </summary>
+    public string? MachineId { get; set; }
+
     /// <summary>Gets or sets the jobs created by this user.</summary>
     public ICollection<Job> Jobs { get; set; } = new List<Job>();
 }
