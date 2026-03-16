@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using HardwareTemplateBuilder.Core.Models;
 
 namespace HardwareTemplateBuilder.Core.Services.Pdf;
@@ -76,6 +78,8 @@ public class PdfAssemblyService
         var workDir = Path.Combine(jobDir, "work");
         Directory.CreateDirectory(workDir);
 
+        var allDescriptionsList = request.AllDescriptions.Values.ToList();
+
         // Build a reverse lookup: template ID → all hardware items that contain it
         // (a template might be shared across multiple items).
         var templateToItems = BuildTemplateToItemsMap(request.Hardware);
@@ -99,7 +103,7 @@ public class PdfAssemblyService
             cancellationToken.ThrowIfCancellationRequested();
 
             progress?.Report($"Acquiring {template.TemplateNumber}...");
-            var acquiredPath = await _acquirer.AcquireAsync(template, jobDir);
+            var acquiredPath = await _acquirer.AcquireAsync(template, jobDir, allDescriptionsList);
 
             // Record snapshot info at acquisition time — before any processing.
             snapshotInfos.Add(new TemplateSnapshotInfo
@@ -179,6 +183,9 @@ public class PdfAssemblyService
         // ----- Step 7: Stamp page numbers on body pages -----
         var finalPath = Path.Combine(jobDir, $"{request.Job.JobNumber}_templates.pdf");
         _numberer.StampPageNumbers(mergedPath, coverPageCount, finalPath);
+
+        // Clean up intermediate work files — only the organised template copies and final PDF are kept.
+        try { Directory.Delete(workDir, recursive: true); } catch { }
 
         progress?.Report("Done.");
         return new AssemblyResult

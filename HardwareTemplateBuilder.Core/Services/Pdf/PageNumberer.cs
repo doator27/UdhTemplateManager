@@ -50,16 +50,25 @@ public class PageNumberer
     }
 
     /// <summary>
-    /// Stamps a single page number in the visual bottom-right corner, accounting for the
-    /// page's <c>/Rotate</c> entry so the label lands in the correct visual position regardless
-    /// of how the viewer has rotated the page.
+    /// Stamps a single page number in the visual bottom-right corner, always upright,
+    /// regardless of the page's <c>/Rotate</c> value.
     /// </summary>
     /// <remarks>
-    /// PdfSharp draws in the page's native (pre-rotation) coordinate space.  For a page with
-    /// <c>/Rotate: 90</c> the viewer rotates the content 90° CW, so the native x-axis maps to
-    /// the display y-axis.  The stamp coordinates are computed per-rotation so the label always
-    /// appears near the visual bottom-right corner.  The label may appear sideways on 90°/270°
-    /// rotated pages — it is still legible for 1–2 digit numbers.
+    /// PdfSharp draws in the page's native (pre-rotation) coordinate space (origin top-left,
+    /// Y-down). The PDF viewer then applies <c>/Rotate</c> (clockwise) when rendering.
+    /// <para>
+    /// This method applies an <see cref="XMatrix"/> that is the inverse of the viewer's
+    /// rotation, mapping visual (display) coordinates back to native coordinates.
+    /// Drawing at the visual bottom-right corner in that transformed space produces text
+    /// that is always upright and in the correct physical corner after the viewer rotates.
+    /// </para>
+    /// Inverse rotation matrices (native W×H; display dims after CW R°):
+    /// <code>
+    ///   R=0:   identity                      visW=W, visH=H
+    ///   R=90:  [ 0, 1,-1, 0, W, 0]           visW=H, visH=W
+    ///   R=180: [-1, 0, 0,-1, W, H]           visW=W, visH=H
+    ///   R=270: [ 0,-1, 1, 0, 0, H]           visW=H, visH=W
+    /// </code>
     /// </remarks>
     private static void StampNumber(PdfPage page, XFont font, int pageNumber)
     {
@@ -73,47 +82,30 @@ public class PageNumberer
         var W = page.Width.Point;
         var H = page.Height.Point;
 
-        // For each rotation, compute the native XGraphics (top-left origin, Y-down) coordinates
-        // that correspond to the visual bottom-right corner of the displayed page.
-        //   Rotate  0  → display W×H  → native = display coords
-        //   Rotate 90  → display H×W  → native(nx,ny): nx = display_y, ny = H - display_x
-        //   Rotate 180 → display W×H  → native(nx,ny): nx = W - display_x, ny = H - display_y
-        //   Rotate 270 → display H×W  → native(nx,ny): nx = W - display_y, ny = display_x
-        double x, y;
-        switch (page.Rotate)
+        // Visual (display) dimensions after the viewer applies /Rotate.
+        double visW = (page.Rotate == 90 || page.Rotate == 270) ? H : W;
+        double visH = (page.Rotate == 90 || page.Rotate == 270) ? W : H;
+
+        // Matrix that maps visual coordinates → native coordinates,
+        // undoing the viewer's CW /Rotate so the stamped text is always upright.
+        // Derivation: viewer applies native(x,y) → display via R=90: (H-y, x); R=270: (y, W-x).
+        // Inverse (display→native): R=90: (vy, H-vx); R=270: (W-vy, vx).
+        XMatrix matrix = page.Rotate switch
         {
-            case 90:
-                // Display is H wide × W tall.  Visual bottom-right baseline in display:
-                //   display_x = H - rightMargin - s.Width,  display_y = W - bottomMargin
-                // → native: nx = W - bottomMargin,  ny = H - (H - rightMargin - s.Width) = rightMargin + s.Width
-                x = W - bottomMargin - s.Height; // shift left so text body doesn't clip page edge
-                y = rightMargin + s.Width;
-                break;
+            90  => new XMatrix( 0, -1,  1,  0, 0, H),
+            180 => new XMatrix(-1,  0,  0, -1, W, H),
+            270 => new XMatrix( 0,  1, -1,  0, W, 0),
+            _   => new XMatrix( 1,  0,  0,  1, 0, 0) // identity
+        };
 
-            case 180:
-                // Display is W×H rotated 180°.  Visual bottom-right in display:
-                //   display_x = W - rightMargin - s.Width,  display_y (baseline) = H - bottomMargin
-                // → native: nx = W - display_x = rightMargin + s.Width,  ny = H - display_y = bottomMargin
-                // DrawString baseline = ny, but for 180° the text is upside-down — still legible for numbers.
-                x = rightMargin;
-                y = bottomMargin + s.Height;
-                break;
+        // DrawString: x = left edge of text, y = baseline (≈ bottom of glyph box).
+        double drawX = visW - rightMargin - s.Width;
+        double drawY = visH - bottomMargin;
 
-            case 270:
-                // Display is H wide × W tall, rotated 270° CW (= 90° CCW).
-                // → native: nx = W - display_y = W - (W - bottomMargin) = bottomMargin,
-                //           ny = display_x = H - rightMargin - s.Width
-                x = bottomMargin;
-                y = H - rightMargin - s.Width + s.Height;
-                break;
-
-            default: // 0 — standard orientation
-                x = W - rightMargin - s.Width;
-                y = H - bottomMargin;
-                break;
-        }
-
-        gfx.DrawString(label, font, XBrushes.Red, x, y);
+        var state = gfx.Save();
+        gfx.MultiplyTransform(matrix);
+        gfx.DrawString(label, font, XBrushes.Red, drawX, drawY);
+        gfx.Restore(state);
     }
 
     /// <summary>

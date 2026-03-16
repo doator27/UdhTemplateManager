@@ -416,16 +416,34 @@ public partial class JobDetailView : UserControl
                     PreparedByName  = profile?.UserName ?? string.Empty
                 };
 
-                // Back up any existing package before overwriting.
-                // Archive path: {saveDir}/{JobNumber}/Old versions/{file-last-write yyyy-MM-dd HH-mm-ss}/
-                var existingPath = Path.Combine(saveDir, job.JobNumber, $"{job.JobNumber}_templates.pdf");
-                if (File.Exists(existingPath))
+                // Back up the entire job folder contents before regenerating.
+                // Everything except the "Old versions" folder is moved into
+                // Old versions/{timestamp}/ so the previous output is fully preserved.
+                var jobDir = Path.Combine(saveDir, job.JobNumber);
+                if (Directory.Exists(jobDir))
                 {
-                    var versionStamp = File.GetLastWriteTime(existingPath).ToString("yyyy-MM-dd HH-mm-ss");
-                    var backupDir    = Path.Combine(saveDir, job.JobNumber, "Old versions", versionStamp);
-                    Directory.CreateDirectory(backupDir);
-                    File.Move(existingPath, Path.Combine(backupDir, Path.GetFileName(existingPath)));
-                    Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = "Backed up previous package...");
+                    var entries = Directory.GetFileSystemEntries(jobDir)
+                        .Where(e => !Path.GetFileName(e).Equals("Old versions",
+                            StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+                    if (entries.Count > 0)
+                    {
+                        var versionStamp = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
+                        var backupDir    = Path.Combine(jobDir, "Old versions", versionStamp);
+                        Directory.CreateDirectory(backupDir);
+
+                        foreach (var entry in entries)
+                        {
+                            var dest = Path.Combine(backupDir, Path.GetFileName(entry));
+                            if (File.Exists(entry))
+                                File.Move(entry, dest);
+                            else if (Directory.Exists(entry))
+                                Directory.Move(entry, dest);
+                        }
+
+                        Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = "Backed up previous version...");
+                    }
                 }
 
                 var progress = new Progress<string>(msg =>
@@ -433,6 +451,11 @@ public partial class JobDetailView : UserControl
 
                 var service = BuildAssemblyService();
                 var result  = await service.AssembleAsync(request, progress, ct);
+
+                // Append a history entry to job_history.txt in the job folder.
+                var historyPath = Path.Combine(saveDir, job.JobNumber, "job_history.txt");
+                AppendHistoryEntry(historyPath, job, hardware, result, profile?.UserName ?? "Unknown");
+
                 return (result.OutputPath, result.TemplateSnapshots);
             }, ct);
         }
@@ -759,6 +782,57 @@ public partial class JobDetailView : UserControl
 
         if (files.Count > 0)
             NewTplLocalLinkBox.Text = files[0].Path.LocalPath;
+    }
+
+    // --- History ---
+
+    /// <summary>
+    /// Appends a single generation record to <paramref name="historyPath"/>, creating the file
+    /// if it does not yet exist.  Each record captures the timestamp, user, hardware list,
+    /// and output file name so the full history of a job's packages is preserved in plain text.
+    /// </summary>
+    private static void AppendHistoryEntry(
+        string historyPath,
+        Job job,
+        IReadOnlyList<HardwareWithTemplates> hardware,
+        AssemblyResult result,
+        string preparedBy)
+    {
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"=== {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
+            sb.AppendLine($"Job:         {job.JobNumber} — {job.JobName}");
+            sb.AppendLine($"Prepared by: {preparedBy}");
+            sb.AppendLine($"Hardware Items ({hardware.Count}):");
+
+            int n = 1;
+            foreach (var hwt in hardware)
+            {
+                var item  = hwt.Item;
+                var mfr   = item.Manufacturer?.ManufacturerName ?? "Unknown";
+                var desc  = item.Description?.DescriptionText   ?? string.Empty;
+                var label = !string.IsNullOrWhiteSpace(hwt.CustomDescription)
+                    ? hwt.CustomDescription!
+                    : item.ModelNumber;
+                var tplNums = string.Join(", ", hwt.Templates.Select(t => t.TemplateNumber));
+
+                sb.AppendLine($"  {n++,2}. {mfr} — {label}" +
+                              (string.IsNullOrEmpty(desc) ? string.Empty : $" [{desc}]"));
+                if (!string.IsNullOrEmpty(tplNums))
+                    sb.AppendLine($"       Templates: {tplNums}");
+            }
+
+            sb.AppendLine($"Output: {Path.GetFileName(result.OutputPath)}");
+            sb.AppendLine(new string('─', 60));
+            sb.AppendLine();
+
+            File.AppendAllText(historyPath, sb.ToString());
+        }
+        catch
+        {
+            // History write failure is non-fatal.
+        }
     }
 
     /// <summary>Creates a fully wired <see cref="PdfAssemblyService"/> with all required dependencies.</summary>

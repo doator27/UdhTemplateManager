@@ -207,8 +207,8 @@ public class TemplateRefreshService
         var descSegment = DescriptionPathService.GetFolderPath(template.DescriptionId, allDescriptions);
 
         return string.IsNullOrEmpty(descSegment)
-            ? Path.Combine(saveLocation, mfrSegment, fileName)
-            : Path.Combine(saveLocation, mfrSegment, descSegment, fileName);
+            ? Path.Combine(saveLocation, "Templates", mfrSegment, fileName)
+            : Path.Combine(saveLocation, "Templates", mfrSegment, descSegment, fileName);
     }
 
     /// <summary>
