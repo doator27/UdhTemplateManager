@@ -181,7 +181,7 @@ public class PdfAssemblyService
         _merger.Merge(new[] { coverSheetPath, bodyPdfPath }, mergedPath);
 
         // ----- Step 7: Stamp page numbers on body pages -----
-        var finalPath = Path.Combine(jobDir, $"{request.Job.JobNumber}_templates.pdf");
+        var finalPath = Path.Combine(jobDir, $"Templates for job {request.Job.JobNumber}.pdf");
         _numberer.StampPageNumbers(mergedPath, coverPageCount, finalPath);
 
         // Clean up intermediate work files — only the organised template copies and final PDF are kept.
