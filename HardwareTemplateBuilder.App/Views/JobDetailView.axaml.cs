@@ -11,6 +11,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
@@ -96,6 +97,16 @@ public partial class JobDetailView : UserControl
         RemoveHardwareButton.Click += (_, _) => RemoveHardwareFromJob();
         GeneratePackageButton.Click    += async (_, _) => await OnGeneratePackageAsync();
         BrowseOldVersionsButton.Click  += (_, _) => BrowseOldVersions();
+
+        // Quick Create toggles
+        ToggleNewHardwareButton.Click    += (_, _) => TogglePanel(NewHardwarePanel,    InitNewHardwarePanel);
+        ToggleNewDescriptionButton.Click += (_, _) => TogglePanel(NewDescriptionPanel, InitNewDescriptionPanel);
+        ToggleNewTemplateButton.Click    += (_, _) => TogglePanel(NewTemplatePanel,    InitNewTemplatePanel);
+
+        CreateHardwareButton.Click    += (_, _) => CreateHardwareItem();
+        CreateDescriptionButton.Click += (_, _) => CreateDescription();
+        CreateTemplateButton.Click    += async (_, _) => await CreateTemplateAsync();
+        NewTplBrowseButton.Click      += async (_, _) => await BrowseLocalFileAsync();
 
         // Drag-and-drop reorder on linked hardware list
         LinkedHardwareList.AddHandler(PointerPressedEvent, OnLinkedListPointerPressed, RoutingStrategies.Tunnel);
@@ -510,6 +521,244 @@ public partial class JobDetailView : UserControl
         {
             PackageStatusLabel.Text = $"Could not open folder: {oldVersionsDir}";
         }
+    }
+
+    // --- Quick Create ---
+
+    private bool _newHardwarePanelReady;
+    private bool _newDescriptionPanelReady;
+    private bool _newTemplatePanelReady;
+
+    private void TogglePanel(Border panel, Action init)
+    {
+        if (!panel.IsVisible)
+        {
+            init();
+            panel.IsVisible = true;
+        }
+        else
+        {
+            panel.IsVisible = false;
+        }
+    }
+
+    private void InitNewHardwarePanel()
+    {
+        if (_newHardwarePanelReady) return;
+        _newHardwarePanelReady = true;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var mfrs  = new ManufacturerRepository(ctx).GetAll().OrderBy(m => m.ManufacturerName).ToList();
+        var descs = DescriptionHelper.BuildComboItems(new DescriptionRepository(ctx).GetAll());
+
+        NewHwMfrCombo.ItemsSource = mfrs;
+        NewHwMfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
+
+        NewHwDescCombo.ItemsSource = descs;
+        NewHwDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+    }
+
+    private void InitNewDescriptionPanel()
+    {
+        if (_newDescriptionPanelReady) return;
+        _newDescriptionPanelReady = true;
+        RefreshNewDescParentCombo();
+    }
+
+    private void RefreshNewDescParentCombo()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var items = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(None — top level)" } };
+        items.AddRange(DescriptionHelper.BuildComboItems(new DescriptionRepository(ctx).GetAll()));
+        NewDescParentCombo.ItemsSource = items;
+        NewDescParentCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+        NewDescParentCombo.SelectedIndex = 0;
+    }
+
+    private void InitNewTemplatePanel()
+    {
+        if (_newTemplatePanelReady) return;
+        _newTemplatePanelReady = true;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var descs      = DescriptionHelper.BuildComboItems(new DescriptionRepository(ctx).GetAll());
+        var materials  = ctx.DoorMaterials.OrderBy(m => m.Material).ToList();
+
+        NewTplDescCombo.ItemsSource = descs;
+        NewTplDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+
+        NewTplMaterialCombo.ItemsSource = materials;
+        NewTplMaterialCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
+        if (materials.Count > 0) NewTplMaterialCombo.SelectedIndex = 0;
+
+        RefreshNewTemplateHardwareCombo();
+    }
+
+    private void RefreshNewTemplateHardwareCombo()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var items = ctx.JobHardware
+            .Include(jh => jh.HardwareItem).ThenInclude(h => h.Manufacturer)
+            .Where(jh => jh.JobId == _jobId)
+            .ToList();
+        NewTplHardwareCombo.ItemsSource = items;
+        NewTplHardwareCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayLabel");
+        if (items.Count > 0) NewTplHardwareCombo.SelectedIndex = 0;
+    }
+
+    private void CreateHardwareItem()
+    {
+        NewHwStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+        NewHwStatusLabel.Text = string.Empty;
+
+        var mfr  = NewHwMfrCombo.SelectedItem  as Manufacturer;
+        var desc = NewHwDescCombo.SelectedItem as DescriptionComboItem;
+        var model = NewHwModelBox.Text?.Trim();
+
+        if (mfr == null)   { NewHwStatusLabel.Text = "Select a manufacturer."; return; }
+        if (desc == null)  { NewHwStatusLabel.Text = "Select a description."; return; }
+        if (string.IsNullOrEmpty(model)) { NewHwStatusLabel.Text = "Enter a model number."; return; }
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var repo = new HardwareItemRepository(ctx);
+        var item = repo.Add(new HardwareItem
+        {
+            ManufacturerId = mfr.Id,
+            DescriptionId  = desc.Id,
+            ModelNumber    = model,
+            Remarks        = string.IsNullOrWhiteSpace(NewHwNotesBox.Text) ? null : NewHwNotesBox.Text.Trim()
+        });
+
+        if (NewHwAddToJobCheck.IsChecked == true)
+        {
+            new JobHardwareRepository(ctx).Add(new JobHardware
+            {
+                JobId          = _jobId,
+                HardwareItemId = item.Id
+            });
+            LoadLinkedHardware();
+            RefreshNewTemplateHardwareCombo();
+        }
+
+        NewHwStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        NewHwStatusLabel.Text = $"Created: {model}" + (NewHwAddToJobCheck.IsChecked == true ? " (added to job)" : string.Empty);
+        NewHwModelBox.Text  = string.Empty;
+        NewHwNotesBox.Text  = string.Empty;
+    }
+
+    private void CreateDescription()
+    {
+        NewDescStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+        NewDescStatusLabel.Text = string.Empty;
+
+        var name = NewDescNameBox.Text?.Trim();
+        if (string.IsNullOrEmpty(name)) { NewDescStatusLabel.Text = "Enter a description name."; return; }
+
+        var parent = NewDescParentCombo.SelectedItem as DescriptionComboItem;
+        int? parentId = (parent == null || parent.Id == 0) ? null : parent.Id;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        new DescriptionRepository(ctx).Add(new Description
+        {
+            DescriptionText = name,
+            ParentId        = parentId
+        });
+
+        // Refresh all description combos so the new entry is immediately available.
+        _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(ctx).GetAll());
+
+        var anyDesc = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
+        anyDesc.AddRange(_descComboItems);
+        SearchDescCombo.ItemsSource = anyDesc;
+        SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+
+        if (_newHardwarePanelReady)
+        {
+            NewHwDescCombo.ItemsSource = _descComboItems;
+            NewHwDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+        }
+        if (_newTemplatePanelReady)
+        {
+            NewTplDescCombo.ItemsSource = _descComboItems;
+            NewTplDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+        }
+
+        RefreshNewDescParentCombo();
+
+        NewDescStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        NewDescStatusLabel.Text = $"Created: {name}";
+        NewDescNameBox.Text = string.Empty;
+    }
+
+    private async Task CreateTemplateAsync()
+    {
+        NewTplStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+        NewTplStatusLabel.Text = string.Empty;
+
+        var jobHw   = NewTplHardwareCombo.SelectedItem as JobHardware;
+        var desc    = NewTplDescCombo.SelectedItem     as DescriptionComboItem;
+        var material = NewTplMaterialCombo.SelectedItem as DoorMaterial;
+        var number  = NewTplNumberBox.Text?.Trim();
+        var pages   = NewTplPagesBox.Text?.Trim();
+        var online  = NewTplOnlineLinkBox.Text?.Trim();
+        var local   = NewTplLocalLinkBox.Text?.Trim();
+
+        if (jobHw == null)  { NewTplStatusLabel.Text = "Select a hardware item to link to."; return; }
+        if (desc == null)   { NewTplStatusLabel.Text = "Select a description."; return; }
+        if (material == null) { NewTplStatusLabel.Text = "Select a door material."; return; }
+        if (string.IsNullOrEmpty(number)) { NewTplStatusLabel.Text = "Enter a template number."; return; }
+        if (string.IsNullOrEmpty(pages))  { NewTplStatusLabel.Text = "Enter pages to print."; return; }
+        if (string.IsNullOrEmpty(online) && string.IsNullOrEmpty(local))
+        { NewTplStatusLabel.Text = "Provide at least an online link or a local file path."; return; }
+
+        using var ctx = DatabaseInitializer.CreateContext();
+
+        var hw = ctx.HardwareItems.Find(jobHw.HardwareItemId);
+        if (hw == null) { NewTplStatusLabel.Text = "Hardware item not found."; return; }
+
+        var template = new IndividualTemplate
+        {
+            ManufacturerId   = hw.ManufacturerId,
+            DescriptionId    = desc.Id,
+            TemplateNumber   = number,
+            PagesToPrint     = pages,
+            DoorMaterialId   = material.Id,
+            OnlineLink       = string.IsNullOrEmpty(online) ? null : online,
+            LocalLink        = string.IsNullOrEmpty(local)  ? null : local
+        };
+
+        ctx.IndividualTemplates.Add(template);
+        ctx.SaveChanges();
+
+        ctx.HardwareItemTemplates.Add(new HardwareItemTemplate
+        {
+            HardwareItemId       = hw.Id,
+            IndividualTemplateId = template.Id
+        });
+        ctx.SaveChanges();
+
+        NewTplStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        NewTplStatusLabel.Text = $"Created and linked: {number}";
+        NewTplNumberBox.Text = string.Empty;
+        NewTplPagesBox.Text  = string.Empty;
+        NewTplOnlineLinkBox.Text = string.Empty;
+        NewTplLocalLinkBox.Text  = string.Empty;
+    }
+
+    private async Task BrowseLocalFileAsync()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title         = "Select Template PDF",
+            AllowMultiple = false,
+            FileTypeFilter = new[] { new FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } } }
+        });
+
+        if (files.Count > 0)
+            NewTplLocalLinkBox.Text = files[0].Path.LocalPath;
     }
 
     /// <summary>Creates a fully wired <see cref="PdfAssemblyService"/> with all required dependencies.</summary>

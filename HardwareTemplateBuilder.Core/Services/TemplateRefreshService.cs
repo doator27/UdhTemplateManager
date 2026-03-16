@@ -81,13 +81,14 @@ public class TemplateRefreshService
     }
 
     /// <summary>
-    /// Refreshes all templates with a non-null <c>OnlineLink</c>, downloading each file to
-    /// <paramref name="saveLocation"/> and updating <c>LocalLink</c> on success.
-    /// Failures are collected and returned — they do not stop remaining downloads.
+    /// Refreshes all templates with a non-null <c>OnlineLink</c>, downloading each file into
+    /// an organised folder hierarchy under <paramref name="saveLocation"/> and updating
+    /// <c>LocalLink</c> on success. Failures are collected and returned without stopping
+    /// remaining downloads.
     /// </summary>
     /// <param name="saveLocation">
-    /// Directory where downloaded files are saved.
-    /// Files are named <c>{ManufacturerName}_{TemplateNumber}.pdf</c>.
+    /// Root directory for downloaded files. Each file is stored at
+    /// <c>{saveLocation}/{Manufacturer}/{DescriptionHierarchy}/{TemplateNumber}.pdf</c>.
     /// </param>
     /// <param name="progress">Optional progress reporter called before each download.</param>
     /// <param name="cancellationToken">Token to cancel the entire refresh.</param>
@@ -101,6 +102,9 @@ public class TemplateRefreshService
             .Include(t => t.Manufacturer)
             .Where(t => t.OnlineLink != null && t.OnlineLink != string.Empty)
             .ToList();
+
+        // Load all descriptions once to avoid repeated queries inside the loop.
+        var allDescriptions = _context.Descriptions.ToList();
 
         Directory.CreateDirectory(saveLocation);
 
@@ -124,7 +128,8 @@ public class TemplateRefreshService
 
             try
             {
-                var destPath = Path.Combine(saveLocation, fileName);
+                var destPath = BuildDestPath(saveLocation, template, allDescriptions, fileName);
+                Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
                 await DownloadAsync(template.OnlineLink!, destPath, cancellationToken);
 
                 // Persist the updated local path immediately so partial progress is not lost.
@@ -176,8 +181,10 @@ public class TemplateRefreshService
         if (template == null || string.IsNullOrWhiteSpace(template.OnlineLink))
             return false;
 
-        Directory.CreateDirectory(saveLocation);
-        var destPath = Path.Combine(saveLocation, BuildFileName(template));
+        var allDescriptions = _context.Descriptions.ToList();
+        var fileName = BuildFileName(template);
+        var destPath = BuildDestPath(saveLocation, template, allDescriptions, fileName);
+        Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
         await DownloadAsync(template.OnlineLink!, destPath, cancellationToken);
         template.LocalLink = destPath;
         _context.SaveChanges();
@@ -187,14 +194,30 @@ public class TemplateRefreshService
     // ---------- Private helpers ----------
 
     /// <summary>
-    /// Builds the output file name for a template:
-    /// <c>{ManufacturerName}_{TemplateNumber}.pdf</c> with invalid path chars replaced.
+    /// Builds the full destination path for a template file:
+    /// <c>{saveLocation}/{Manufacturer}/{DescriptionHierarchy}/{TemplateNumber}.pdf</c>.
+    /// </summary>
+    private static string BuildDestPath(
+        string saveLocation,
+        IndividualTemplate template,
+        IReadOnlyList<Description> allDescriptions,
+        string fileName)
+    {
+        var mfrSegment  = Sanitize(template.Manufacturer?.ManufacturerName ?? "Unknown");
+        var descSegment = DescriptionPathService.GetFolderPath(template.DescriptionId, allDescriptions);
+
+        return string.IsNullOrEmpty(descSegment)
+            ? Path.Combine(saveLocation, mfrSegment, fileName)
+            : Path.Combine(saveLocation, mfrSegment, descSegment, fileName);
+    }
+
+    /// <summary>
+    /// Builds the output file name for a template: <c>{TemplateNumber}.pdf</c>
+    /// with invalid file-name characters replaced by underscores.
     /// </summary>
     private static string BuildFileName(IndividualTemplate template)
     {
-        var mfr    = Sanitize(template.Manufacturer?.ManufacturerName ?? "Unknown");
-        var number = Sanitize(template.TemplateNumber);
-        return $"{mfr}_{number}.pdf";
+        return $"{Sanitize(template.TemplateNumber)}.pdf";
     }
 
     /// <summary>Replaces file-name-invalid characters with underscores.</summary>
