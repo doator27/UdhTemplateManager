@@ -113,6 +113,30 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Parameterized route: "BulkHardwareEntry:{id}"
+        if (viewName.StartsWith("BulkHardwareEntry:") &&
+            int.TryParse(viewName.Substring("BulkHardwareEntry:".Length), out var bulkJobId))
+        {
+            var bulk = new Views.BulkHardwareEntryView(bulkJobId);
+            bulk.NavigationRequested += NavigateTo;
+            ContentArea.Content = bulk;
+            var u2 = SessionService.ActiveUserProfile?.UserName;
+            StatusText.Text = $"Bulk Hardware Entry{(u2 != null ? $"  —  {u2}" : string.Empty)}";
+            return;
+        }
+
+        // Parameterized route: "TemplateResolutionWizard:{id}"
+        if (viewName.StartsWith("TemplateResolutionWizard:") &&
+            int.TryParse(viewName.Substring("TemplateResolutionWizard:".Length), out var wizJobId))
+        {
+            var wizard = new Views.TemplateResolutionWizardView(wizJobId);
+            wizard.NavigationRequested += NavigateTo;
+            ContentArea.Content = wizard;
+            var u3 = SessionService.ActiveUserProfile?.UserName;
+            StatusText.Text = $"Template Resolution Wizard{(u3 != null ? $"  —  {u3}" : string.Empty)}";
+            return;
+        }
+
         // Parameterized route: "HardwareItemDetail:{id}"
         if (viewName.StartsWith("HardwareItemDetail:") &&
             int.TryParse(viewName.Substring("HardwareItemDetail:".Length), out var itemId))

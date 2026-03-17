@@ -1,0 +1,107 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.TemplateResolutionWizardView">
+    <DockPanel Margin="8">
+        <!-- Header -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Name="ItemHeaderLabel" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <!-- Navigation footer -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Left"  Name="PrevButton"   Content="← Previous" Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Right" Name="FinishButton" Content="Finish"      IsVisible="False"/>
+            <Button DockPanel.Dock="Right" Name="NextButton"   Content="Next →"      Margin="0,0,8,0"/>
+            <TextBlock Name="WizardStatusLabel" VerticalAlignment="Center" Foreground="#800000" TextWrapping="Wrap"/>
+        </DockPanel>
+
+        <!-- Scrollable body -->
+        <ScrollViewer>
+            <StackPanel Spacing="8">
+
+                <!-- Custom label field -->
+                <Border BorderBrush="#B0B0B0" BorderThickness="1" Padding="8">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Grid.Column="0" Text="Custom Label:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox   Grid.Column="1" Name="CustomLabelBox" Watermark="Leave blank to use model number"/>
+                    </Grid>
+                </Border>
+
+                <!-- Status panel (shown for both cases) -->
+                <TextBlock Name="ItemStatusLabel" TextWrapping="Wrap" FontStyle="Italic" Foreground="#404040"/>
+
+                <!-- Linked templates list (Case A — matched item) -->
+                <Border Name="MatchedPanel" IsVisible="False"
+                        BorderBrush="#B0B0B0" BorderThickness="1" Padding="8">
+                    <StackPanel>
+                        <TextBlock Text="Templates already linked to this item:" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <ListBox Name="LinkedTemplatesList" Height="100"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Template add form (Case B — new item) -->
+                <Border Name="NewItemPanel" IsVisible="False"
+                        BorderBrush="#B0B0B0" BorderThickness="1" Padding="8">
+                    <StackPanel>
+                        <TextBlock Text="Add Templates for this new item:" FontWeight="Bold" Margin="0,0,0,6"/>
+
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                              Margin="0,0,0,6">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Template #:"    VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <TextBox   Grid.Row="0" Grid.Column="1" Name="TplNumberBox"   Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Description:"   VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <ComboBox  Grid.Row="1" Grid.Column="1" Name="TplDescCombo"   HorizontalAlignment="Stretch" Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Pages to print:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <TextBox   Grid.Row="2" Grid.Column="1" Name="TplPagesBox"    Watermark="e.g. 1  or  1-3" Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Door material:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <ComboBox  Grid.Row="3" Grid.Column="1" Name="TplMaterialCombo" HorizontalAlignment="Stretch" Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Online link:"   VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <TextBox   Grid.Row="4" Grid.Column="1" Name="TplOnlineLinkBox" Watermark="https://..." Margin="0,0,0,4"/>
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Local file:"    VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Grid      Grid.Row="5" Grid.Column="1" ColumnDefinitions="*,Auto">
+                                <TextBox Grid.Column="0" Name="TplLocalLinkBox" Watermark="Path to PDF..."/>
+                                <Button  Grid.Column="1" Name="TplBrowseButton" Content="..." Width="32" Margin="4,0,0,0"/>
+                            </Grid>
+                        </Grid>
+
+                        <Button Name="AddTemplateButton" Content="Add Template" HorizontalAlignment="Left" Margin="0,0,0,6"/>
+                        <TextBlock Name="AddTemplateStatusLabel" Foreground="#800000" TextWrapping="Wrap" Margin="0,0,0,6"/>
+
+                        <TextBlock Text="Staged templates:" FontWeight="Bold" Margin="0,4,0,4"/>
+                        <ListBox Name="PendingTemplatesList" Height="100"/>
+                        <Button Name="RemovePendingTemplateButton" Content="Remove Selected" HorizontalAlignment="Left" Margin="0,4,0,0"/>
+
+                        <!-- Search for an existing template by partial number -->
+                        <Button Name="ToggleSearchButton" Content="Search for existing template…"
+                                HorizontalAlignment="Left" Margin="0,10,0,0"/>
+                        <Border Name="SearchExistingPanel" IsVisible="False"
+                                BorderBrush="#D0D0D0" BorderThickness="1" Padding="8" Margin="0,4,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Search existing templates for this manufacturer:"
+                                           FontWeight="Bold" Margin="0,0,0,6"/>
+                                <Grid ColumnDefinitions="Auto,*,Auto,*" Margin="0,0,0,4">
+                                    <TextBlock Grid.Column="0" Text="Template #:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBox   Grid.Column="1" Name="SearchTplNumBox" Watermark="partial number…"/>
+                                    <TextBlock Grid.Column="2" Text="Description:" VerticalAlignment="Center" Margin="8,0,6,0"/>
+                                    <ComboBox  Grid.Column="3" Name="SearchTplDescCombo" HorizontalAlignment="Stretch"/>
+                                </Grid>
+                                <ListBox Name="SearchTplResultsList" Height="100" Margin="0,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Name="StageSearchResultButton" Content="Stage Selected"/>
+                                </StackPanel>
+                                <TextBlock Name="SearchTplStatusLabel" Foreground="#800000"
+                                           TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

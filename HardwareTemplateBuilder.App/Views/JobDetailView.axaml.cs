@@ -88,8 +88,16 @@ public partial class JobDetailView : UserControl
 
         LoadLinkedHardware();
 
+        // Auto-redirect to bulk entry when the job has no hardware yet.
+        if (_linkedHardware.Count == 0)
+        {
+            NavigationRequested?.Invoke($"BulkHardwareEntry:{_jobId}");
+            return;
+        }
+
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
+        BulkAddButton.Click += (_, _) => NavigationRequested?.Invoke($"BulkHardwareEntry:{_jobId}");
         SearchMfrCombo.SelectionChanged += (_, _) => OnSearchMfrChanged();
         SearchDescCombo.SelectionChanged += (_, _) => { if (!_updatingSearchDescCombo) SearchHardware(); };
         SearchModelBox.TextChanged += (_, _) => SearchHardware();

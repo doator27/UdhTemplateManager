@@ -35,6 +35,9 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/AppSettingsView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
+[/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/BulkHardwareEntryView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/CustomersView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
@@ -81,6 +84,9 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/TemplateLookupView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
+[/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/TemplateResolutionWizardView.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/TemplatesView.axaml]

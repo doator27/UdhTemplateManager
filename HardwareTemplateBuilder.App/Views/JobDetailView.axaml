@@ -5,7 +5,8 @@
         <!-- Top: back button + job title -->
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,8,0"/>
-            <Button DockPanel.Dock="Left" Name="BackButton" Content="← Back to Jobs" Margin="0,0,12,0"/>
+            <Button DockPanel.Dock="Left" Name="BackButton" Content="← Back to Jobs" Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Left" Name="BulkAddButton" Content="Bulk Add Hardware" Margin="0,0,12,0"/>
             <TextBlock Name="JobTitleLabel" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
 
