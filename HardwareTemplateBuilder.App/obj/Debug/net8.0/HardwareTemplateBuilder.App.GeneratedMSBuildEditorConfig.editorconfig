@@ -47,6 +47,9 @@ build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/DatabaseSetupDialog.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 
+[/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/DeduplicateHardwareView.axaml]
+build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
+
 [/home/paperclip/Documents/Programming/UdhTemplateManager/HardwareTemplateBuilder.App/Views/DescriptionPickerWindow.axaml]
 build_metadata.AdditionalFiles.SourceItemGroup = AvaloniaXaml
 

@@ -13,8 +13,8 @@ using HardwareTemplateBuilder.Core.Repositories;
 namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
-/// Scrollable bulk-entry table where the user enters one hardware item per row before
-/// launching the template resolution wizard.
+/// Scrollable bulk-entry table where the user groups hardware items by manufacturer
+/// before launching the template resolution wizard.
 /// </summary>
 public partial class BulkHardwareEntryView : UserControl
 {
@@ -26,8 +26,28 @@ public partial class BulkHardwareEntryView : UserControl
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event Action<string>? NavigationRequested;
 
-    /// <summary>In-memory rows parallel to the UI row controls.</summary>
-    private readonly List<BulkHardwareRow> _rows = new();
+    // ── Group model ───────────────────────────────────────────────────────────
+
+    /// <summary>One manufacturer section containing one or more hardware rows.</summary>
+    private sealed class MfrGroup
+    {
+        /// <summary>Gets or sets the currently selected manufacturer for this group.</summary>
+        public Manufacturer? Manufacturer { get; set; }
+
+        /// <summary>In-memory rows belonging to this group.</summary>
+        public List<BulkHardwareRow> Rows { get; } = new();
+
+        /// <summary>The UI panel that holds the row grids for this group.</summary>
+        public StackPanel RowsPanel { get; set; } = null!;
+
+        /// <summary>The outer border element for the whole group.</summary>
+        public Border GroupBorder { get; set; } = null!;
+
+        /// <summary>Per-row callbacks that refresh model items and match state when the manufacturer changes.</summary>
+        public Dictionary<BulkHardwareRow, Action> RefreshActions { get; } = new();
+    }
+
+    private readonly List<MfrGroup> _groups = new();
 
     /// <summary>Initializes the bulk entry view for the given job.</summary>
     /// <param name="jobId">The job to which hardware will be added.</param>
@@ -41,43 +61,128 @@ public partial class BulkHardwareEntryView : UserControl
     private void Initialize()
     {
         using var ctx = DatabaseInitializer.CreateContext();
-        _manufacturers       = new ManufacturerRepository(ctx).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _allDescriptions     = new DescriptionRepository(ctx).GetAll().ToList();
-        _allDescComboItems   = DescriptionHelper.BuildComboItems(_allDescriptions);
+        _manufacturers     = new ManufacturerRepository(ctx).GetAll().OrderBy(m => m.ManufacturerName).ToList();
+        _allDescriptions   = new DescriptionRepository(ctx).GetAll().ToList();
+        _allDescComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
 
         BackButton.Click     += (_, _) => NavigationRequested?.Invoke($"JobDetail:{_jobId}");
-        AddRowButton.Click   += (_, _) => AddRow();
+        AddGroupButton.Click += (_, _) => AddGroup();
         ContinueButton.Click += (_, _) => OnContinue();
 
-        AddRow();
+        AddGroup();
     }
 
-    // ── Row building ─────────────────────────────────────────────────────────
+    // ── Group building ────────────────────────────────────────────────────────
 
-    /// <summary>Appends a new blank data-entry row to the panel.</summary>
-    private void AddRow()
+    /// <summary>Appends a new manufacturer group (with one blank row) to the panel.</summary>
+    private void AddGroup()
     {
-        var row = new BulkHardwareRow();
-        _rows.Add(row);
+        var group = new MfrGroup();
+        _groups.Add(group);
 
-        // Column widths must match the header grid in the AXAML.
-        var grid = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("150,180,170,70,120,160,32"),
-            Margin = new Avalonia.Thickness(0, 0, 0, 4)
-        };
-
-        // ── Col 0: Manufacturer ComboBox ──────────────────────────────────────
+        // Manufacturer combo for this group
         var mfrCombo = new ComboBox
         {
             ItemsSource = _manufacturers,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Avalonia.Thickness(0, 0, 4, 0)
+            HorizontalAlignment = HorizontalAlignment.Left,
+            MinWidth = 200,
+            Margin = new Avalonia.Thickness(0, 0, 8, 0)
         };
         mfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
-        Grid.SetColumn(mfrCombo, 0);
 
-        // ── Col 1: Description picker (search + tree + new) ──────────────────
+        var addItemBtn = new Button
+        {
+            Content = "+ Add Item",
+            FontSize = 11,
+            Padding = new Avalonia.Thickness(6, 2)
+        };
+
+        var removeGroupBtn = new Button
+        {
+            Content = "Remove Group",
+            FontSize = 10,
+            Padding = new Avalonia.Thickness(4, 1),
+            Margin = new Avalonia.Thickness(8, 0, 0, 0),
+            Foreground = Brushes.DarkRed
+        };
+
+        var mfrHeader = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 4,
+            Margin = new Avalonia.Thickness(0, 0, 0, 4)
+        };
+        mfrHeader.Children.Add(new TextBlock
+        {
+            Text = "Manufacturer:",
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Avalonia.Thickness(0, 0, 4, 0)
+        });
+        mfrHeader.Children.Add(mfrCombo);
+        mfrHeader.Children.Add(addItemBtn);
+        mfrHeader.Children.Add(removeGroupBtn);
+
+        var rowsPanel = new StackPanel();
+        group.RowsPanel = rowsPanel;
+
+        var groupContent = new StackPanel { Margin = new Avalonia.Thickness(4) };
+        groupContent.Children.Add(mfrHeader);
+        groupContent.Children.Add(rowsPanel);
+
+        var groupBorder = new Border
+        {
+            BorderBrush = Brushes.Gray,
+            BorderThickness = new Avalonia.Thickness(1),
+            CornerRadius = new Avalonia.CornerRadius(2),
+            Margin = new Avalonia.Thickness(0, 0, 0, 10),
+            Padding = new Avalonia.Thickness(8, 6),
+            Child = groupContent
+        };
+        group.GroupBorder = groupBorder;
+        GroupsPanel.Children.Add(groupBorder);
+
+        // When the manufacturer changes, propagate to all rows in this group.
+        mfrCombo.SelectionChanged += (_, _) =>
+        {
+            group.Manufacturer = mfrCombo.SelectedItem as Manufacturer;
+            foreach (var row in group.Rows)
+            {
+                row.SelectedManufacturer = group.Manufacturer;
+                if (group.RefreshActions.TryGetValue(row, out var refresh))
+                    refresh();
+            }
+            RefreshContinue();
+        };
+
+        addItemBtn.Click += (_, _) => AddRowToGroup(group);
+
+        removeGroupBtn.Click += (_, _) =>
+        {
+            _groups.Remove(group);
+            GroupsPanel.Children.Remove(groupBorder);
+            RefreshContinue();
+        };
+
+        AddRowToGroup(group);
+    }
+
+    // ── Row building ──────────────────────────────────────────────────────────
+
+    /// <summary>Appends a new blank hardware row to <paramref name="group"/>.</summary>
+    private void AddRowToGroup(MfrGroup group)
+    {
+        var row = new BulkHardwareRow { SelectedManufacturer = group.Manufacturer };
+        group.Rows.Add(row);
+
+        // Column widths: Description, Model#, Match, Custom Label, Remarks, Remove
+        // These must match the header grid in the AXAML.
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("260,210,90,170,210,36"),
+            Margin = new Avalonia.Thickness(0, 0, 0, 8)
+        };
+
+        // ── Col 0: Description picker (search + tree + new) ──────────────────
         var descSearchBox = new TextBox
         {
             Watermark = "Search descriptions…",
@@ -116,78 +221,76 @@ public partial class BulkHardwareEntryView : UserControl
         var descStack = new StackPanel
         {
             Orientation = Orientation.Vertical,
-            Spacing = 1,
-            Margin = new Avalonia.Thickness(0, 0, 4, 0)
+            Spacing = 2,
+            Margin = new Avalonia.Thickness(0, 0, 8, 0)
         };
         descStack.Children.Add(descSearchBox);
         descStack.Children.Add(descMatchList);
         descStack.Children.Add(descSelectedLabel);
         descStack.Children.Add(descBtnRow);
-        Grid.SetColumn(descStack, 1);
+        Grid.SetColumn(descStack, 0);
 
-        // ── Col 2: Model # — editable ComboBox ───────────────────────────────
-        // Items are loaded from the DB when Manufacturer/Description change.
-        // IsEditable=true lets the user type a new model number not in the list.
+        // ── Col 1: Model # — editable ComboBox ───────────────────────────────
         var modelCombo = new ComboBox
         {
             IsEditable = true,
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Avalonia.Thickness(0, 0, 4, 0)
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Avalonia.Thickness(0, 0, 8, 0)
         };
         modelCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
-        Grid.SetColumn(modelCombo, 2);
+        Grid.SetColumn(modelCombo, 1);
 
-        // ── Col 3: Match status ───────────────────────────────────────────────
+        // ── Col 2: Match status ───────────────────────────────────────────────
         var matchLabel = new TextBlock
         {
             Text = "—",
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Avalonia.Thickness(2, 0, 4, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Avalonia.Thickness(4, 4, 8, 0),
             FontSize = 11,
             TextWrapping = TextWrapping.Wrap
         };
-        Grid.SetColumn(matchLabel, 3);
+        Grid.SetColumn(matchLabel, 2);
 
-        // ── Col 4: Custom label ───────────────────────────────────────────────
+        // ── Col 3: Custom label ───────────────────────────────────────────────
         var customBox = new TextBox
         {
             Watermark = "Optional",
-            Margin = new Avalonia.Thickness(0, 0, 4, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Avalonia.Thickness(0, 0, 8, 0),
             TextWrapping = TextWrapping.Wrap
         };
-        Grid.SetColumn(customBox, 4);
+        Grid.SetColumn(customBox, 3);
 
-        // ── Col 5: Remarks ────────────────────────────────────────────────────
+        // ── Col 4: Remarks ────────────────────────────────────────────────────
         var remarksBox = new TextBox
         {
             Watermark = "Optional",
-            Margin = new Avalonia.Thickness(0, 0, 4, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Avalonia.Thickness(0, 0, 8, 0),
             TextWrapping = TextWrapping.Wrap
         };
-        Grid.SetColumn(remarksBox, 5);
+        Grid.SetColumn(remarksBox, 4);
 
-        // ── Col 6: Remove button ──────────────────────────────────────────────
+        // ── Col 5: Remove button ──────────────────────────────────────────────
         var removeBtn = new Button
         {
             Content = "×",
             Width = 28,
             HorizontalContentAlignment = HorizontalAlignment.Center
         };
-        Grid.SetColumn(removeBtn, 6);
+        Grid.SetColumn(removeBtn, 5);
 
-        grid.Children.Add(mfrCombo);
         grid.Children.Add(descStack);
         grid.Children.Add(modelCombo);
         grid.Children.Add(matchLabel);
         grid.Children.Add(customBox);
         grid.Children.Add(remarksBox);
         grid.Children.Add(removeBtn);
-        RowsPanel.Children.Add(grid);
+        group.RowsPanel.Children.Add(grid);
 
-        // ── Local helpers ────────────────────────────────────────────────────
+        // ── Local helpers ─────────────────────────────────────────────────────
 
-        // Reloads the model combo's dropdown to show HardwareItems that match
-        // the current manufacturer + description selection.
         void RefreshModelItems()
         {
             if (row.SelectedManufacturer == null && row.SelectedDescription == null)
@@ -204,8 +307,6 @@ public partial class BulkHardwareEntryView : UserControl
             modelCombo.ItemsSource = q.OrderBy(h => h.ModelNumber).ToList();
         }
 
-        // Syncs row.MatchedItem and row.ModelNumber from the combo's current state,
-        // then updates the match label and the Continue button.
         void SyncModelState()
         {
             var text = modelCombo.Text?.Trim() ?? "";
@@ -217,12 +318,10 @@ public partial class BulkHardwareEntryView : UserControl
             }
             else if (modelCombo.SelectedItem is HardwareItem h && h.ModelNumber == text)
             {
-                // User picked an existing item from the dropdown.
                 row.MatchedItem = h;
             }
             else
             {
-                // User typed a value — check the DB for an exact match.
                 row.MatchedItem = null;
                 if (row.SelectedManufacturer != null && row.SelectedDescription != null)
                 {
@@ -238,23 +337,18 @@ public partial class BulkHardwareEntryView : UserControl
             RefreshContinue();
         }
 
-        // ── Wire events ──────────────────────────────────────────────────────
+        // Register with group so manufacturer changes can trigger refresh.
+        group.RefreshActions[row] = () => { RefreshModelItems(); SyncModelState(); };
 
-        mfrCombo.SelectionChanged += (_, _) =>
-        {
-            row.SelectedManufacturer = mfrCombo.SelectedItem as Manufacturer;
-            RefreshModelItems();
-            SyncModelState();
-        };
+        // ── Description picker events ─────────────────────────────────────────
 
-        // Selects a description and updates all related state.
         void SelectDescription(Description? desc)
         {
-            row.SelectedDescription         = desc;
-            descSelectedLabel.Text          = desc != null ? BuildDescPath(desc) : "(none)";
-            descSelectedLabel.Foreground    = desc != null ? Brushes.Black : Brushes.Gray;
-            descSearchBox.Text              = "";
-            descMatchList.IsVisible         = false;
+            row.SelectedDescription      = desc;
+            descSelectedLabel.Text       = desc != null ? BuildDescPath(desc) : "(none)";
+            descSelectedLabel.Foreground = desc != null ? Brushes.Black : Brushes.Gray;
+            descSearchBox.Text           = "";
+            descMatchList.IsVisible      = false;
             RefreshModelItems();
             SyncModelState();
         }
@@ -293,14 +387,16 @@ public partial class BulkHardwareEntryView : UserControl
             SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == newDesc.Id));
         };
 
-        // Track text changes in the editable combo via property change notification.
+        // ── Model combo events ────────────────────────────────────────────────
+
         modelCombo.PropertyChanged += (_, e) =>
         {
             if (e.Property == ComboBox.TextProperty)
                 SyncModelState();
         };
-        // Also fire on explicit selection from the dropdown.
         modelCombo.SelectionChanged += (_, _) => SyncModelState();
+
+        // ── Other column events ───────────────────────────────────────────────
 
         customBox.TextChanged += (_, _) =>
         {
@@ -314,17 +410,20 @@ public partial class BulkHardwareEntryView : UserControl
 
         removeBtn.Click += (_, _) =>
         {
-            var idx = _rows.IndexOf(row);
-            if (idx >= 0)
+            group.Rows.Remove(row);
+            group.RefreshActions.Remove(row);
+            group.RowsPanel.Children.Remove(grid);
+            // Remove the entire group if it now has no rows.
+            if (group.Rows.Count == 0)
             {
-                _rows.RemoveAt(idx);
-                RowsPanel.Children.Remove(grid);
-                RefreshContinue();
+                _groups.Remove(group);
+                GroupsPanel.Children.Remove(group.GroupBorder);
             }
+            RefreshContinue();
         };
     }
 
-    // ── State helpers ─────────────────────────────────────────────────────────
+    // ── State helpers ──────────────────────────────────────────────────────────
 
     private static void UpdateMatchLabel(BulkHardwareRow row, TextBlock label)
     {
@@ -347,18 +446,23 @@ public partial class BulkHardwareEntryView : UserControl
 
     private void RefreshContinue()
     {
-        ContinueButton.IsEnabled = _rows.Any(r =>
-            r.SelectedManufacturer != null &&
-            r.SelectedDescription  != null &&
-            !string.IsNullOrWhiteSpace(r.ModelNumber));
+        ContinueButton.IsEnabled = _groups
+            .SelectMany(g => g.Rows)
+            .Any(r =>
+                r.SelectedManufacturer != null &&
+                r.SelectedDescription  != null &&
+                !string.IsNullOrWhiteSpace(r.ModelNumber));
     }
 
     private void OnContinue()
     {
-        var complete = _rows.Where(r =>
-            r.SelectedManufacturer != null &&
-            r.SelectedDescription  != null &&
-            !string.IsNullOrWhiteSpace(r.ModelNumber)).ToList();
+        var complete = _groups
+            .SelectMany(g => g.Rows)
+            .Where(r =>
+                r.SelectedManufacturer != null &&
+                r.SelectedDescription  != null &&
+                !string.IsNullOrWhiteSpace(r.ModelNumber))
+            .ToList();
 
         if (complete.Count == 0)
         {
@@ -371,7 +475,7 @@ public partial class BulkHardwareEntryView : UserControl
         NavigationRequested?.Invoke($"TemplateResolutionWizard:{_jobId}");
     }
 
-    // ── Utilities ─────────────────────────────────────────────────────────────
+    // ── Utilities ──────────────────────────────────────────────────────────────
 
     /// <summary>Reloads descriptions from the database and rebuilds the combo item list.</summary>
     private void RefreshDescriptions()
@@ -391,8 +495,8 @@ public partial class BulkHardwareEntryView : UserControl
 
     private string BuildDescPath(Description target)
     {
-        var lookup = _allDescriptions.ToDictionary(d => d.Id);
-        var parts  = new List<string>();
+        var lookup  = _allDescriptions.ToDictionary(d => d.Id);
+        var parts   = new List<string>();
         var current = target;
         while (current != null)
         {

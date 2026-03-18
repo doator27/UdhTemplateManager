@@ -96,13 +96,6 @@ public partial class JobDetailView : UserControl
         OpenAttachmentButton.Click    += (_, _) => OpenAttachment();
         RemoveAttachmentButton.Click  += (_, _) => RemoveAttachment();
 
-        // Auto-redirect to bulk entry when the job has no hardware yet.
-        if (_linkedHardware.Count == 0)
-        {
-            NavigationRequested?.Invoke($"BulkHardwareEntry:{_jobId}");
-            return;
-        }
-
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
         BulkAddButton.Click += (_, _) => NavigationRequested?.Invoke($"BulkHardwareEntry:{_jobId}");
@@ -256,9 +249,24 @@ public partial class JobDetailView : UserControl
     {
         if (HardwareSearchList.SelectedItem is not HardwareItem h) { LinkStatusLabel.Text = "Select a hardware item to add."; return; }
 
-        var customDesc = CustomDescBox.Text?.Trim();
+        var customDesc  = CustomDescBox.Text?.Trim();
+        var customLabel = string.IsNullOrWhiteSpace(customDesc) ? null : customDesc;
 
         using var context = DatabaseInitializer.CreateContext();
+
+        // Duplicate check: same item + same custom label (including both null) is a duplicate.
+        bool isDuplicate = context.JobHardware.Any(jh =>
+            jh.JobId             == _jobId &&
+            jh.HardwareItemId    == h.Id   &&
+            jh.CustomDescription == customLabel);
+
+        if (isDuplicate)
+        {
+            LinkStatusLabel.Text = $"Already in job: {h.ModelNumber}"
+                + (customLabel != null ? $" ({customLabel})" : string.Empty);
+            return;
+        }
+
         var freqService = new FrequencyService(context);
         var hardwareItem = context.HardwareItems.Find(h.Id);
         if (hardwareItem != null) freqService.IncrementFrequency(hardwareItem);
@@ -267,10 +275,10 @@ public partial class JobDetailView : UserControl
         {
             JobId             = _jobId,
             HardwareItemId    = h.Id,
-            CustomDescription = string.IsNullOrWhiteSpace(customDesc) ? null : customDesc
+            CustomDescription = customLabel
         });
 
-        CustomDescBox.Text = "";
+        CustomDescBox.Text   = "";
         LinkStatusLabel.Text = $"Added: {h.ModelNumber}";
         LoadLinkedHardware();
     }

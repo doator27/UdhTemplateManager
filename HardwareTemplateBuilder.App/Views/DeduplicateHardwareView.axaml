@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.DeduplicateHardwareView">
+    <DockPanel Margin="8">
+
+        <!-- Top toolbar -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,12,0"/>
+            <TextBlock Text="Deduplicate Hardware Items" FontSize="16" FontWeight="Bold"
+                       VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <!-- Status / instruction bar (always visible at bottom) -->
+        <TextBlock DockPanel.Dock="Bottom"
+                   Name="StatusLabel"
+                   Foreground="#800000"
+                   TextWrapping="Wrap"
+                   Margin="0,6,0,0"/>
+
+        <!-- Controls panel -->
+        <Border DockPanel.Dock="Top"
+                BorderBrush="#808080" BorderThickness="1"
+                Padding="10" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock TextWrapping="Wrap" Margin="0,0,0,8">
+                    Scans for hardware items with the same Manufacturer, Description, and Model Number.
+                    For each duplicate group, select which item to keep — all job links and templates
+                    belonging to the discarded items will be re-linked to the kept item before deletion.
+                </TextBlock>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Name="ScanButton"     Content="Scan for Duplicates"/>
+                    <Button Name="MergeAllButton" Content="Merge All Groups" IsEnabled="False"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Duplicate groups are built here in code-behind -->
+        <ScrollViewer Name="ResultsScroller" IsVisible="False">
+            <StackPanel Name="GroupsPanel" Margin="0,4,0,0"/>
+        </ScrollViewer>
+
+    </DockPanel>
+</UserControl>

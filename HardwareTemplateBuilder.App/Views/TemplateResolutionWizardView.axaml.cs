@@ -242,9 +242,11 @@ public partial class TemplateResolutionWizardView : UserControl
 
     // ── Finish ───────────────────────────────────────────────────────────────
 
-    private void OnFinish()
+    private async void OnFinish()
     {
         SaveCustomLabel(_currentIndex);
+
+        var skipped = new List<string>();
 
         using var ctx = DatabaseInitializer.CreateContext();
         var hwRepo      = new HardwareItemRepository(ctx);
@@ -298,13 +300,35 @@ public partial class TemplateResolutionWizardView : UserControl
                 }
             }
 
-            // Create JobHardware record
+            // Duplicate check: same item + same custom label already in the job → skip.
+            var customLabel = string.IsNullOrWhiteSpace(row.CustomLabel) ? null : row.CustomLabel;
+            bool isDuplicate = ctx.JobHardware.Any(jh =>
+                jh.JobId             == _jobId  &&
+                jh.HardwareItemId    == hwItemId &&
+                jh.CustomDescription == customLabel);
+
+            if (isDuplicate)
+            {
+                skipped.Add(row.ModelNumber + (customLabel != null ? $" ({customLabel})" : string.Empty));
+                continue;
+            }
+
             jhRepo.Add(new JobHardware
             {
                 JobId             = _jobId,
                 HardwareItemId    = hwItemId,
-                CustomDescription = string.IsNullOrWhiteSpace(row.CustomLabel) ? null : row.CustomLabel
+                CustomDescription = customLabel
             });
+        }
+
+        if (skipped.Count > 0)
+        {
+            var win = TopLevel.GetTopLevel(this) as Window;
+            if (win != null)
+                await DialogHelper.ShowInfoAsync(win,
+                    "The following items were already in the job and were skipped:\n" +
+                    string.Join("\n", skipped.Select(s => $"  \u2022 {s}")),
+                    "Duplicate Items Skipped");
         }
 
         BulkAddSession.PendingRows = new();

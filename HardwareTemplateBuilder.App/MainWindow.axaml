@@ -22,7 +22,8 @@
             </MenuItem>
             <MenuItem Header="_Template Lookup" Name="MenuTemplateLookup" />
             <MenuItem Header="_Maintenance">
-                <MenuItem Header="_Refresh Templates" Name="MenuRefreshTemplates" />
+                <MenuItem Header="_Refresh Templates"        Name="MenuRefreshTemplates" />
+                <MenuItem Header="_Deduplicate Hardware..."  Name="MenuDeduplicateHardware" />
             </MenuItem>
             <MenuItem Header="_Admin">
                 <MenuItem Header="_Hardware Items" Name="MenuHardwareItems" />

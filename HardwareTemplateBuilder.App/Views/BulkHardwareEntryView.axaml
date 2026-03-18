@@ -11,28 +11,27 @@
 
         <!-- Bottom action bar -->
         <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-            <Button DockPanel.Dock="Left"  Name="AddRowButton"   Content="+ Add Row"   Margin="0,0,8,0"/>
-            <Button DockPanel.Dock="Right" Name="ContinueButton" Content="Continue →"  IsEnabled="False"/>
+            <Button DockPanel.Dock="Left"  Name="AddGroupButton"  Content="+ Add Manufacturer" Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Right" Name="ContinueButton"  Content="Continue →" IsEnabled="False"/>
             <TextBlock Name="StatusLabel" VerticalAlignment="Center" Foreground="#800000" TextWrapping="Wrap"/>
         </DockPanel>
 
         <!--
-            Header and rows are both inside the ScrollViewer so they share
+            Header and groups are both inside the ScrollViewer so they share
             exactly the same available width — no scrollbar-offset misalignment.
         -->
         <ScrollViewer HorizontalScrollBarVisibility="Auto">
             <StackPanel>
-                <!-- Column header row — same column widths as data rows -->
-                <Grid ColumnDefinitions="150,180,170,70,120,160,32" Margin="0,0,0,2">
-                    <TextBlock Grid.Column="0" Text="Manufacturer"  FontWeight="Bold" Margin="2,0"/>
-                    <TextBlock Grid.Column="1" Text="Description"   FontWeight="Bold" Margin="2,0"/>
-                    <TextBlock Grid.Column="2" Text="Model #"       FontWeight="Bold" Margin="2,0"/>
-                    <TextBlock Grid.Column="3" Text="Match"         FontWeight="Bold" Margin="2,0"/>
-                    <TextBlock Grid.Column="4" Text="Custom Label"  FontWeight="Bold" Margin="2,0"/>
-                    <TextBlock Grid.Column="5" Text="Remarks"       FontWeight="Bold" Margin="2,0"/>
+                <!-- Item column header row (no Manufacturer column — that is the group header) -->
+                <Grid ColumnDefinitions="260,210,90,170,210,36" Margin="0,0,0,4">
+                    <TextBlock Grid.Column="0" Text="Description"  FontWeight="Bold" Margin="4,0"/>
+                    <TextBlock Grid.Column="1" Text="Model #"      FontWeight="Bold" Margin="4,0"/>
+                    <TextBlock Grid.Column="2" Text="Match"        FontWeight="Bold" Margin="4,0"/>
+                    <TextBlock Grid.Column="3" Text="Custom Label" FontWeight="Bold" Margin="4,0"/>
+                    <TextBlock Grid.Column="4" Text="Remarks"      FontWeight="Bold" Margin="4,0"/>
                 </Grid>
-                <!-- Data rows added in code-behind -->
-                <StackPanel Name="RowsPanel"/>
+                <!-- Manufacturer groups added in code-behind -->
+                <StackPanel Name="GroupsPanel"/>
             </StackPanel>
         </ScrollViewer>
     </DockPanel>
