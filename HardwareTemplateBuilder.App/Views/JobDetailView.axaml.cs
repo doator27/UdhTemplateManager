@@ -844,14 +844,25 @@ public partial class JobDetailView : UserControl
     }
 
     /// <summary>Creates a fully wired <see cref="PdfAssemblyService"/> with all required dependencies.</summary>
-    private static PdfAssemblyService BuildAssemblyService() =>
-        new PdfAssemblyService(
+    private static PdfAssemblyService BuildAssemblyService()
+    {
+        // Bypass SSL certificate errors when downloading manufacturer PDFs.
+        // Manufacturer sites frequently have expired or chain-incomplete certificates;
+        // the URLs are user-supplied and trusted, so validation is not meaningful here.
+        var handler = new System.Net.Http.HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback =
+                System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+
+        return new PdfAssemblyService(
             new TemplateSorter(new WeightTemplateSortStrategy()),
-            new FileAcquirer(new HttpClient()),
+            new FileAcquirer(new HttpClient(handler)),
             new PageRangeParser(),
             new PageExtractor(),
             new PageRotator(),
             new PdfMerger(),
             new CoverSheetBuilder(),
             new PageNumberer());
+    }
 }

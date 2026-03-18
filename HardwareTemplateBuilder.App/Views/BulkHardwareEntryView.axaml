@@ -11,25 +11,28 @@
 
         <!-- Bottom action bar -->
         <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-            <Button DockPanel.Dock="Left" Name="AddRowButton" Content="+ Add Row" Margin="0,0,8,0"/>
-            <Button DockPanel.Dock="Right" Name="ContinueButton" Content="Continue →" IsEnabled="False"/>
+            <Button DockPanel.Dock="Left"  Name="AddRowButton"   Content="+ Add Row"   Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Right" Name="ContinueButton" Content="Continue →"  IsEnabled="False"/>
             <TextBlock Name="StatusLabel" VerticalAlignment="Center" Foreground="#800000" TextWrapping="Wrap"/>
         </DockPanel>
 
-        <!-- Row table header -->
-        <Grid DockPanel.Dock="Top" Margin="0,0,0,2"
-              ColumnDefinitions="160,180,140,80,120,32">
-            <TextBlock Grid.Column="0" Text="Manufacturer"  FontWeight="Bold" Margin="2,0"/>
-            <TextBlock Grid.Column="1" Text="Description"   FontWeight="Bold" Margin="2,0"/>
-            <TextBlock Grid.Column="2" Text="Model #"       FontWeight="Bold" Margin="2,0"/>
-            <TextBlock Grid.Column="3" Text="Match"         FontWeight="Bold" Margin="2,0"/>
-            <TextBlock Grid.Column="4" Text="Custom Label"  FontWeight="Bold" Margin="2,0"/>
-            <TextBlock Grid.Column="5" Text=""              FontWeight="Bold" Margin="2,0"/>
-        </Grid>
-
-        <!-- Scrollable rows -->
-        <ScrollViewer>
-            <StackPanel Name="RowsPanel"/>
+        <!--
+            Header and rows are both inside the ScrollViewer so they share
+            exactly the same available width — no scrollbar-offset misalignment.
+        -->
+        <ScrollViewer HorizontalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Column header row — same column widths as data rows -->
+                <Grid ColumnDefinitions="160,200,200,80,150,32" Margin="0,0,0,2">
+                    <TextBlock Grid.Column="0" Text="Manufacturer"  FontWeight="Bold" Margin="2,0"/>
+                    <TextBlock Grid.Column="1" Text="Description"   FontWeight="Bold" Margin="2,0"/>
+                    <TextBlock Grid.Column="2" Text="Model #"        FontWeight="Bold" Margin="2,0"/>
+                    <TextBlock Grid.Column="3" Text="Match"          FontWeight="Bold" Margin="2,0"/>
+                    <TextBlock Grid.Column="4" Text="Custom Label"   FontWeight="Bold" Margin="2,0"/>
+                </Grid>
+                <!-- Data rows added in code-behind -->
+                <StackPanel Name="RowsPanel"/>
+            </StackPanel>
         </ScrollViewer>
     </DockPanel>
 </UserControl>

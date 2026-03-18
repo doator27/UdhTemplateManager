@@ -43,12 +43,14 @@ public partial class BulkHardwareEntryView : UserControl
         _manufacturers   = new ManufacturerRepository(ctx).GetAll().OrderBy(m => m.ManufacturerName).ToList();
         _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
 
-        BackButton.Click    += (_, _) => NavigationRequested?.Invoke($"JobDetail:{_jobId}");
-        AddRowButton.Click  += (_, _) => AddRow();
+        BackButton.Click     += (_, _) => NavigationRequested?.Invoke($"JobDetail:{_jobId}");
+        AddRowButton.Click   += (_, _) => AddRow();
         ContinueButton.Click += (_, _) => OnContinue();
 
         AddRow();
     }
+
+    // ── Row building ─────────────────────────────────────────────────────────
 
     /// <summary>Appends a new blank data-entry row to the panel.</summary>
     private void AddRow()
@@ -56,13 +58,14 @@ public partial class BulkHardwareEntryView : UserControl
         var row = new BulkHardwareRow();
         _rows.Add(row);
 
+        // Column widths must match the header grid in the AXAML.
         var grid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("160,180,140,80,120,32"),
+            ColumnDefinitions = new ColumnDefinitions("160,200,200,80,150,32"),
             Margin = new Avalonia.Thickness(0, 0, 0, 4)
         };
 
-        // Manufacturer ComboBox
+        // ── Col 0: Manufacturer ComboBox ──────────────────────────────────────
         var mfrCombo = new ComboBox
         {
             ItemsSource = _manufacturers,
@@ -72,14 +75,14 @@ public partial class BulkHardwareEntryView : UserControl
         mfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
         Grid.SetColumn(mfrCombo, 0);
 
-        // Description Button + label in a stack
+        // ── Col 1: Description picker ─────────────────────────────────────────
         var descLabel = new TextBlock
         {
             Text = "(none)",
             VerticalAlignment = VerticalAlignment.Center,
             Foreground = Brushes.Gray,
             FontSize = 11,
-            TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis
+            TextWrapping = TextWrapping.Wrap
         };
         var descButton = new Button
         {
@@ -87,38 +90,49 @@ public partial class BulkHardwareEntryView : UserControl
             FontSize = 11,
             Padding = new Avalonia.Thickness(4, 1)
         };
-        var descStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new Avalonia.Thickness(0, 0, 4, 0) };
+        var descStack = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            Spacing = 2,
+            Margin = new Avalonia.Thickness(0, 0, 4, 0)
+        };
         descStack.Children.Add(descButton);
         descStack.Children.Add(descLabel);
         Grid.SetColumn(descStack, 1);
 
-        // Model TextBox
-        var modelBox = new TextBox
+        // ── Col 2: Model # — editable ComboBox ───────────────────────────────
+        // Items are loaded from the DB when Manufacturer/Description change.
+        // IsEditable=true lets the user type a new model number not in the list.
+        var modelCombo = new ComboBox
         {
-            Watermark = "Model #",
+            IsEditable = true,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             Margin = new Avalonia.Thickness(0, 0, 4, 0)
         };
-        Grid.SetColumn(modelBox, 2);
+        modelCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
+        Grid.SetColumn(modelCombo, 2);
 
-        // Match status
+        // ── Col 3: Match status ───────────────────────────────────────────────
         var matchLabel = new TextBlock
         {
             Text = "—",
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Avalonia.Thickness(2, 0, 4, 0),
-            FontSize = 11
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap
         };
         Grid.SetColumn(matchLabel, 3);
 
-        // Custom label TextBox
+        // ── Col 4: Custom label ───────────────────────────────────────────────
         var customBox = new TextBox
         {
             Watermark = "Optional",
-            Margin = new Avalonia.Thickness(0, 0, 4, 0)
+            Margin = new Avalonia.Thickness(0, 0, 4, 0),
+            TextWrapping = TextWrapping.Wrap
         };
         Grid.SetColumn(customBox, 4);
 
-        // Remove button
+        // ── Col 5: Remove button ──────────────────────────────────────────────
         var removeBtn = new Button
         {
             Content = "×",
@@ -129,19 +143,73 @@ public partial class BulkHardwareEntryView : UserControl
 
         grid.Children.Add(mfrCombo);
         grid.Children.Add(descStack);
-        grid.Children.Add(modelBox);
+        grid.Children.Add(modelCombo);
         grid.Children.Add(matchLabel);
         grid.Children.Add(customBox);
         grid.Children.Add(removeBtn);
-
         RowsPanel.Children.Add(grid);
 
-        // Wire events
+        // ── Local helpers ────────────────────────────────────────────────────
+
+        // Reloads the model combo's dropdown to show HardwareItems that match
+        // the current manufacturer + description selection.
+        void RefreshModelItems()
+        {
+            if (row.SelectedManufacturer == null && row.SelectedDescription == null)
+            {
+                modelCombo.ItemsSource = null;
+                return;
+            }
+            using var ctx = DatabaseInitializer.CreateContext();
+            var q = ctx.HardwareItems.AsQueryable();
+            if (row.SelectedManufacturer != null)
+                q = q.Where(h => h.ManufacturerId == row.SelectedManufacturer.Id);
+            if (row.SelectedDescription != null)
+                q = q.Where(h => h.DescriptionId == row.SelectedDescription.Id);
+            modelCombo.ItemsSource = q.OrderBy(h => h.ModelNumber).ToList();
+        }
+
+        // Syncs row.MatchedItem and row.ModelNumber from the combo's current state,
+        // then updates the match label and the Continue button.
+        void SyncModelState()
+        {
+            var text = modelCombo.Text?.Trim() ?? "";
+            row.ModelNumber = text;
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                row.MatchedItem = null;
+            }
+            else if (modelCombo.SelectedItem is HardwareItem h && h.ModelNumber == text)
+            {
+                // User picked an existing item from the dropdown.
+                row.MatchedItem = h;
+            }
+            else
+            {
+                // User typed a value — check the DB for an exact match.
+                row.MatchedItem = null;
+                if (row.SelectedManufacturer != null && row.SelectedDescription != null)
+                {
+                    using var ctx = DatabaseInitializer.CreateContext();
+                    row.MatchedItem = ctx.HardwareItems.FirstOrDefault(item =>
+                        item.ManufacturerId == row.SelectedManufacturer.Id &&
+                        item.DescriptionId  == row.SelectedDescription.Id &&
+                        item.ModelNumber    == text);
+                }
+            }
+
+            UpdateMatchLabel(row, matchLabel);
+            RefreshContinue();
+        }
+
+        // ── Wire events ──────────────────────────────────────────────────────
+
         mfrCombo.SelectionChanged += (_, _) =>
         {
             row.SelectedManufacturer = mfrCombo.SelectedItem as Manufacturer;
-            CheckMatch(row, matchLabel);
-            RefreshContinue();
+            RefreshModelItems();
+            SyncModelState();
         };
 
         descButton.Click += async (_, _) =>
@@ -151,19 +219,21 @@ public partial class BulkHardwareEntryView : UserControl
             {
                 var desc = _allDescriptions.FirstOrDefault(d => d.Id == picked.Value);
                 row.SelectedDescription = desc;
-                descLabel.Text = desc != null ? BuildDescPath(desc) : "(none)";
-                descLabel.Foreground = Brushes.Black;
+                descLabel.Text       = desc != null ? BuildDescPath(desc) : "(none)";
+                descLabel.Foreground = desc != null ? Brushes.Black : Brushes.Gray;
             }
-            CheckMatch(row, matchLabel);
-            RefreshContinue();
+            RefreshModelItems();
+            SyncModelState();
         };
 
-        modelBox.TextChanged += (_, _) =>
+        // Track text changes in the editable combo via property change notification.
+        modelCombo.PropertyChanged += (_, e) =>
         {
-            row.ModelNumber = modelBox.Text?.Trim() ?? "";
-            CheckMatch(row, matchLabel);
-            RefreshContinue();
+            if (e.Property == ComboBox.TextProperty)
+                SyncModelState();
         };
+        // Also fire on explicit selection from the dropdown.
+        modelCombo.SelectionChanged += (_, _) => SyncModelState();
 
         customBox.TextChanged += (_, _) =>
         {
@@ -182,43 +252,27 @@ public partial class BulkHardwareEntryView : UserControl
         };
     }
 
-    /// <summary>
-    /// Checks whether the row's Manufacturer + Description + ModelNumber match an existing
-    /// <see cref="HardwareItem"/> and updates the match status label accordingly.
-    /// </summary>
-    private void CheckMatch(BulkHardwareRow row, TextBlock matchLabel)
+    // ── State helpers ─────────────────────────────────────────────────────────
+
+    private static void UpdateMatchLabel(BulkHardwareRow row, TextBlock label)
     {
-        if (row.SelectedManufacturer == null || row.SelectedDescription == null || string.IsNullOrWhiteSpace(row.ModelNumber))
+        if (string.IsNullOrWhiteSpace(row.ModelNumber))
         {
-            row.MatchedItem = null;
-            matchLabel.Text = "—";
-            matchLabel.Foreground = Brushes.Gray;
-            return;
+            label.Text       = "—";
+            label.Foreground = Brushes.Gray;
         }
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        var match = ctx.HardwareItems.FirstOrDefault(h =>
-            h.ManufacturerId == row.SelectedManufacturer.Id &&
-            h.DescriptionId  == row.SelectedDescription.Id &&
-            h.ModelNumber    == row.ModelNumber);
-
-        row.MatchedItem = match;
-        if (match != null)
+        else if (row.MatchedItem != null)
         {
-            matchLabel.Text = "✓ Matched";
-            matchLabel.Foreground = Brushes.DarkGreen;
+            label.Text       = "✓ Matched";
+            label.Foreground = Brushes.DarkGreen;
         }
         else
         {
-            matchLabel.Text = "(new)";
-            matchLabel.Foreground = Brushes.Gray;
+            label.Text       = "(new)";
+            label.Foreground = Brushes.Gray;
         }
     }
 
-    /// <summary>
-    /// Enables the Continue button when at least one row has Manufacturer, Description,
-    /// and ModelNumber all set.
-    /// </summary>
     private void RefreshContinue()
     {
         ContinueButton.IsEnabled = _rows.Any(r =>
@@ -245,17 +299,16 @@ public partial class BulkHardwareEntryView : UserControl
         NavigationRequested?.Invoke($"TemplateResolutionWizard:{_jobId}");
     }
 
-    /// <summary>Opens the <see cref="DescriptionPickerWindow"/> and returns the selected ID.</summary>
+    // ── Utilities ─────────────────────────────────────────────────────────────
+
     private async Task<int?> OpenDescriptionPickerAsync()
     {
         var window = TopLevel.GetTopLevel(this) as Window;
         if (window == null) return null;
-
         var picker = new DescriptionPickerWindow(_allDescriptions);
         return await picker.ShowDialog<int?>(window);
     }
 
-    /// <summary>Builds the full ancestor path string for a description node.</summary>
     private string BuildDescPath(Description target)
     {
         var lookup = _allDescriptions.ToDictionary(d => d.Id);

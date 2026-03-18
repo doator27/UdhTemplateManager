@@ -174,6 +174,10 @@ public partial class TemplateResolutionWizardView : UserControl
         var pages    = TplPagesBox.Text?.Trim();
         var online   = TplOnlineLinkBox.Text?.Trim();
         var local    = TplLocalLinkBox.Text?.Trim();
+        var pagesToRotate = TplPagesToRotateBox.Text?.Trim();
+
+        int numPages = int.TryParse(TplNumPagesBox.Text?.Trim(), out var np) && np > 0 ? np : 1;
+        int rotDir   = int.TryParse(TplRotationDirectionBox.Text?.Trim(), out var rd) ? rd : 0;
 
         if (desc == null)                              { AddTemplateStatusLabel.Text = "Select a description."; return; }
         if (material == null)                          { AddTemplateStatusLabel.Text = "Select a door material."; return; }
@@ -190,14 +194,16 @@ public partial class TemplateResolutionWizardView : UserControl
         var templateRepo = new IndividualTemplateRepository(ctx);
         var candidate = new IndividualTemplate
         {
-            ManufacturerId = mfrId,
-            DescriptionId  = desc.Id,
-            DoorMaterialId = material.Id,
-            TemplateNumber = number,
-            PagesToPrint   = pages,
-            NumPages       = 1,
-            OnlineLink     = string.IsNullOrEmpty(online) ? null : online,
-            LocalLink      = string.IsNullOrEmpty(local)  ? null : local,
+            ManufacturerId    = mfrId,
+            DescriptionId     = desc.Id,
+            DoorMaterialId    = material.Id,
+            TemplateNumber    = number,
+            PagesToPrint      = pages,
+            NumPages          = numPages,
+            PagesToRotate     = string.IsNullOrEmpty(pagesToRotate) ? null : pagesToRotate,
+            RotationDirection = rotDir,
+            OnlineLink        = string.IsNullOrEmpty(online) ? null : online,
+            LocalLink         = string.IsNullOrEmpty(local)  ? null : local,
         };
         var saved = templateRepo.Add(candidate);
 
@@ -208,10 +214,13 @@ public partial class TemplateResolutionWizardView : UserControl
         AddTemplateStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
         AddTemplateStatusLabel.Text = $"Staged: {saved.TemplateNumber}";
 
-        TplNumberBox.Text      = "";
-        TplPagesBox.Text       = "";
-        TplOnlineLinkBox.Text  = "";
-        TplLocalLinkBox.Text   = "";
+        TplNumberBox.Text              = "";
+        TplNumPagesBox.Text            = "1";
+        TplPagesBox.Text               = "";
+        TplPagesToRotateBox.Text       = "";
+        TplRotationDirectionBox.Text   = "";
+        TplOnlineLinkBox.Text          = "";
+        TplLocalLinkBox.Text           = "";
     }
 
     private void RemovePendingTemplate()
