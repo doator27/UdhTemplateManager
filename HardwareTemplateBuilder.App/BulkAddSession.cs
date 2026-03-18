@@ -21,6 +21,9 @@ public class BulkHardwareRow
     /// <summary>Gets or sets the optional custom label for the job link.</summary>
     public string? CustomLabel { get; set; }
 
+    /// <summary>Gets or sets optional remarks to store on the hardware item.</summary>
+    public string? Remarks { get; set; }
+
     /// <summary>
     /// Gets or sets the existing <see cref="HardwareItem"/> that exactly matches this row,
     /// or <c>null</c> if this will be a new item.

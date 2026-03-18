@@ -23,12 +23,13 @@
         <ScrollViewer HorizontalScrollBarVisibility="Auto">
             <StackPanel>
                 <!-- Column header row — same column widths as data rows -->
-                <Grid ColumnDefinitions="160,200,200,80,150,32" Margin="0,0,0,2">
+                <Grid ColumnDefinitions="150,180,170,70,120,160,32" Margin="0,0,0,2">
                     <TextBlock Grid.Column="0" Text="Manufacturer"  FontWeight="Bold" Margin="2,0"/>
                     <TextBlock Grid.Column="1" Text="Description"   FontWeight="Bold" Margin="2,0"/>
-                    <TextBlock Grid.Column="2" Text="Model #"        FontWeight="Bold" Margin="2,0"/>
-                    <TextBlock Grid.Column="3" Text="Match"          FontWeight="Bold" Margin="2,0"/>
-                    <TextBlock Grid.Column="4" Text="Custom Label"   FontWeight="Bold" Margin="2,0"/>
+                    <TextBlock Grid.Column="2" Text="Model #"       FontWeight="Bold" Margin="2,0"/>
+                    <TextBlock Grid.Column="3" Text="Match"         FontWeight="Bold" Margin="2,0"/>
+                    <TextBlock Grid.Column="4" Text="Custom Label"  FontWeight="Bold" Margin="2,0"/>
+                    <TextBlock Grid.Column="5" Text="Remarks"       FontWeight="Bold" Margin="2,0"/>
                 </Grid>
                 <!-- Data rows added in code-behind -->
                 <StackPanel Name="RowsPanel"/>

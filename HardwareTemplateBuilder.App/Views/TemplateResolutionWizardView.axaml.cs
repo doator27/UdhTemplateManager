@@ -258,10 +258,18 @@ public partial class TemplateResolutionWizardView : UserControl
 
             if (row.MatchedItem != null)
             {
-                // Case A — matched; increment frequency
+                // Case A — matched; increment frequency, update remarks if provided
                 hwItemId = row.MatchedItem.Id;
                 var existing = ctx.HardwareItems.Find(hwItemId);
-                if (existing != null) freqService.IncrementFrequency(existing);
+                if (existing != null)
+                {
+                    freqService.IncrementFrequency(existing);
+                    if (!string.IsNullOrWhiteSpace(row.Remarks))
+                    {
+                        existing.Remarks = row.Remarks;
+                        ctx.SaveChanges();
+                    }
+                }
             }
             else
             {
@@ -272,7 +280,8 @@ public partial class TemplateResolutionWizardView : UserControl
                     {
                         ManufacturerId = row.SelectedManufacturer!.Id,
                         DescriptionId  = row.SelectedDescription!.Id,
-                        ModelNumber    = row.ModelNumber
+                        ModelNumber    = row.ModelNumber,
+                        Remarks        = string.IsNullOrWhiteSpace(row.Remarks) ? null : row.Remarks
                     });
                     row.CreatedItem = newItem;
                 }

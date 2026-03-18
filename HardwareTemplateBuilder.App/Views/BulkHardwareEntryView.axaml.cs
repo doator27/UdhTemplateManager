@@ -61,7 +61,7 @@ public partial class BulkHardwareEntryView : UserControl
         // Column widths must match the header grid in the AXAML.
         var grid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("160,200,200,80,150,32"),
+            ColumnDefinitions = new ColumnDefinitions("150,180,170,70,120,160,32"),
             Margin = new Avalonia.Thickness(0, 0, 0, 4)
         };
 
@@ -132,20 +132,30 @@ public partial class BulkHardwareEntryView : UserControl
         };
         Grid.SetColumn(customBox, 4);
 
-        // ── Col 5: Remove button ──────────────────────────────────────────────
+        // ── Col 5: Remarks ────────────────────────────────────────────────────
+        var remarksBox = new TextBox
+        {
+            Watermark = "Optional",
+            Margin = new Avalonia.Thickness(0, 0, 4, 0),
+            TextWrapping = TextWrapping.Wrap
+        };
+        Grid.SetColumn(remarksBox, 5);
+
+        // ── Col 6: Remove button ──────────────────────────────────────────────
         var removeBtn = new Button
         {
             Content = "×",
             Width = 28,
             HorizontalContentAlignment = HorizontalAlignment.Center
         };
-        Grid.SetColumn(removeBtn, 5);
+        Grid.SetColumn(removeBtn, 6);
 
         grid.Children.Add(mfrCombo);
         grid.Children.Add(descStack);
         grid.Children.Add(modelCombo);
         grid.Children.Add(matchLabel);
         grid.Children.Add(customBox);
+        grid.Children.Add(remarksBox);
         grid.Children.Add(removeBtn);
         RowsPanel.Children.Add(grid);
 
@@ -238,6 +248,11 @@ public partial class BulkHardwareEntryView : UserControl
         customBox.TextChanged += (_, _) =>
         {
             row.CustomLabel = string.IsNullOrWhiteSpace(customBox.Text) ? null : customBox.Text.Trim();
+        };
+
+        remarksBox.TextChanged += (_, _) =>
+        {
+            row.Remarks = string.IsNullOrWhiteSpace(remarksBox.Text) ? null : remarksBox.Text.Trim();
         };
 
         removeBtn.Click += (_, _) =>
