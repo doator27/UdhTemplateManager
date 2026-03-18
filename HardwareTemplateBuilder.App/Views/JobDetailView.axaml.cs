@@ -88,6 +88,14 @@ public partial class JobDetailView : UserControl
 
         LoadLinkedHardware();
 
+        // Attachments
+        AttachmentList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayLabel");
+        LoadAttachments();
+        AddEmailButton.Click          += async (_, _) => await AddAttachmentAsync("Email");
+        AddPdfButton.Click            += async (_, _) => await AddAttachmentAsync("PDF");
+        OpenAttachmentButton.Click    += (_, _) => OpenAttachment();
+        RemoveAttachmentButton.Click  += (_, _) => RemoveAttachment();
+
         // Auto-redirect to bulk entry when the job has no hardware yet.
         if (_linkedHardware.Count == 0)
         {
@@ -432,7 +440,9 @@ public partial class JobDetailView : UserControl
                 {
                     var entries = Directory.GetFileSystemEntries(jobDir)
                         .Where(e => !Path.GetFileName(e).Equals("Old versions",
-                            StringComparison.OrdinalIgnoreCase))
+                                        StringComparison.OrdinalIgnoreCase)
+                                 && !Path.GetFileName(e).Equals("Attachments",
+                                        StringComparison.OrdinalIgnoreCase))
                         .ToList();
 
                     if (entries.Count > 0)
@@ -552,6 +562,147 @@ public partial class JobDetailView : UserControl
         {
             PackageStatusLabel.Text = $"Could not open folder: {oldVersionsDir}";
         }
+    }
+
+    // --- Attachments ---
+
+    private void LoadAttachments()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var attachments = new JobAttachmentRepository(ctx).GetByJob(_jobId);
+        AttachmentList.ItemsSource = attachments;
+    }
+
+    /// <summary>
+    /// Resolves the job's Attachments subfolder path, creating it if needed.
+    /// Returns null when the job or its save location cannot be determined.
+    /// </summary>
+    private string? GetAttachmentsFolder()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var job     = ctx.Jobs.Find(_jobId);
+        if (job == null) return null;
+        var profile = ctx.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
+        var saveDir = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
+            ? profile.DefaultTemplateSaveLocation
+            : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        var folder = Path.Combine(saveDir, job.JobNumber, "Attachments");
+        Directory.CreateDirectory(folder);
+        return folder;
+    }
+
+    private async Task AddAttachmentAsync(string fileType)
+    {
+        AttachmentStatusLabel.Text = "";
+        var topLevel = TopLevel.GetTopLevel(this) as Window;
+        if (topLevel == null) return;
+
+        var filters = fileType == "Email"
+            ? new[] { new FilePickerFileType("Email / PDF") { Patterns = new[] { "*.eml", "*.msg", "*.pdf" } } }
+            : new[] { new FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } } };
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title         = $"Select {fileType} file",
+            AllowMultiple = true,
+            FileTypeFilter = filters
+        });
+
+        if (files.Count == 0) return;
+
+        var folder = GetAttachmentsFolder();
+        if (folder == null) { AttachmentStatusLabel.Text = "Could not resolve job folder."; return; }
+
+        var notes = AttachmentNoteBox.Text?.Trim();
+        int added = 0;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var repo = new JobAttachmentRepository(ctx);
+
+        foreach (var file in files)
+        {
+            var sourcePath = file.Path.LocalPath;
+            var fileName   = Path.GetFileName(sourcePath);
+            var destPath   = Path.Combine(folder, fileName);
+
+            // If a file with that name already exists, append a counter.
+            if (File.Exists(destPath))
+            {
+                var stem = Path.GetFileNameWithoutExtension(fileName);
+                var ext  = Path.GetExtension(fileName);
+                int n = 1;
+                while (File.Exists(destPath))
+                    destPath = Path.Combine(folder, $"{stem} ({n++}){ext}");
+            }
+
+            File.Copy(sourcePath, destPath);
+
+            repo.Add(new JobAttachment
+            {
+                JobId      = _jobId,
+                FileName   = Path.GetFileName(destPath),
+                StoredPath = destPath,
+                FileType   = fileType,
+                Notes      = string.IsNullOrWhiteSpace(notes) ? null : notes,
+                DateAdded  = DateTime.UtcNow
+            });
+            added++;
+        }
+
+        AttachmentNoteBox.Text = "";
+        AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        AttachmentStatusLabel.Text = $"Added {added} file{(added == 1 ? "" : "s")}.";
+        LoadAttachments();
+    }
+
+    private void OpenAttachment()
+    {
+        if (AttachmentList.SelectedItem is not JobAttachment a)
+        {
+            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Text = "Select an attachment to open.";
+            return;
+        }
+        if (!File.Exists(a.StoredPath))
+        {
+            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Text = "File not found on disk.";
+            return;
+        }
+        try
+        {
+            Process.Start(new ProcessStartInfo(a.StoredPath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Text = $"Could not open: {ex.Message}";
+        }
+    }
+
+    private void RemoveAttachment()
+    {
+        if (AttachmentList.SelectedItem is not JobAttachment a)
+        {
+            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Text = "Select an attachment to remove.";
+            return;
+        }
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var record = ctx.JobAttachments.Find(a.Id);
+        if (record != null)
+        {
+            ctx.JobAttachments.Remove(record);
+            ctx.SaveChanges();
+        }
+
+        // Delete the copied file if it still exists.
+        try { if (File.Exists(a.StoredPath)) File.Delete(a.StoredPath); } catch { }
+
+        AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        AttachmentStatusLabel.Text = $"Removed: {a.FileName}";
+        LoadAttachments();
     }
 
     // --- Quick Create ---

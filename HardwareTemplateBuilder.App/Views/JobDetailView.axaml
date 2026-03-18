@@ -12,6 +12,28 @@
 
         <ScrollViewer>
             <StackPanel>
+                <!-- Job Attachments sub-panel -->
+                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="Job Attachments" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <ListBox Name="AttachmentList" Height="110" Margin="0,0,0,8"/>
+
+                        <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
+                            <TextBlock Grid.Column="0" Text="Note (optional):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox   Grid.Column="1" Name="AttachmentNoteBox" Watermark="Describe this file…"/>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,8">
+                            <Button Name="AddEmailButton"  Content="+ Add Email…"/>
+                            <Button Name="AddPdfButton"    Content="+ Add PDF…"/>
+                            <Button Name="OpenAttachmentButton"   Content="Open"/>
+                            <Button Name="RemoveAttachmentButton" Content="Remove"/>
+                        </StackPanel>
+
+                        <TextBlock Name="AttachmentStatusLabel" Foreground="#800000" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- Linked Hardware Items sub-panel -->
                 <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                     <StackPanel>

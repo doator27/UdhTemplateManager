@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HardwareTemplateBuilder.SmokeTest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4f025fd584cd767002393a312b2aef90a5c07e26")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b16971bff8e612f3ef953c20756185a9e00c05fd")]
 [assembly: System.Reflection.AssemblyProductAttribute("HardwareTemplateBuilder.SmokeTest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HardwareTemplateBuilder.SmokeTest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

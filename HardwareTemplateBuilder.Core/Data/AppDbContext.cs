@@ -51,6 +51,9 @@ public class AppDbContext : DbContext
     /// <summary>Gets or sets the job template snapshots table.</summary>
     public DbSet<JobTemplateSnapshot> JobTemplateSnapshots => Set<JobTemplateSnapshot>();
 
+    /// <summary>Gets or sets the job attachments table.</summary>
+    public DbSet<JobAttachment> JobAttachments => Set<JobAttachment>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -190,5 +193,12 @@ public class AppDbContext : DbContext
             .WithMany(t => t.Snapshots)
             .HasForeignKey(s => s.IndividualTemplateId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // JobAttachment → Job (cascade: deleting a job removes its attachments)
+        modelBuilder.Entity<JobAttachment>()
+            .HasOne(a => a.Job)
+            .WithMany(j => j.Attachments)
+            .HasForeignKey(a => a.JobId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

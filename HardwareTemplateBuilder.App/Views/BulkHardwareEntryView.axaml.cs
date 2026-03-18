@@ -21,6 +21,7 @@ public partial class BulkHardwareEntryView : UserControl
     private readonly int _jobId;
     private List<Manufacturer> _manufacturers = new();
     private List<Description> _allDescriptions = new();
+    private List<DescriptionComboItem> _allDescComboItems = new();
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event Action<string>? NavigationRequested;
@@ -40,8 +41,9 @@ public partial class BulkHardwareEntryView : UserControl
     private void Initialize()
     {
         using var ctx = DatabaseInitializer.CreateContext();
-        _manufacturers   = new ManufacturerRepository(ctx).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
+        _manufacturers       = new ManufacturerRepository(ctx).GetAll().OrderBy(m => m.ManufacturerName).ToList();
+        _allDescriptions     = new DescriptionRepository(ctx).GetAll().ToList();
+        _allDescComboItems   = DescriptionHelper.BuildComboItems(_allDescriptions);
 
         BackButton.Click     += (_, _) => NavigationRequested?.Invoke($"JobDetail:{_jobId}");
         AddRowButton.Click   += (_, _) => AddRow();
@@ -75,29 +77,52 @@ public partial class BulkHardwareEntryView : UserControl
         mfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
         Grid.SetColumn(mfrCombo, 0);
 
-        // ── Col 1: Description picker ─────────────────────────────────────────
-        var descLabel = new TextBlock
+        // ── Col 1: Description picker (search + tree + new) ──────────────────
+        var descSearchBox = new TextBox
+        {
+            Watermark = "Search descriptions…",
+            FontSize = 11,
+            Margin = new Avalonia.Thickness(0, 0, 0, 2)
+        };
+        var descMatchList = new ListBox { MaxHeight = 80, IsVisible = false };
+        descMatchList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+        var descSelectedLabel = new TextBlock
         {
             Text = "(none)",
-            VerticalAlignment = VerticalAlignment.Center,
             Foreground = Brushes.Gray,
-            FontSize = 11,
+            FontSize = 10,
             TextWrapping = TextWrapping.Wrap
         };
-        var descButton = new Button
+        var descPickTreeBtn = new Button
         {
-            Content = "Pick…",
-            FontSize = 11,
+            Content = "⋯ Tree",
+            FontSize = 10,
             Padding = new Avalonia.Thickness(4, 1)
         };
+        var descNewBtn = new Button
+        {
+            Content = "+ New",
+            FontSize = 10,
+            Padding = new Avalonia.Thickness(4, 1)
+        };
+        var descBtnRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 4,
+            Margin = new Avalonia.Thickness(0, 2, 0, 0)
+        };
+        descBtnRow.Children.Add(descPickTreeBtn);
+        descBtnRow.Children.Add(descNewBtn);
         var descStack = new StackPanel
         {
             Orientation = Orientation.Vertical,
-            Spacing = 2,
+            Spacing = 1,
             Margin = new Avalonia.Thickness(0, 0, 4, 0)
         };
-        descStack.Children.Add(descButton);
-        descStack.Children.Add(descLabel);
+        descStack.Children.Add(descSearchBox);
+        descStack.Children.Add(descMatchList);
+        descStack.Children.Add(descSelectedLabel);
+        descStack.Children.Add(descBtnRow);
         Grid.SetColumn(descStack, 1);
 
         // ── Col 2: Model # — editable ComboBox ───────────────────────────────
@@ -222,18 +247,50 @@ public partial class BulkHardwareEntryView : UserControl
             SyncModelState();
         };
 
-        descButton.Click += async (_, _) =>
+        // Selects a description and updates all related state.
+        void SelectDescription(Description? desc)
+        {
+            row.SelectedDescription         = desc;
+            descSelectedLabel.Text          = desc != null ? BuildDescPath(desc) : "(none)";
+            descSelectedLabel.Foreground    = desc != null ? Brushes.Black : Brushes.Gray;
+            descSearchBox.Text              = "";
+            descMatchList.IsVisible         = false;
+            RefreshModelItems();
+            SyncModelState();
+        }
+
+        descSearchBox.TextChanged += (_, _) =>
+        {
+            var q = descSearchBox.Text?.Trim() ?? "";
+            if (string.IsNullOrEmpty(q)) { descMatchList.IsVisible = false; return; }
+            var matches = _allDescComboItems
+                .Where(d => d.DisplayText.Contains(q, StringComparison.OrdinalIgnoreCase))
+                .Take(8).ToList();
+            descMatchList.ItemsSource = matches;
+            descMatchList.IsVisible   = matches.Count > 0;
+        };
+
+        descMatchList.SelectionChanged += (_, _) =>
+        {
+            if (descMatchList.SelectedItem is DescriptionComboItem item)
+                SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == item.Id));
+        };
+
+        descPickTreeBtn.Click += async (_, _) =>
         {
             var picked = await OpenDescriptionPickerAsync();
             if (picked.HasValue)
-            {
-                var desc = _allDescriptions.FirstOrDefault(d => d.Id == picked.Value);
-                row.SelectedDescription = desc;
-                descLabel.Text       = desc != null ? BuildDescPath(desc) : "(none)";
-                descLabel.Foreground = desc != null ? Brushes.Black : Brushes.Gray;
-            }
-            RefreshModelItems();
-            SyncModelState();
+                SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == picked.Value));
+        };
+
+        descNewBtn.Click += (_, _) =>
+        {
+            var name = descSearchBox.Text?.Trim();
+            if (string.IsNullOrEmpty(name)) return;
+            using var ctx = DatabaseInitializer.CreateContext();
+            var newDesc = new DescriptionRepository(ctx).Add(new Description { DescriptionText = name, ParentId = null });
+            RefreshDescriptions();
+            SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == newDesc.Id));
         };
 
         // Track text changes in the editable combo via property change notification.
@@ -315,6 +372,14 @@ public partial class BulkHardwareEntryView : UserControl
     }
 
     // ── Utilities ─────────────────────────────────────────────────────────────
+
+    /// <summary>Reloads descriptions from the database and rebuilds the combo item list.</summary>
+    private void RefreshDescriptions()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        _allDescriptions   = new DescriptionRepository(ctx).GetAll().ToList();
+        _allDescComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
+    }
 
     private async Task<int?> OpenDescriptionPickerAsync()
     {

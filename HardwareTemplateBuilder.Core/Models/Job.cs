@@ -42,4 +42,7 @@ public class Job
 
     /// <summary>Gets or sets the template snapshots captured when PDF packages were generated for this job.</summary>
     public ICollection<JobTemplateSnapshot> Snapshots { get; set; } = new List<JobTemplateSnapshot>();
+
+    /// <summary>Gets or sets the files (emails and PDFs) attached to this job.</summary>
+    public ICollection<JobAttachment> Attachments { get; set; } = new List<JobAttachment>();
 }
