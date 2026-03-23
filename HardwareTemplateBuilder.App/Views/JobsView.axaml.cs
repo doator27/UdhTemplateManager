@@ -19,6 +19,7 @@ public partial class JobsView : UserControl
     private List<Customer> _customers = new();
     private List<ProjectManager> _projectManagers = new();
     private int _selectedJobId;
+    private bool _selectedJobIsComplete;
 
     /// <summary>Raised when the user requests navigation to a named view (e.g. "JobDetail:42").</summary>
     public event System.Action<string>? NavigationRequested;
@@ -41,6 +42,7 @@ public partial class JobsView : UserControl
 
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         FilterBox.TextChanged += (_, _) => LoadJobList();
+        ShowCompletedCheck.IsCheckedChanged += (_, _) => LoadJobList();
         JobList.SelectionChanged += (_, _) => OnJobSelected();
         SaveButton.Click += (_, _) => Save();
         NewButton.Click += (_, _) => ClearForm();
@@ -55,6 +57,7 @@ public partial class JobsView : UserControl
             if (_selectedJobId == 0) { StatusLabel.Text = "Select a job to open."; return; }
             NavigationRequested?.Invoke($"JobDetail:{_selectedJobId}");
         };
+        ToggleCompleteButton.Click += (_, _) => ToggleJobComplete();
 
         AddCustomerButton.Click        += (_, _) => TogglePanel(NewCustomerPanel, NewCustomerBox);
         CancelCustomerButton.Click     += (_, _) => HidePanel(NewCustomerPanel, NewCustomerBox);
@@ -121,13 +124,17 @@ public partial class JobsView : UserControl
 
     private void LoadJobList()
     {
-        var filter = FilterBox.Text?.ToLower() ?? "";
+        var filter       = FilterBox.Text?.ToLower() ?? "";
+        var showComplete = ShowCompletedCheck.IsChecked == true;
+
         var items = _repo!.GetAll()
+            .Where(j => showComplete || !j.IsComplete)
             .Where(j => string.IsNullOrEmpty(filter) ||
                         j.JobNumber.ToLower().Contains(filter) ||
                         j.JobName.ToLower().Contains(filter))
             .OrderBy(j => j.JobNumber)
             .ToList();
+
         JobList.ItemsSource = items;
         JobList.DisplayMemberBinding = new Avalonia.Data.Binding("JobNumber");
     }
@@ -136,13 +143,29 @@ public partial class JobsView : UserControl
     {
         if (JobList.SelectedItem is Job j)
         {
-            _selectedJobId = j.Id;
+            _selectedJobId         = j.Id;
+            _selectedJobIsComplete = j.IsComplete;
             JobNumberBox.Text = j.JobNumber;
             JobNameBox.Text = j.JobName;
             CustomerCombo.SelectedItem = _customers.FirstOrDefault(c => c.Id == j.CustomerId);
             ProjectManagerCombo.SelectedItem = _projectManagers.FirstOrDefault(pm => pm.Id == j.ProjectManagerId);
-            StatusLabel.Text = "";
+            ToggleCompleteButton.Content = j.IsComplete ? "↺ Reactivate" : "✓ Mark Complete";
+            StatusLabel.Text = j.IsComplete ? "[Complete]" : "";
         }
+    }
+
+    private void ToggleJobComplete()
+    {
+        if (_selectedJobId == 0) { StatusLabel.Text = "Select a job first."; return; }
+        using var ctx = DatabaseInitializer.CreateContext();
+        var job = ctx.Jobs.Find(_selectedJobId);
+        if (job == null) return;
+        job.IsComplete = !job.IsComplete;
+        ctx.SaveChanges();
+        _selectedJobIsComplete = job.IsComplete;
+        ToggleCompleteButton.Content = job.IsComplete ? "↺ Reactivate" : "✓ Mark Complete";
+        StatusLabel.Text = job.IsComplete ? "Marked complete." : "Reactivated.";
+        LoadJobList();
     }
 
     private void Save()

@@ -47,6 +47,12 @@ public partial class JobDetailView : UserControl
     private Point _dragStartPoint;
     private bool _updatingSearchDescCombo;
 
+    /// <summary>Currently selected release ID; null means the base hardware list.</summary>
+    private int? _currentReleaseId;
+
+    /// <summary>Tracks whether the job is currently marked complete.</summary>
+    private bool _isComplete;
+
     /// <summary>Raised when the user requests navigation to a named view (e.g. "Jobs").</summary>
     public event Action<string>? NavigationRequested;
 
@@ -66,9 +72,11 @@ public partial class JobDetailView : UserControl
         _manufacturers  = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
         _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
 
-        // Show job header
+        // Show job header and completion status
         var job = context.Jobs.Find(_jobId);
         JobTitleLabel.Text = job != null ? $"Job: {job.JobNumber} — {job.JobName}" : $"Job #{_jobId}";
+        _isComplete = job?.IsComplete ?? false;
+        UpdateCompleteButtons();
 
         // Search combos
         var anyMfr = new List<Manufacturer> { new Manufacturer { Id = 0, ManufacturerName = "(Any)" } };
@@ -99,6 +107,44 @@ public partial class JobDetailView : UserControl
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
         BulkAddButton.Click += (_, _) => NavigationRequested?.Invoke($"BulkHardwareEntry:{_jobId}");
+
+        // Phase 20: Mark complete / Reactivate
+        MarkCompleteButton.Click  += async (_, _) => await MarkCompleteAsync();
+        ReactivateButton.Click    += (_, _) => Reactivate();
+
+        // Collapsible section toggles
+        WireToggle(ToggleAttachmentsButton,     AttachmentsBody);
+        WireToggle(ToggleLinkedHardwareButton,  LinkedHardwareBody);
+        WireToggle(ToggleQuickCreateButton,     QuickCreateBody);
+        WireToggle(TogglePdfButton,             PdfBody);
+
+        // Phase 22: Sort + Edit
+        SortByMfrButton.Click  += (_, _) => SortLinkedHardware("mfr");
+        SortByDescButton.Click += (_, _) => SortLinkedHardware("desc");
+        EditHardwareButton.Click += (_, _) =>
+        {
+            if (LinkedHardwareList.SelectedItem is not JobHardware jh)
+            {
+                LinkStatusLabel.Text = "Select a hardware item to edit.";
+                return;
+            }
+            EditCustomDescBox.Text = jh.CustomDescription ?? string.Empty;
+            EditHardwarePanel.IsVisible = true;
+        };
+        SaveHardwareEditButton.Click += (_, _) => SaveHardwareEdit();
+        CancelHardwareEditButton.Click += (_, _) =>
+        {
+            EditHardwarePanel.IsVisible = false;
+            EditHardwareStatusLabel.Text = string.Empty;
+        };
+
+        // Phase 23: Releases
+        LoadReleaseCombo();
+        ReleaseCombo.SelectionChanged += (_, _) => OnReleaseChanged();
+        NewReleaseButton.Click    += (_, _) => { NewReleasePanel.IsVisible = true; ReleaseLabelBox.Focus(); };
+        CancelReleaseButton.Click += (_, _) => { NewReleasePanel.IsVisible = false; ReleaseStatusLabel.Text = string.Empty; };
+        SaveReleaseButton.Click   += (_, _) => CreateRelease();
+
         SearchMfrCombo.SelectionChanged += (_, _) => OnSearchMfrChanged();
         SearchDescCombo.SelectionChanged += (_, _) => { if (!_updatingSearchDescCombo) SearchHardware(); };
         SearchModelBox.TextChanged += (_, _) => SearchHardware();
@@ -219,12 +265,19 @@ public partial class JobDetailView : UserControl
     {
         _linkedHardware.Clear();
         using var context = DatabaseInitializer.CreateContext();
-        var rows = context.JobHardware
+        var query = context.JobHardware
             .Include(jh => jh.HardwareItem)
-            .ThenInclude(h => h.Manufacturer)
-            .Where(jh => jh.JobId == _jobId)
-            .ToList();
-        foreach (var row in rows)
+                .ThenInclude(h => h.Manufacturer)
+            .Include(jh => jh.HardwareItem)
+                .ThenInclude(h => h.Description)
+            .Where(jh => jh.JobId == _jobId);
+
+        if (_currentReleaseId == null)
+            query = query.Where(jh => jh.ReleaseId == null);
+        else
+            query = query.Where(jh => jh.ReleaseId == _currentReleaseId);
+
+        foreach (var row in query.ToList())
             _linkedHardware.Add(row);
     }
 
@@ -275,7 +328,8 @@ public partial class JobDetailView : UserControl
         {
             JobId             = _jobId,
             HardwareItemId    = h.Id,
-            CustomDescription = customLabel
+            CustomDescription = customLabel,
+            ReleaseId         = _currentReleaseId
         });
 
         CustomDescBox.Text   = "";
@@ -296,6 +350,159 @@ public partial class JobDetailView : UserControl
             LinkStatusLabel.Text = $"Removed: {jh.DisplayLabel}";
             LoadLinkedHardware();
         }
+    }
+
+    // --- Phase 20: Job complete status ---
+
+    /// <summary>Updates the Mark Complete / Reactivate button visibility and status label.</summary>
+    private void UpdateCompleteButtons()
+    {
+        MarkCompleteButton.IsVisible = !_isComplete;
+        ReactivateButton.IsVisible   = _isComplete;
+        JobStatusLabel.Text          = _isComplete ? "[COMPLETE]" : string.Empty;
+    }
+
+    private async Task MarkCompleteAsync()
+    {
+        var win = TopLevel.GetTopLevel(this) as Window;
+        if (win == null) return;
+
+        bool markDone = await Helpers.DialogHelper.ConfirmAsync(win,
+            "Mark this job as complete?\n\nCompleted jobs are hidden from the main list but remain searchable.",
+            "Mark Job Complete");
+        if (!markDone) return;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var job = ctx.Jobs.Find(_jobId);
+        if (job == null) return;
+        job.IsComplete = true;
+        ctx.SaveChanges();
+
+        _isComplete = true;
+        UpdateCompleteButtons();
+    }
+
+    private void Reactivate()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var job = ctx.Jobs.Find(_jobId);
+        if (job == null) return;
+        job.IsComplete = false;
+        ctx.SaveChanges();
+
+        _isComplete = false;
+        UpdateCompleteButtons();
+    }
+
+    // --- Phase 21 is wired in Initialize via ToggleLinkedHardwareButton ---
+
+    // --- Phase 22: Sort + Edit hardware ---
+
+    /// <summary>Sorts the linked hardware list in-place by manufacturer or description name.</summary>
+    private void SortLinkedHardware(string by)
+    {
+        var sorted = by == "mfr"
+            ? _linkedHardware.OrderBy(jh => jh.HardwareItem?.Manufacturer?.ManufacturerName ?? string.Empty)
+                             .ThenBy(jh => jh.HardwareItem?.ModelNumber ?? string.Empty)
+                             .ToList()
+            : _linkedHardware.OrderBy(jh => jh.HardwareItem?.Description?.DescriptionText ?? string.Empty)
+                             .ThenBy(jh => jh.HardwareItem?.ModelNumber ?? string.Empty)
+                             .ToList();
+
+        _linkedHardware.Clear();
+        foreach (var item in sorted)
+            _linkedHardware.Add(item);
+    }
+
+    /// <summary>Saves the edited custom label for the currently selected hardware link.</summary>
+    private void SaveHardwareEdit()
+    {
+        if (LinkedHardwareList.SelectedItem is not JobHardware jh)
+        {
+            EditHardwareStatusLabel.Text = "No item selected.";
+            return;
+        }
+
+        var newLabel = EditCustomDescBox.Text?.Trim();
+        newLabel = string.IsNullOrEmpty(newLabel) ? null : newLabel;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var link = ctx.JobHardware.Find(jh.Id);
+        if (link == null) { EditHardwareStatusLabel.Text = "Record not found."; return; }
+
+        link.CustomDescription = newLabel;
+        ctx.SaveChanges();
+
+        EditHardwareStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        EditHardwareStatusLabel.Text = "Saved.";
+        EditHardwarePanel.IsVisible = false;
+        LoadLinkedHardware();
+    }
+
+    // --- Phase 23: Job releases ---
+
+    /// <summary>
+    /// Populates the ReleaseCombo with "(Base list)" + all named releases for this job.
+    /// </summary>
+    private void LoadReleaseCombo()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var releases = ctx.JobReleases
+            .Where(r => r.JobId == _jobId)
+            .OrderBy(r => r.ReleaseNumber)
+            .ToList();
+
+        var items = new System.Collections.Generic.List<object>
+        {
+            new { Label = "(Base list)", ReleaseId = (int?)null }
+        };
+        foreach (var r in releases)
+            items.Add(new { Label = r.DisplayLabel, ReleaseId = (int?)r.Id });
+
+        ReleaseCombo.ItemsSource = items;
+        ReleaseCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Label");
+        ReleaseCombo.SelectedIndex = 0;
+    }
+
+    private void OnReleaseChanged()
+    {
+        if (ReleaseCombo.SelectedItem == null) return;
+        // Use reflection-style dynamic to avoid introducing a named type.
+        var item = ReleaseCombo.SelectedItem;
+        var prop = item.GetType().GetProperty("ReleaseId");
+        _currentReleaseId = prop?.GetValue(item) as int?;
+        LoadLinkedHardware();
+    }
+
+    private void CreateRelease()
+    {
+        var label = ReleaseLabelBox.Text?.Trim();
+        if (string.IsNullOrEmpty(label))
+        {
+            ReleaseStatusLabel.Text = "Enter a release label.";
+            return;
+        }
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var repo   = new JobReleaseRepository(ctx);
+        var number = repo.NextReleaseNumber(_jobId);
+        var release = repo.Add(new HardwareTemplateBuilder.Core.Models.JobRelease
+        {
+            JobId         = _jobId,
+            ReleaseNumber = number,
+            ReleaseLabel  = label,
+            Notes         = string.IsNullOrWhiteSpace(ReleaseNotesBox.Text) ? null : ReleaseNotesBox.Text.Trim()
+        });
+
+        ReleaseLabelBox.Text  = string.Empty;
+        ReleaseNotesBox.Text  = string.Empty;
+        NewReleasePanel.IsVisible = false;
+        ReleaseStatusLabel.Text   = string.Empty;
+
+        // Refresh combo and select the new release.
+        LoadReleaseCombo();
+        // Select the last item (the new release).
+        ReleaseCombo.SelectedIndex = ReleaseCombo.ItemCount - 1;
     }
 
     // --- Generate Package ---
@@ -535,6 +742,26 @@ public partial class JobDetailView : UserControl
         catch
         {
             // Non-fatal: file was generated but couldn't be auto-opened.
+        }
+
+        // Phase 20: ask whether to mark job complete (only if not already complete).
+        if (!_isComplete)
+        {
+            var winForComplete = TopLevel.GetTopLevel(this) as Window;
+            if (winForComplete != null)
+            {
+                bool markDone = await Helpers.DialogHelper.ConfirmAsync(winForComplete,
+                    "Package generated successfully.\n\nIs this job done? Mark it as complete?",
+                    "Mark Job Complete?");
+                if (markDone)
+                {
+                    using var ctx2 = DatabaseInitializer.CreateContext();
+                    var job2 = ctx2.Jobs.Find(_jobId);
+                    if (job2 != null) { job2.IsComplete = true; ctx2.SaveChanges(); }
+                    _isComplete = true;
+                    UpdateCompleteButtons();
+                }
+            }
         }
     }
 
@@ -1000,6 +1227,16 @@ public partial class JobDetailView : UserControl
         {
             // History write failure is non-fatal.
         }
+    }
+
+    /// <summary>Wires a toggle button to show/hide a panel and update the ▼/▲ arrow.</summary>
+    private static void WireToggle(Button button, Avalonia.Controls.Control body)
+    {
+        button.Click += (_, _) =>
+        {
+            body.IsVisible     = !body.IsVisible;
+            button.Content     = body.IsVisible ? "▲" : "▼";
+        };
     }
 
     /// <summary>Creates a fully wired <see cref="PdfAssemblyService"/> with all required dependencies.</summary>

@@ -93,6 +93,24 @@ public static class DatabaseInitializer
             cmd.CommandText = "ALTER TABLE \"UserProfiles\" ADD COLUMN \"MachineId\" TEXT";
             cmd.ExecuteNonQuery();
         }
+
+        // Patch: SMTP / alert email settings (Phase 24).
+        // Uses INSERT OR IGNORE so the operation is safe on both new and existing databases.
+        var smtpDefaults = new (string Key, string Value)[]
+        {
+            ("SmtpHost",       ""),
+            ("SmtpPort",       "587"),
+            ("SmtpUsername",   ""),
+            ("SmtpPassword",   ""),
+            ("AlertEmailTo",   ""),
+            ("AlertEmailFrom", "")
+        };
+        foreach (var (key, value) in smtpDefaults)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"INSERT OR IGNORE INTO \"AppSettings\" (\"Key\", \"Value\") VALUES ('{key}', '{value}')";
+            cmd.ExecuteNonQuery();
+        }
     }
 
     private static bool ColumnExists(System.Data.Common.DbConnection conn, string table, string column)

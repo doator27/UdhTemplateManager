@@ -3,7 +3,7 @@
              x:Class="HardwareTemplateBuilder.App.Views.JobsView">
     <DockPanel Margin="8">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,12,0"/>
+            <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="⊞ Dashboard" Margin="0,0,12,0"/>
             <TextBlock Text="Jobs" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
         <Grid ColumnDefinitions="260,*">
@@ -11,6 +11,7 @@
             <DockPanel Grid.Column="0" Margin="0,0,8,0">
                 <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2"/>
                 <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4"/>
+                <CheckBox DockPanel.Dock="Top" Name="ShowCompletedCheck" Content="Show completed" Margin="0,0,0,4"/>
                 <ListBox Name="JobList"/>
             </DockPanel>
             <!-- Right: metadata form -->
@@ -49,7 +50,8 @@
                             <Button Name="SaveButton"    Content="Save"     Margin="0,0,8,0"/>
                             <Button Name="NewButton"     Content="New"      Margin="0,0,8,0"/>
                             <Button Name="DeleteButton"  Content="Delete"   Margin="0,0,8,0"/>
-                            <Button Name="OpenJobButton" Content="Open Job" Margin="0,0,0,0"/>
+                            <Button Name="OpenJobButton" Content="Open Job" Margin="0,0,8,0"/>
+                            <Button Name="ToggleCompleteButton" Content="Mark Complete" Margin="0,0,0,0"/>
                         </StackPanel>
                         <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
                     </StackPanel>

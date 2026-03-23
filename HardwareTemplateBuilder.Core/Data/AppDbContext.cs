@@ -54,6 +54,12 @@ public class AppDbContext : DbContext
     /// <summary>Gets or sets the job attachments table.</summary>
     public DbSet<JobAttachment> JobAttachments => Set<JobAttachment>();
 
+    /// <summary>Gets or sets the job releases (addenda) table.</summary>
+    public DbSet<JobRelease> JobReleases => Set<JobRelease>();
+
+    /// <summary>Gets or sets the bulk-add draft persistence table.</summary>
+    public DbSet<BulkAddDraft> BulkAddDrafts => Set<BulkAddDraft>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,7 +70,9 @@ public class AppDbContext : DbContext
             .HasIndex(s => s.Key)
             .IsUnique();
 
-        // Seed the default app settings
+        // Seed the default app settings (only the original template storage location).
+        // SMTP / alert settings are seeded idempotently in DatabaseInitializer.EnsureSchemaPatches
+        // to avoid migration INSERT conflicts on existing databases.
         modelBuilder.Entity<AppSetting>().HasData(
             new AppSetting { Id = 1, Key = "TemplateStorageLocation", Value = "" }
         );
@@ -200,5 +208,30 @@ public class AppDbContext : DbContext
             .WithMany(j => j.Attachments)
             .HasForeignKey(a => a.JobId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // JobRelease → Job (cascade: deleting a job removes its releases)
+        modelBuilder.Entity<JobRelease>()
+            .HasOne(r => r.Job)
+            .WithMany(j => j.Releases)
+            .HasForeignKey(r => r.JobId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // JobHardware → JobRelease (optional FK; set null not cascade)
+        modelBuilder.Entity<JobHardware>()
+            .HasOne(jh => jh.Release)
+            .WithMany(r => r.HardwareLinks)
+            .HasForeignKey(jh => jh.ReleaseId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // BulkAddDraft → Job (one draft per job; cascade on job delete)
+        modelBuilder.Entity<BulkAddDraft>()
+            .HasOne(d => d.Job)
+            .WithMany()
+            .HasForeignKey(d => d.JobId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<BulkAddDraft>()
+            .HasIndex(d => d.JobId)
+            .IsUnique();
     }
 }

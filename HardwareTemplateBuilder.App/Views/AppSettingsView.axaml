@@ -45,6 +45,32 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Missing-template email alerts (Phase 24) -->
+                <Border BorderBrush="#808080" BorderThickness="1" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Missing-Template Email Alerts:" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="#444444" FontSize="11"
+                                   Text="If hardware items on an active job have no templates one week after job creation, an alert email is sent at startup. Leave blank to disable."
+                                   Margin="0,0,0,8"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,12">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="SMTP Host:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <TextBox   Grid.Row="0" Grid.Column="1" Name="SmtpHostBox" Watermark="e.g. smtp.gmail.com" Margin="0,0,0,4"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="SMTP Port:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <TextBox   Grid.Row="1" Grid.Column="1" Name="SmtpPortBox" Watermark="587" Margin="0,0,0,4"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Username:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <TextBox   Grid.Row="2" Grid.Column="1" Name="SmtpUsernameBox" Watermark="user@example.com" Margin="0,0,0,4"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Password:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <TextBox   Grid.Row="3" Grid.Column="1" Name="SmtpPasswordBox" PasswordChar="*" Margin="0,0,0,4"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Alert To:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <TextBox   Grid.Row="4" Grid.Column="1" Name="AlertEmailToBox" Watermark="recipient@example.com" Margin="0,0,0,4"/>
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Alert From:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox   Grid.Row="5" Grid.Column="1" Name="AlertEmailFromBox" Watermark="sender@example.com"/>
+                        </Grid>
+                        <Button Name="SaveSmtpButton" Content="Save SMTP Settings" HorizontalAlignment="Left"/>
+                        <TextBlock Name="SmtpStatusLabel" Margin="0,10,0,0" Foreground="#800000"/>
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
         </ScrollViewer>
     </DockPanel>

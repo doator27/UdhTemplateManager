@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
@@ -37,6 +38,18 @@ public class Job
     /// <summary>Gets or sets the user profile that created this job.</summary>
     public UserProfile UserProfile { get; set; } = null!;
 
+    /// <summary>Gets or sets whether the job has been marked as complete.</summary>
+    public bool IsComplete { get; set; } = false;
+
+    /// <summary>Gets or sets when the job was created (UTC).</summary>
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Gets or sets when the missing-template alert email was last sent for this job (UTC).
+    /// Null means no alert has been sent yet.
+    /// </summary>
+    public DateTime? MissingTemplateNotifiedAt { get; set; }
+
     /// <summary>Gets or sets the junction records linking hardware items to this job.</summary>
     public ICollection<JobHardware> JobHardwareLinks { get; set; } = new List<JobHardware>();
 
@@ -45,4 +58,7 @@ public class Job
 
     /// <summary>Gets or sets the files (emails and PDFs) attached to this job.</summary>
     public ICollection<JobAttachment> Attachments { get; set; } = new List<JobAttachment>();
+
+    /// <summary>Gets or sets the named releases (addenda) created for this job.</summary>
+    public ICollection<JobRelease> Releases { get; set; } = new List<JobRelease>();
 }

@@ -1,9 +1,11 @@
 using System.Reflection;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.App.Navigation;
 using HardwareTemplateBuilder.App.Views;
 using HardwareTemplateBuilder.Core.Data;
+using HardwareTemplateBuilder.Core.Services;
 
 namespace HardwareTemplateBuilder.App;
 
@@ -22,7 +24,18 @@ public partial class MainWindow : Window
         _router = new ViewRouter(ContentArea);
         RegisterViews();
         WireMenuItems();
-        NavigateTo("Dashboard");
+        NavigateTo("Jobs");
+
+        // Phase 24: Run missing-template alert check at startup (best-effort, background).
+        Task.Run(() =>
+        {
+            try
+            {
+                new MissingTemplateAlertService(DatabaseInitializer.CreateContext).RunCheck();
+            }
+            catch { /* Swallow: startup alert failure must not crash the app. */ }
+        });
+
     }
 
     /// <summary>Registers all application views with the router.</summary>

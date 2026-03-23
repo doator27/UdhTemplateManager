@@ -3,6 +3,7 @@ using System;
 using HardwareTemplateBuilder.Core.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HardwareTemplateBuilder.Core.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260322005421_20260321000000_AddJobLifecycleFeatures")]
+    partial class _20260321000000_AddJobLifecycleFeatures
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.25");
@@ -43,42 +46,6 @@ namespace HardwareTemplateBuilder.Core.Migrations
                         {
                             Id = 1,
                             Key = "TemplateStorageLocation",
-                            Value = ""
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Key = "SmtpHost",
-                            Value = ""
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Key = "SmtpPort",
-                            Value = "587"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Key = "SmtpUsername",
-                            Value = ""
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Key = "SmtpPassword",
-                            Value = ""
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Key = "AlertEmailTo",
-                            Value = ""
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Key = "AlertEmailFrom",
                             Value = ""
                         });
                 });

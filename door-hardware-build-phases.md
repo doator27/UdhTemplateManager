@@ -544,3 +544,203 @@ Phase 1 (DB Schema)
 > Phase 18 should be implemented before Phase 17 in practice — database location must be resolved before the profile picker can query it.
 > Phase 16 can be targeted earlier (immediately after Phase 11) if the 403 error is blocking active use.
 > Phase 19 depends on Phase 11 (refresh service) and benefits from Phase 16 (403 fix) being in place first.
+
+---
+
+## Phase 20 — Job Lifecycle: Active / Complete Status
+
+**Goal:** Jobs have an explicit active/complete state. Generating a PDF package prompts the user to mark the job finished. Completed jobs are hidden from the default job list but remain fully searchable and can be reactivated at any time.
+
+### Schema Changes
+- Add `IsComplete bool NOT NULL DEFAULT 0` column to the `Job` table via EF migration.
+- No other schema changes.
+
+### Code Changes
+
+**`Job` model:**
+- Add `public bool IsComplete { get; set; }` property.
+
+**`JobsView.axaml/.cs`:**
+- Default query: `WHERE IsComplete = 0` (active only).
+- Add a "Show Completed" checkbox / toggle above the job list; when checked, the query returns all jobs (or completed-only — user preference).
+- Completed jobs displayed with a visual indicator (greyed text, or `[COMPLETE]` prefix on the label).
+
+**`JobDetailView.axaml/.cs`:**
+- Add a **"Mark Complete"** button to the toolbar (shown only when `IsComplete == false`).
+- Add a **"Reactivate Job"** button (shown only when `IsComplete == true`).
+- Both buttons toggle the flag and immediately reload the view.
+- After `OnGeneratePackageAsync` succeeds: show a `ConfirmAsync` dialog — _"PDF generated. Is this job finished? Mark it as complete?"_ — and set `IsComplete` if the user confirms.
+
+### Deliverable
+Jobs move cleanly through active → complete. The job list stays uncluttered. Completed jobs are never lost and can always be reopened.
+
+---
+
+## Phase 21 — Collapsible Linked Hardware Panel
+
+**Goal:** The linked hardware list in `JobDetailView` can be collapsed/expanded with one click, matching the existing collapsible pattern used by the Quick-Create panels.
+
+### Code Changes
+
+**`JobDetailView.axaml`:**
+- Wrap the linked hardware `ListBox` and its associated controls (Remove button, custom-desc input, etc.) in a `Border` with `Name="LinkedHardwarePanel"` and `IsVisible="True"`.
+- Add a **"▼ Linked Hardware (n)"** toggle button directly above that border; the header updates the count after every add/remove.
+
+**`JobDetailView.axaml.cs`:**
+- Wire the toggle button with the same `TogglePanel` helper already used by `NewHardwarePanel`, `NewDescriptionPanel`, and `NewTemplatePanel`.
+- Update the toggle button label to reflect current item count and collapsed/expanded state (e.g. `"▼ Linked Hardware (4)"` / `"► Linked Hardware (4)"`).
+
+### Deliverable
+Users with long hardware lists can collapse the linked section to reclaim vertical space without losing any functionality.
+
+---
+
+## Phase 22 — Editable and Sortable Job Hardware
+
+**Goal:** Any hardware row already linked to a job can have its Custom Label and Remarks edited in-place. The linked list can be re-sorted by Manufacturer or Description without disrupting the final drag-drop order.
+
+### Code Changes
+
+**`JobDetailView.axaml`:**
+- Add **"Sort by Manufacturer"** and **"Sort by Description"** buttons to the linked hardware toolbar.
+- Add an **"Edit Selected"** button (or double-click handler) on the linked hardware list.
+
+**`JobDetailView.axaml.cs`:**
+- `SortLinkedHardware(field)`: re-orders `_linkedHardware` in-place by `HardwareItem.Manufacturer.ManufacturerName` or `HardwareItem.Description.DescriptionText`; preserves the observable collection so drag-drop still works afterward.
+- `EditLinkedHardware()`: opens a small inline edit panel (or a dialog) showing the selected `JobHardware`'s current `CustomDescription` and `HardwareItem.Remarks`; Save writes both fields back to the DB and refreshes the list.
+- The edit panel reuses the existing Win98-style `Border` / `TextBox` pattern; no new dependencies.
+
+### Deliverable
+Hardware on a job is not permanent once added. Users can correct labels and remarks, and re-sort the list at any time without losing drag-drop control.
+
+---
+
+## Phase 23 — Job Releases (Multiple Revisions)
+
+**Goal:** A single job can have multiple named releases, each with its own hardware list. Releasing a job does not delete or overwrite the base list. Any release can be used to generate its own PDF package.
+
+### Schema Changes
+- New table `JobRelease`: `Id (PK), JobId (FK → Jobs, CASCADE), ReleaseNumber (int), ReleaseLabel (string), Notes (string?), CreatedAt (datetime)`.
+- Add nullable `ReleaseId (int? FK → JobRelease)` column to `JobHardware`.
+  - `NULL` = base/main release (existing rows are unaffected; no data migration needed).
+  - Non-null = hardware belonging to a specific named release.
+- Unique constraint on `(JobId, ReleaseNumber)`.
+
+### Code Changes
+
+**New models:** `JobRelease`, update `JobHardware` with `ReleaseId` + nav property.
+
+**`JobReleaseRepository`:** standard CRUD + `GetByJob(jobId)`.
+
+**`JobDetailView.axaml/.cs`:**
+- Add a **Release selector** ComboBox at the top of the hardware panel (items: `"Base"` + all `JobRelease` records for the job); defaults to `"Base"` (null `ReleaseId`).
+- Add a **"+ New Release"** button that opens a dialog for `ReleaseLabel` and `Notes`, with an option to copy hardware from the current selection.
+- All add/remove/sort operations apply only to the currently selected release.
+- `LoadLinkedHardware()` filters `JobHardware` by the active `ReleaseId` (null = base).
+- `OnGeneratePackageAsync()` passes only the hardware rows for the active release to the assembly service.
+- The cover sheet title shows the release label (if not base) alongside the job number.
+
+**`AssemblyRequest`:** add `string? ReleaseLabel` for cover sheet use.
+
+### Deliverable
+A job can be revised multiple times without losing earlier hardware lists. Each release generates its own independent PDF package, and all versions coexist under the same job number.
+
+---
+
+## Phase 24 — Missing Template Email Alerts
+
+**Goal:** If a job's hardware items still have no linked templates one week after the job was created, the app automatically sends an email notification listing the gaps.
+
+### Schema Changes
+- Add `AppSetting` keys (seeded empty, configured via `AppSettingsView`):
+  - `SmtpHost`, `SmtpPort` (default `"587"`), `SmtpUsername`, `SmtpPassword`, `SmtpFromAddress`, `NotifyEmailAddress`.
+- Add `MissingTemplateNotifiedAt (datetime?)` nullable column to `Job` — set when the notification email is sent; never reset, so the email fires at most once per job.
+
+### Code Changes
+
+**`AppSettingsView.axaml/.cs`:**
+- Add a new "Email Notifications" section with labeled text inputs for all six SMTP keys plus a **"Send Test Email"** button.
+- Inputs are password-masked for `SmtpPassword`.
+
+**`MissingTemplateAlertService` (new, Core):**
+- `GetJobsMissingTemplates(ctx, olderThanDays: 7) → IReadOnlyList<JobAlertInfo>`: queries jobs where `CreatedAt < now - 7d AND MissingTemplateNotifiedAt IS NULL` and have at least one `JobHardware` row whose `HardwareItem` has zero `HardwareItemTemplate` records.
+- `SendAlertAsync(jobs, smtpSettings)`: builds a plain-text email listing each job (number, name, items with no templates) and sends it via `System.Net.Mail.SmtpClient`.
+- Marks `MissingTemplateNotifiedAt = UtcNow` on each alerted job.
+
+**`App.axaml.cs` / `MainWindow` startup:**
+- After profile selection, run `MissingTemplateAlertService.GetJobsMissingTemplates()` in the background.
+- If results found AND all SMTP settings are configured: call `SendAlertAsync` silently; update the status bar with a brief "Alert sent for N job(s)" message on success.
+- If SMTP is not configured: show an in-app status bar note only — no crash, no blocking dialog.
+
+### Deliverable
+Jobs with incomplete hardware setups are never silently forgotten. One week after creation, a single notification email lists every hardware item still missing a template. SMTP is configured once by the admin and runs automatically thereafter.
+
+---
+
+## Phase 25 — Persistent Bulk-Add Session
+
+**Goal:** Work in the Bulk Hardware Entry view survives navigation away. Returning to the bulk entry view for the same job restores the previous manufacturer groups and rows exactly as left.
+
+### Schema Changes
+- New table `BulkAddDraft`: `Id (PK), JobId (int, unique), DraftJson (text), SavedAt (datetime)`.
+  - One row per job (upsert on save; delete on Finish or explicit Cancel).
+
+### Code Changes
+
+**`BulkAddDraft` model + `BulkAddDraftRepository`:** standard; `GetByJob(jobId)`, `Save(jobId, json)`, `Delete(jobId)`.
+
+**Draft serialization:**
+- `BulkAddDraftDto`: a JSON-serializable mirror of the manufacturer-group + row structure (manufacturer ID, description ID, model number, custom label, remarks — no matched-item references, those are re-resolved on restore).
+- Use `System.Text.Json` for serialize/deserialize.
+
+**`BulkHardwareEntryView.axaml.cs`:**
+- On `Initialize()`: check `BulkAddDraftRepository.GetByJob(_jobId)`.
+  - If a draft exists: call `RestoreDraft(draft)`, which re-creates all `MfrGroup` panels and `AddRowToGroup` calls using the saved data, then re-runs `SyncModelState` on each row to recompute match status.
+  - Show a subtle `StatusLabel` note: _"Draft restored — {n} row(s) from previous session."_
+- On `BackButton.Click` / any navigation away (override `OnDetachedFromVisualTree` or wire `BackButton.Click` before calling `NavigationRequested`): call `SaveDraft()` which serializes current groups/rows to JSON and upserts to `BulkAddDraft`.
+- On `OnContinue()` (Finish): call `BulkAddDraftRepository.Delete(_jobId)` after populating `BulkAddSession.PendingRows`.
+- Add a **"Clear Draft"** button (small, bottom-left) to discard saved state and start fresh.
+
+### Deliverable
+Bulk entry is no longer all-or-nothing. Users can leave mid-entry and return days later to exactly where they left off. The draft is silently saved on every navigation away and deleted on successful completion.
+
+---
+
+## Phase 26 — Jobs as Default Home Page
+
+**Goal:** Opening the app lands directly on the Jobs list. The dashboard remains accessible but is no longer the entry point.
+
+### Code Changes
+
+**`MainWindow.axaml.cs`:**
+- Change the startup navigation from `NavigateTo("Dashboard")` → `NavigateTo("Jobs")` in the constructor.
+
+**`JobsView.axaml`:**
+- Add a **"⊞ Dashboard"** button to the toolbar (alongside the existing navigation buttons) that calls `NavigationRequested?.Invoke("Dashboard")`.
+
+**`MainWindow.axaml`:**
+- No menu changes required — the Dashboard is already reachable via the existing button grid on the DashboardView itself.
+
+### Deliverable
+Power users open the app and are immediately in the job list. The dashboard is one button press away for users who prefer the visual navigation grid.
+
+---
+
+## Updated Dependency Map (Phases 20–26)
+
+```
+Phase 12 (Polish) — baseline
+  ├── Phase 20 (Job Complete Status)    ← needs Job model + JobDetailView
+  │     └── Phase 23 (Job Releases)    ← extends job lifecycle concept
+  ├── Phase 21 (Collapsible Hardware)  ← UI-only, independent
+  ├── Phase 22 (Editable Hardware)     ← UI + minor DB, independent
+  ├── Phase 23 (Job Releases)          ← new table, JobHardware FK; Phase 20 recommended first
+  ├── Phase 24 (Email Alerts)          ← needs AppSettings (Phase 14/v2); independent otherwise
+  ├── Phase 25 (Persistent Bulk-Add)   ← new table; independent of other new phases
+  └── Phase 26 (Jobs Home Page)        ← 2-line change; do last (or first — no risk either way)
+```
+
+> Phases 21, 22, 25, and 26 are self-contained and can be done in any order or in parallel.
+> Phase 20 should precede Phase 23 since the release UI builds on the job status concept.
+> Phase 24 depends on the AppSettings infrastructure introduced in v2-changes-plan Phase 14.
+> Phase 23 is the most complex of the group — plan a dedicated session for schema migration + UI work.

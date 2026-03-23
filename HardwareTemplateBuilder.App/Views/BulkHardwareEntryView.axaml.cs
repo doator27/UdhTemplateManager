@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -65,11 +66,23 @@ public partial class BulkHardwareEntryView : UserControl
         _allDescriptions   = new DescriptionRepository(ctx).GetAll().ToList();
         _allDescComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
 
-        BackButton.Click     += (_, _) => NavigationRequested?.Invoke($"JobDetail:{_jobId}");
+        BackButton.Click     += (_, _) => { SaveDraft(); NavigationRequested?.Invoke($"JobDetail:{_jobId}"); };
         AddGroupButton.Click += (_, _) => AddGroup();
         ContinueButton.Click += (_, _) => OnContinue();
+        ClearDraftButton.Click += (_, _) =>
+        {
+            using var ctx2 = DatabaseInitializer.CreateContext();
+            new BulkAddDraftRepository(ctx2).DeleteByJob(_jobId);
+            // Reset UI
+            _groups.Clear();
+            GroupsPanel.Children.Clear();
+            AddGroup();
+            StatusLabel.Text = "Draft cleared.";
+        };
 
-        AddGroup();
+        // Restore draft if one exists; otherwise start with a blank group.
+        if (!RestoreDraft())
+            AddGroup();
     }
 
     // ── Group building ────────────────────────────────────────────────────────
@@ -470,9 +483,147 @@ public partial class BulkHardwareEntryView : UserControl
             return;
         }
 
+        // Clear the draft when the user explicitly continues.
+        using (var ctx = DatabaseInitializer.CreateContext())
+            new BulkAddDraftRepository(ctx).DeleteByJob(_jobId);
+
         BulkAddSession.JobId       = _jobId;
         BulkAddSession.PendingRows = complete;
         NavigationRequested?.Invoke($"TemplateResolutionWizard:{_jobId}");
+    }
+
+    // ── Draft persistence (Phase 25) ──────────────────────────────────────────
+
+    /// <summary>A minimal serialisable snapshot of one group for draft persistence.</summary>
+    private sealed class DraftGroup
+    {
+        public int? ManufacturerId { get; set; }
+        public List<DraftRow> Rows { get; set; } = new();
+    }
+
+    /// <summary>A minimal serialisable snapshot of one row for draft persistence.</summary>
+    private sealed class DraftRow
+    {
+        public int? DescriptionId  { get; set; }
+        public string ModelNumber  { get; set; } = string.Empty;
+        public string? CustomLabel { get; set; }
+        public string? Remarks     { get; set; }
+    }
+
+    /// <summary>Serialises current groups to the database draft table.</summary>
+    private void SaveDraft()
+    {
+        try
+        {
+            var snapshot = _groups.Select(g => new DraftGroup
+            {
+                ManufacturerId = g.Manufacturer?.Id,
+                Rows = g.Rows.Select(r => new DraftRow
+                {
+                    DescriptionId = r.SelectedDescription?.Id,
+                    ModelNumber   = r.ModelNumber,
+                    CustomLabel   = r.CustomLabel,
+                    Remarks       = r.Remarks
+                }).ToList()
+            }).ToList();
+
+            var json = JsonSerializer.Serialize(snapshot);
+            using var ctx = DatabaseInitializer.CreateContext();
+            new BulkAddDraftRepository(ctx).Upsert(_jobId, json);
+        }
+        catch
+        {
+            // Draft save failure is non-fatal.
+        }
+    }
+
+    /// <summary>
+    /// Attempts to restore groups from a saved draft.
+    /// Returns true if any groups were restored; false if no draft exists.
+    /// </summary>
+    private bool RestoreDraft()
+    {
+        try
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var draft = new BulkAddDraftRepository(ctx).GetByJob(_jobId);
+            if (draft == null || string.IsNullOrWhiteSpace(draft.DraftJson) || draft.DraftJson == "[]")
+                return false;
+
+            var snapshots = JsonSerializer.Deserialize<List<DraftGroup>>(draft.DraftJson);
+            if (snapshots == null || snapshots.Count == 0) return false;
+
+            var mfrLookup  = _manufacturers.ToDictionary(m => m.Id);
+            var descLookup = _allDescriptions.ToDictionary(d => d.Id);
+
+            foreach (var sg in snapshots)
+            {
+                AddGroup();   // creates a blank group and selects no manufacturer
+                var group = _groups.Last();
+
+                if (sg.ManufacturerId.HasValue && mfrLookup.TryGetValue(sg.ManufacturerId.Value, out var mfr))
+                {
+                    group.Manufacturer = mfr;
+                    // Find the manufacturer ComboBox in the group border and set its selection.
+                    var mfrComboInPanel = FindMfrComboInGroup(group);
+                    if (mfrComboInPanel != null)
+                        mfrComboInPanel.SelectedItem = mfr;
+                }
+
+                // The AddGroup already added one blank row; remove it before restoring.
+                if (group.Rows.Count > 0)
+                {
+                    var blankRow = group.Rows[0];
+                    group.Rows.Remove(blankRow);
+                    group.RefreshActions.Remove(blankRow);
+                    if (group.RowsPanel.Children.Count > 0)
+                        group.RowsPanel.Children.RemoveAt(0);
+                }
+
+                foreach (var sr in sg.Rows)
+                {
+                    AddRowToGroup(group);
+                    var row = group.Rows.Last();
+
+                    if (sr.DescriptionId.HasValue && descLookup.TryGetValue(sr.DescriptionId.Value, out var desc))
+                    {
+                        row.SelectedDescription = desc;
+                        // Trigger the UI label refresh via the stored refresh action.
+                        if (group.RefreshActions.TryGetValue(row, out var refresh))
+                            refresh();
+                    }
+
+                    row.ModelNumber = sr.ModelNumber;
+                    row.CustomLabel = sr.CustomLabel;
+                    row.Remarks     = sr.Remarks;
+                }
+            }
+
+            StatusLabel.Text = "Draft restored.";
+            RefreshContinue();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Finds the manufacturer ComboBox within a group's border by traversing the visual tree.
+    /// </summary>
+    private static ComboBox? FindMfrComboInGroup(MfrGroup group)
+    {
+        if (group.GroupBorder.Child is StackPanel content)
+        {
+            // First child of content is the mfrHeader StackPanel.
+            if (content.Children.Count > 0 && content.Children[0] is StackPanel header)
+            {
+                foreach (var child in header.Children)
+                    if (child is ComboBox cb) return cb;
+            }
+        }
+        return null;
     }
 
     // ── Utilities ──────────────────────────────────────────────────────────────

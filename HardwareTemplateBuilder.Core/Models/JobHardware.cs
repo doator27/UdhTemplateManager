@@ -29,6 +29,15 @@ public class JobHardware
     public string? CustomDescription { get; set; }
 
     /// <summary>
+    /// Gets or sets the optional foreign key to the <see cref="JobRelease"/> this row belongs to.
+    /// Null means the row belongs to the base (original) hardware list.
+    /// </summary>
+    public int? ReleaseId { get; set; }
+
+    /// <summary>Gets or sets the release this row belongs to (null = base list).</summary>
+    public JobRelease? Release { get; set; }
+
+    /// <summary>
     /// Returns the custom description if set; otherwise the linked item's model number.
     /// Used as the display label in the UI linked-hardware list.
     /// </summary>
