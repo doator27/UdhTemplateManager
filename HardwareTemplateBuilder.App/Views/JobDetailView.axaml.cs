@@ -116,7 +116,7 @@ public partial class JobDetailView : UserControl
         WireToggle(ToggleAttachmentsButton,     AttachmentsBody);
         WireToggle(ToggleLinkedHardwareButton,  LinkedHardwareBody);
         WireToggle(ToggleQuickCreateButton,     QuickCreateBody);
-        WireToggle(TogglePdfButton,             PdfBody);
+
 
         // Phase 22: Sort + Edit
         SortByMfrButton.Click  += (_, _) => SortLinkedHardware("mfr");
