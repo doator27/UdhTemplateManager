@@ -122,7 +122,12 @@ public class FileAcquirer
         return new string(chars);
     }
 
-    /// <summary>Downloads the file at <paramref name="url"/> to <paramref name="destPath"/>.</summary>
+    /// <summary>
+    /// Downloads the file at <paramref name="url"/> to <paramref name="destPath"/>.
+    /// Validates that the response is a PDF by checking the Content-Type header and the
+    /// <c>%PDF</c> magic bytes; throws <see cref="System.InvalidOperationException"/> if
+    /// the server returns HTML or any other non-PDF content.
+    /// </summary>
     private async Task DownloadAsync(string url, string destPath)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -132,7 +137,29 @@ public class FileAcquirer
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
 
+        // Reject obvious HTML responses (redirect pages, auth walls, error pages).
+        var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+        if (contentType.StartsWith("text/html", System.StringComparison.OrdinalIgnoreCase))
+            throw new System.InvalidOperationException(
+                $"Download from '{url}' returned HTML instead of a PDF (Content-Type: {contentType}). " +
+                "The server may require authentication or returned an error page. " +
+                "Try refreshing the template's local file via the Refresh button.");
+
+        // Read the full body so we can validate the magic bytes.
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+
+        // PDF files always begin with the 4-byte sequence %PDF (hex 25 50 44 46).
+        if (bytes.Length < 4 ||
+            bytes[0] != 0x25 || bytes[1] != 0x50 || bytes[2] != 0x44 || bytes[3] != 0x46)
+        {
+            throw new System.InvalidOperationException(
+                $"Download from '{url}' did not return a valid PDF file " +
+                $"(Content-Type: '{contentType}', first bytes: {(bytes.Length >= 4 ? $"0x{bytes[0]:X2} 0x{bytes[1]:X2} 0x{bytes[2]:X2} 0x{bytes[3]:X2}" : "< 4 bytes received")}). " +
+                "The server may have returned an error page or redirect. " +
+                "Try refreshing the template's local file via the Refresh button.");
+        }
+
         await using var fileStream = File.Create(destPath);
-        await response.Content.CopyToAsync(fileStream);
+        await fileStream.WriteAsync(bytes);
     }
 }
