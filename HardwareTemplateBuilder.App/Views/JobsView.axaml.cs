@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Controls;
@@ -15,6 +16,26 @@ namespace HardwareTemplateBuilder.App.Views;
 /// </summary>
 public partial class JobsView : UserControl
 {
+    /// <summary>
+    /// Lightweight wrapper used as the ListBox item type so the row template can
+    /// apply red colouring when a note has been outstanding for more than one week.
+    /// </summary>
+    private sealed class JobRow
+    {
+        public Job Job { get; }
+        public string Display => Job.JobNumber + (string.IsNullOrWhiteSpace(Job.JobName) ? "" : $"  —  {Job.JobName}");
+
+        /// <summary>
+        /// True when the job has an unresolved note that is more than 7 days old.
+        /// </summary>
+        public bool IsOverdue =>
+            !string.IsNullOrWhiteSpace(Job.Notes) &&
+            Job.NotesUpdatedAt.HasValue &&
+            (DateTime.UtcNow - Job.NotesUpdatedAt.Value).TotalDays > 7;
+
+        public JobRow(Job job) => Job = job;
+    }
+
     private JobRepository? _repo;
     private List<Customer> _customers = new();
     private List<ProjectManager> _projectManagers = new();
@@ -40,6 +61,20 @@ public partial class JobsView : UserControl
         LoadProjectManagers();
         LoadJobList();
 
+        // Set the ListBox item template once — rows with overdue notes render in dark red.
+        JobList.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<JobRow>((row, _) =>
+        {
+            var tb = new TextBlock
+            {
+                Text     = row?.Display ?? "",
+                Padding  = new Avalonia.Thickness(2),
+                Foreground = (row?.IsOverdue == true)
+                    ? Avalonia.Media.Brushes.DarkRed
+                    : Avalonia.Media.Brushes.Black,
+            };
+            return tb;
+        }, supportsRecycling: false);
+
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         FilterBox.TextChanged += (_, _) => LoadJobList();
         ShowCompletedCheck.IsCheckedChanged += (_, _) => LoadJobList();
@@ -58,6 +93,8 @@ public partial class JobsView : UserControl
             NavigationRequested?.Invoke($"JobDetail:{_selectedJobId}");
         };
         ToggleCompleteButton.Click += (_, _) => ToggleJobComplete();
+        SaveNotesButton.Click  += (_, _) => SaveNotes();
+        ClearNotesButton.Click += (_, _) => ClearNotes();
 
         AddCustomerButton.Click        += (_, _) => TogglePanel(NewCustomerPanel, NewCustomerBox);
         CancelCustomerButton.Click     += (_, _) => HidePanel(NewCustomerPanel, NewCustomerBox);
@@ -127,31 +164,40 @@ public partial class JobsView : UserControl
         var filter       = FilterBox.Text?.ToLower() ?? "";
         var showComplete = ShowCompletedCheck.IsChecked == true;
 
-        var items = _repo!.GetAll()
+        var rows = _repo!.GetAll()
             .Where(j => showComplete || !j.IsComplete)
             .Where(j => string.IsNullOrEmpty(filter) ||
                         j.JobNumber.ToLower().Contains(filter) ||
                         j.JobName.ToLower().Contains(filter))
             .OrderBy(j => j.JobNumber)
+            .Select(j => new JobRow(j))
             .ToList();
 
-        JobList.ItemsSource = items;
-        JobList.DisplayMemberBinding = new Avalonia.Data.Binding("JobNumber");
+        JobList.ItemsSource = rows;
     }
 
     private void OnJobSelected()
     {
-        if (JobList.SelectedItem is Job j)
-        {
-            _selectedJobId         = j.Id;
-            _selectedJobIsComplete = j.IsComplete;
-            JobNumberBox.Text = j.JobNumber;
-            JobNameBox.Text = j.JobName;
-            CustomerCombo.SelectedItem = _customers.FirstOrDefault(c => c.Id == j.CustomerId);
-            ProjectManagerCombo.SelectedItem = _projectManagers.FirstOrDefault(pm => pm.Id == j.ProjectManagerId);
-            ToggleCompleteButton.Content = j.IsComplete ? "↺ Reactivate" : "✓ Mark Complete";
-            StatusLabel.Text = j.IsComplete ? "[Complete]" : "";
-        }
+        if (JobList.SelectedItem is not JobRow row) return;
+        var j = row.Job;
+
+        _selectedJobId         = j.Id;
+        _selectedJobIsComplete = j.IsComplete;
+        JobNumberBox.Text  = j.JobNumber;
+        JobNameBox.Text    = j.JobName;
+        CustomerCombo.SelectedItem       = _customers.FirstOrDefault(c => c.Id == j.CustomerId);
+        ProjectManagerCombo.SelectedItem = _projectManagers.FirstOrDefault(pm => pm.Id == j.ProjectManagerId);
+        ToggleCompleteButton.Content = j.IsComplete ? "↺ Reactivate" : "✓ Mark Complete";
+        StatusLabel.Text = j.IsComplete ? "[Complete]" : "";
+
+        NotesBox.Text         = j.Notes ?? "";
+        NotesStatusLabel.Text = "";
+        NotesDateLabel.Text   = j.NotesUpdatedAt.HasValue
+            ? $"Saved {j.NotesUpdatedAt.Value.ToLocalTime():yyyy-MM-dd HH:mm}"
+            : "";
+        NotesDateLabel.Foreground = (row.IsOverdue)
+            ? Avalonia.Media.Brushes.DarkRed
+            : Avalonia.Media.Brushes.Gray;
     }
 
     private void ToggleJobComplete()
@@ -214,14 +260,55 @@ public partial class JobsView : UserControl
         LoadJobList();
     }
 
+    private void SaveNotes()
+    {
+        if (_selectedJobId == 0) { NotesStatusLabel.Text = "Select a job first."; return; }
+        using var ctx = DatabaseInitializer.CreateContext();
+        var job = ctx.Jobs.Find(_selectedJobId);
+        if (job == null) return;
+
+        var text = string.IsNullOrWhiteSpace(NotesBox.Text) ? null : NotesBox.Text.Trim();
+        job.Notes          = text;
+        job.NotesUpdatedAt = text != null ? DateTime.UtcNow : null;
+        ctx.SaveChanges();
+
+        var savedAt = job.NotesUpdatedAt?.ToLocalTime();
+        NotesDateLabel.Text      = savedAt.HasValue ? $"Saved {savedAt.Value:yyyy-MM-dd HH:mm}" : "";
+        NotesDateLabel.Foreground = Avalonia.Media.Brushes.Gray;
+        NotesStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        NotesStatusLabel.Text    = "Saved.";
+        LoadJobList();
+    }
+
+    private void ClearNotes()
+    {
+        if (_selectedJobId == 0) { NotesStatusLabel.Text = "Select a job first."; return; }
+        using var ctx = DatabaseInitializer.CreateContext();
+        var job = ctx.Jobs.Find(_selectedJobId);
+        if (job == null) return;
+
+        job.Notes          = null;
+        job.NotesUpdatedAt = null;
+        ctx.SaveChanges();
+
+        NotesBox.Text             = "";
+        NotesDateLabel.Text       = "";
+        NotesStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        NotesStatusLabel.Text     = "Note cleared.";
+        LoadJobList();
+    }
+
     private void ClearForm()
     {
         _selectedJobId = 0;
         JobNumberBox.Text = "";
-        JobNameBox.Text = "";
-        CustomerCombo.SelectedItem = null;
+        JobNameBox.Text   = "";
+        CustomerCombo.SelectedItem       = null;
         ProjectManagerCombo.SelectedItem = null;
-        StatusLabel.Text = "";
-        JobList.SelectedItem = null;
+        StatusLabel.Text      = "";
+        NotesBox.Text         = "";
+        NotesDateLabel.Text   = "";
+        NotesStatusLabel.Text = "";
+        JobList.SelectedItem  = null;
     }
 }

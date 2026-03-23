@@ -86,6 +86,20 @@ public static class DatabaseInitializer
         if (conn.State != System.Data.ConnectionState.Open)
             conn.Open();
 
+        // Patch: Job notes columns (AddJobNotes migration — emptied to handle pre-existing columns).
+        if (!ColumnExists(conn, "Jobs", "Notes"))
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "ALTER TABLE \"Jobs\" ADD COLUMN \"Notes\" TEXT";
+            cmd.ExecuteNonQuery();
+        }
+        if (!ColumnExists(conn, "Jobs", "NotesUpdatedAt"))
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "ALTER TABLE \"Jobs\" ADD COLUMN \"NotesUpdatedAt\" TEXT";
+            cmd.ExecuteNonQuery();
+        }
+
         // Patch: MachineId column on UserProfiles (migration 20260315000002)
         if (!ColumnExists(conn, "UserProfiles", "MachineId"))
         {

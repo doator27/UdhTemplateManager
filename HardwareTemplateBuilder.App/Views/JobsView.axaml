@@ -12,7 +12,7 @@
                 <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2"/>
                 <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4"/>
                 <CheckBox DockPanel.Dock="Top" Name="ShowCompletedCheck" Content="Show completed" Margin="0,0,0,4"/>
-                <ListBox Name="JobList"/>
+                <ListBox Name="JobList" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
             </DockPanel>
             <!-- Right: metadata form -->
             <ScrollViewer Grid.Column="1">
@@ -54,6 +54,25 @@
                             <Button Name="ToggleCompleteButton" Content="Mark Complete" Margin="0,0,0,0"/>
                         </StackPanel>
                         <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+
+                        <!-- Notes -->
+                        <DockPanel Margin="0,12,0,2">
+                            <TextBlock DockPanel.Dock="Left" Text="Notes:" VerticalAlignment="Center"/>
+                            <TextBlock Name="NotesDateLabel" DockPanel.Dock="Right"
+                                       FontSize="11" Foreground="#666"
+                                       VerticalAlignment="Center" TextAlignment="Right"/>
+                        </DockPanel>
+                        <TextBox Name="NotesBox"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Height="100"
+                                 Watermark="Waiting on templates, special instructions, reminders..."
+                                 Margin="0,0,0,4"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Name="SaveNotesButton" Content="Save Notes" Margin="0,0,8,0"/>
+                            <Button Name="ClearNotesButton" Content="Clear Note" Margin="0,0,0,0"/>
+                            <TextBlock Name="NotesStatusLabel" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="#800000"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </ScrollViewer>

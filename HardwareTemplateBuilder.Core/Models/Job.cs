@@ -41,6 +41,15 @@ public class Job
     /// <summary>Gets or sets whether the job has been marked as complete.</summary>
     public bool IsComplete { get; set; } = false;
 
+    /// <summary>Gets or sets free-form notes about this job (e.g. pending templates, special instructions).</summary>
+    public string? Notes { get; set; }
+
+    /// <summary>
+    /// Gets or sets when the current note was last saved (UTC).
+    /// Null when there is no active note.
+    /// </summary>
+    public DateTime? NotesUpdatedAt { get; set; }
+
     /// <summary>Gets or sets when the job was created (UTC).</summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
