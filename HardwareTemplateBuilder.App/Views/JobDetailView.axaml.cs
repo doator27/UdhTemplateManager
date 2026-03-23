@@ -682,7 +682,45 @@ public partial class JobDetailView : UserControl
                 var progress = new Progress<string>(msg =>
                     Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = msg));
 
-                var service = BuildAssemblyService();
+                // Create a single shared HTTP client (SSL bypass for manufacturer sites).
+                using var httpHandler = new System.Net.Http.HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback =
+                        System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                };
+                using var httpClient = new HttpClient(httpHandler);
+
+                // Pre-download any templates that don't have a valid local file yet.
+                // TemplateRefreshService uses the same context, so EF's identity map means
+                // the LocalLink update lands on the same template objects already in `hardware`.
+                var allUniqueTemplates = hardware
+                    .SelectMany(h => h.Templates)
+                    .GroupBy(t => t.Id)
+                    .Select(g => g.First())
+                    .Where(t => string.IsNullOrWhiteSpace(t.LocalLink) || !File.Exists(t.LocalLink))
+                    .ToList();
+
+                if (allUniqueTemplates.Count > 0)
+                {
+                    var refreshService = new TemplateRefreshService(context, httpClient);
+                    for (int i = 0; i < allUniqueTemplates.Count; i++)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        var t = allUniqueTemplates[i];
+                        Dispatcher.UIThread.Post(() => PackageStatusLabel.Text =
+                            $"Downloading {t.TemplateNumber} ({i + 1}/{allUniqueTemplates.Count})...");
+                        try
+                        {
+                            await refreshService.RefreshSingleAsync(t.Id, saveDir, ct);
+                        }
+                        catch
+                        {
+                            // Download failures are reported by AssembleAsync's per-template error collection.
+                        }
+                    }
+                }
+
+                var service = BuildAssemblyService(httpClient);
                 var result  = await service.AssembleAsync(request, progress, ct);
 
                 // Append a history entry to job_history.txt in the job folder.
@@ -702,7 +740,7 @@ public partial class JobDetailView : UserControl
             PackageStatusLabel.Text = "Generation failed — see error report.";
             var win = TopLevel.GetTopLevel(this) as Window;
             if (win != null)
-                await DialogHelper.ShowInfoAsync(win, ex.Message, "Package Generation Failed");
+                await DialogHelper.ShowScrollableInfoAsync(win, ex.Message, "Package Generation Failed");
             return;
         }
         finally
@@ -1242,21 +1280,12 @@ public partial class JobDetailView : UserControl
         };
     }
 
-    /// <summary>Creates a fully wired <see cref="PdfAssemblyService"/> with all required dependencies.</summary>
-    private static PdfAssemblyService BuildAssemblyService()
+    /// <summary>Creates a fully wired <see cref="PdfAssemblyService"/> using the supplied HTTP client.</summary>
+    private static PdfAssemblyService BuildAssemblyService(HttpClient httpClient)
     {
-        // Bypass SSL certificate errors when downloading manufacturer PDFs.
-        // Manufacturer sites frequently have expired or chain-incomplete certificates;
-        // the URLs are user-supplied and trusted, so validation is not meaningful here.
-        var handler = new System.Net.Http.HttpClientHandler
-        {
-            ServerCertificateCustomValidationCallback =
-                System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-        };
-
         return new PdfAssemblyService(
             new TemplateSorter(new WeightTemplateSortStrategy()),
-            new FileAcquirer(new HttpClient(handler)),
+            new FileAcquirer(httpClient),
             new PageRangeParser(),
             new PageExtractor(),
             new PageRotator(),
