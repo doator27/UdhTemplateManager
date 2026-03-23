@@ -57,7 +57,18 @@ public class FileAcquirer
             try
             {
                 File.Copy(template.LocalLink, destPath, overwrite: true);
-                return destPath;
+
+                // Validate the copied file is actually a PDF (guards against a previously
+                // corrupt download that was saved to LocalLink as HTML).
+                using (var fs = File.OpenRead(destPath))
+                {
+                    var magic = new byte[4];
+                    int read = fs.Read(magic, 0, 4);
+                    if (read == 4 && magic[0] == 0x25 && magic[1] == 0x50 && magic[2] == 0x44 && magic[3] == 0x46)
+                        return destPath;
+                }
+                // Not a valid PDF — delete the bad copy and fall through to online download.
+                File.Delete(destPath);
             }
             catch
             {

@@ -227,7 +227,11 @@ public class TemplateRefreshService
         return new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
     }
 
-    /// <summary>Downloads the file at <paramref name="url"/> to <paramref name="destPath"/>.</summary>
+    /// <summary>
+    /// Downloads the file at <paramref name="url"/> to <paramref name="destPath"/>.
+    /// Validates that the response is a PDF by checking the Content-Type header and the
+    /// <c>%PDF</c> magic bytes; throws <see cref="InvalidOperationException"/> otherwise.
+    /// </summary>
     private async Task DownloadAsync(string url, string destPath, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -238,7 +242,22 @@ public class TemplateRefreshService
             request, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
 
+        var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+        if (contentType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                $"Download from '{url}' returned HTML instead of a PDF (Content-Type: {contentType}). " +
+                "The server may require authentication or returned an error page.");
+
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+        if (bytes.Length < 4 ||
+            bytes[0] != 0x25 || bytes[1] != 0x50 || bytes[2] != 0x44 || bytes[3] != 0x46)
+        {
+            throw new InvalidOperationException(
+                $"Download from '{url}' did not return a valid PDF file " +
+                $"(Content-Type: '{contentType}'). The server may have returned an error page.");
+        }
+
         await using var fs = File.Create(destPath);
-        await response.Content.CopyToAsync(fs, ct);
+        await fs.WriteAsync(bytes, ct);
     }
 }

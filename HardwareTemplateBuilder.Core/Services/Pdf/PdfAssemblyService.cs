@@ -98,12 +98,26 @@ public class PdfAssemblyService
             .ToDictionary(g => g.Key, _ => new List<int>());
         int bodyPageCursor = 1;
 
+        // Collect per-template failures so we can report all problems at once.
+        var templateFailures = new List<(string Label, string Error)>();
+
         foreach (var template in sortedTemplates)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            var templateLabel = $"{template.Manufacturer?.ManufacturerName ?? "Unknown"} — {template.TemplateNumber}";
             progress?.Report($"Acquiring {template.TemplateNumber}...");
-            var acquiredPath = await _acquirer.AcquireAsync(template, jobDir, allDescriptionsList);
+
+            string acquiredPath;
+            try
+            {
+                acquiredPath = await _acquirer.AcquireAsync(template, jobDir, allDescriptionsList);
+            }
+            catch (System.Exception ex)
+            {
+                templateFailures.Add((templateLabel, ex.Message));
+                continue;
+            }
 
             // Record snapshot info at acquisition time — before any processing.
             snapshotInfos.Add(new TemplateSnapshotInfo
@@ -120,7 +134,15 @@ public class PdfAssemblyService
 
             // Extract the specified pages.
             var extractedPath = Path.Combine(workDir, $"ex_{template.Id}.pdf");
-            _extractor.Extract(acquiredPath, pageNumbers, extractedPath);
+            try
+            {
+                _extractor.Extract(acquiredPath, pageNumbers, extractedPath);
+            }
+            catch (System.Exception ex)
+            {
+                templateFailures.Add((templateLabel, $"Failed to extract pages: {ex.Message}"));
+                continue;
+            }
 
             // Rotate pages if required.
             string processedPath = extractedPath;
@@ -141,7 +163,15 @@ public class PdfAssemblyService
                 if (rotateExtracted.Count > 0)
                 {
                     processedPath = Path.Combine(workDir, $"rot_{template.Id}.pdf");
-                    _rotator.Rotate(extractedPath, rotateExtracted, template.RotationDirection, processedPath);
+                    try
+                    {
+                        _rotator.Rotate(extractedPath, rotateExtracted, template.RotationDirection, processedPath);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        templateFailures.Add((templateLabel, $"Failed to rotate pages: {ex.Message}"));
+                        continue;
+                    }
                 }
             }
 
@@ -161,6 +191,22 @@ public class PdfAssemblyService
             }
 
             bodyPageCursor += pageNumbers.Count;
+        }
+
+        // If any templates failed, abort and report all failures before attempting the merge.
+        if (templateFailures.Count > 0)
+        {
+            var report = new System.Text.StringBuilder();
+            report.AppendLine($"{templateFailures.Count} template(s) could not be processed:");
+            report.AppendLine();
+            foreach (var (label, error) in templateFailures)
+            {
+                report.AppendLine($"• {label}");
+                report.AppendLine($"  {error}");
+                report.AppendLine();
+            }
+            report.AppendLine("Fix the issues above and try generating again.");
+            throw new InvalidOperationException(report.ToString().TrimEnd());
         }
 
         // ----- Step 4: Merge body PDF -----

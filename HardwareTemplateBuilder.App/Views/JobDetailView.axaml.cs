@@ -699,7 +699,10 @@ public partial class JobDetailView : UserControl
         }
         catch (Exception ex)
         {
-            PackageStatusLabel.Text = $"Error: {ex.Message}";
+            PackageStatusLabel.Text = "Generation failed — see error report.";
+            var win = TopLevel.GetTopLevel(this) as Window;
+            if (win != null)
+                await DialogHelper.ShowInfoAsync(win, ex.Message, "Package Generation Failed");
             return;
         }
         finally
