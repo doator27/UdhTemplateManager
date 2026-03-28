@@ -184,10 +184,9 @@ public partial class TemplateLookupView : UserControl
             string saveLocationForCheck;
             using (var context = DatabaseInitializer.CreateContext())
             {
-                var profile = context.UserProfiles.FirstOrDefault();
-                saveLocationForCheck = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
-                    ? profile.DefaultTemplateSaveLocation
-                    : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                saveLocationForCheck = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
+                if (string.IsNullOrWhiteSpace(saveLocationForCheck))
+                    saveLocationForCheck = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             }
 
             var expectedPath = Path.Combine(
@@ -282,10 +281,9 @@ public partial class TemplateLookupView : UserControl
                 .Select(hit => hit.IndividualTemplate)
                 .ToList();
 
-            var profile = context.UserProfiles.FirstOrDefault();
-            saveLocation = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
-                ? profile.DefaultTemplateSaveLocation
-                : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            saveLocation = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
+            if (string.IsNullOrWhiteSpace(saveLocation))
+                saveLocation = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         }
 
         if (templates.Count == 0)

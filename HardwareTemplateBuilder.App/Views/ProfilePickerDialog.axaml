@@ -34,13 +34,6 @@
                 <TextBlock Text="Or create a new profile:" FontWeight="Bold" Margin="0,0,0,6"/>
                 <TextBlock Text="Name:" Margin="0,0,0,2"/>
                 <TextBox Name="NewNameBox" Margin="0,0,0,8"/>
-                <TextBlock Text="Job PDF Save Location:" Margin="0,0,0,2"/>
-                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                    <TextBox Grid.Column="0" Name="NewLocationBox"
-                             Watermark="Folder where your job PDFs are saved"/>
-                    <Button Grid.Column="1" Name="BrowseButton"
-                            Content="..." Width="32" Margin="4,0,0,0"/>
-                </Grid>
                 <Button Name="CreateButton" Content="Create &amp; Select"
                         HorizontalAlignment="Left"/>
                 <TextBlock Name="CreateStatus" Foreground="#800000" Margin="0,4,0,0"/>

@@ -106,7 +106,7 @@ public partial class JobDetailView : UserControl
 
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
-        BulkAddButton.Click += (_, _) => NavigationRequested?.Invoke($"BulkHardwareEntry:{_jobId}");
+        BulkAddButton.Click += (_, _) => NavigationRequested?.Invoke($"BulkManufacturerSession:{_jobId}");
 
         // Phase 20: Mark complete / Reactivate
         MarkCompleteButton.Click  += async (_, _) => await MarkCompleteAsync();
@@ -582,7 +582,7 @@ public partial class JobDetailView : UserControl
         PackageProgress.IsVisible = true;
         PackageStatusLabel.Text = "Loading job data...";
 
-        var orderedJobHardware = _linkedHardware.Select(jh => (jh.HardwareItemId, jh.CustomDescription)).ToList();
+        var orderedJobHardware = _linkedHardware.Select(jh => (jh.HardwareItemId, jh.CustomDescription, jh.CalloutRemarks)).ToList();
 
         string outputPath;
         IReadOnlyList<TemplateSnapshotInfo> snapshots;
@@ -623,7 +623,8 @@ public partial class JobDetailView : UserControl
                         {
                             Item              = hardwareDict[x.HardwareItemId],
                             Templates         = templates,
-                            CustomDescription = x.CustomDescription
+                            CustomDescription = x.CustomDescription,
+                            CalloutRemarks    = x.CalloutRemarks
                         };
                     })
                     .ToList()
@@ -631,9 +632,9 @@ public partial class JobDetailView : UserControl
 
                 var profile = context.UserProfiles
                     .FirstOrDefault(u => u.Id == job.UserProfileId);
-                var saveDir = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
-                    ? profile.DefaultTemplateSaveLocation
-                    : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                var saveDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
+                if (string.IsNullOrWhiteSpace(saveDir))
+                    saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
                 var allDescriptions = context.Descriptions
                     .ToDictionary(d => d.Id);
@@ -817,10 +818,9 @@ public partial class JobDetailView : UserControl
         {
             var job     = ctx.Jobs.Find(_jobId);
             jobNumber   = job?.JobNumber ?? string.Empty;
-            var profile = ctx.UserProfiles.FirstOrDefault(u => u.Id == (job != null ? job.UserProfileId : 0));
-            saveDir     = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
-                ? profile.DefaultTemplateSaveLocation
-                : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            saveDir = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
+            if (string.IsNullOrWhiteSpace(saveDir))
+                saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         }
 
         var oldVersionsDir = Path.Combine(saveDir, jobNumber, "Old versions");
@@ -858,10 +858,9 @@ public partial class JobDetailView : UserControl
         using var ctx = DatabaseInitializer.CreateContext();
         var job     = ctx.Jobs.Find(_jobId);
         if (job == null) return null;
-        var profile = ctx.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
-        var saveDir = !string.IsNullOrWhiteSpace(profile?.DefaultTemplateSaveLocation)
-            ? profile.DefaultTemplateSaveLocation
-            : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        var saveDir = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
+        if (string.IsNullOrWhiteSpace(saveDir))
+            saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         var folder = Path.Combine(saveDir, job.JobNumber, "Attachments");
         Directory.CreateDirectory(folder);
         return folder;

@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Platform.Storage;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
@@ -34,25 +33,12 @@ public partial class UserProfilesView : UserControl
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();
         SaveButton.Click += (_, _) => Save();
         NewButton.Click += (_, _) => ClearForm();
-        BrowseButton.Click += async (_, _) => await BrowseFolder();
         DeleteButton.Click += async (_, _) =>
         {
             var window = TopLevel.GetTopLevel(this) as Window;
             if (window != null && await DialogHelper.ConfirmAsync(window, "Delete this user profile?"))
                 DeleteSelected();
         };
-    }
-
-    private async System.Threading.Tasks.Task BrowseFolder()
-    {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
-
-        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(
-            new FolderPickerOpenOptions { Title = "Select Template Save Location", AllowMultiple = false });
-
-        if (folders.Count > 0)
-            SaveLocationBox.Text = folders[0].Path.LocalPath;
     }
 
     private void LoadList()
@@ -72,7 +58,6 @@ public partial class UserProfilesView : UserControl
         {
             _selectedId = u.Id;
             UserNameBox.Text = u.UserName;
-            SaveLocationBox.Text = u.DefaultTemplateSaveLocation;
             StatusLabel.Text = "";
         }
     }
@@ -80,19 +65,16 @@ public partial class UserProfilesView : UserControl
     private void Save()
     {
         var name = UserNameBox.Text?.Trim();
-        var location = SaveLocationBox.Text?.Trim();
         if (string.IsNullOrEmpty(name)) { StatusLabel.Text = "User Name is required."; return; }
-        if (string.IsNullOrEmpty(location)) { StatusLabel.Text = "Save Location is required."; return; }
 
         if (_selectedId == 0)
-            _repo!.Add(new UserProfile { UserName = name, DefaultTemplateSaveLocation = location });
+            _repo!.Add(new UserProfile { UserName = name, DefaultTemplateSaveLocation = string.Empty });
         else
         {
             var existing = _repo!.GetById(_selectedId);
             if (existing != null)
             {
                 existing.UserName = name;
-                existing.DefaultTemplateSaveLocation = location;
                 _repo.Update(existing);
             }
         }
@@ -112,7 +94,6 @@ public partial class UserProfilesView : UserControl
     {
         _selectedId = 0;
         UserNameBox.Text = "";
-        SaveLocationBox.Text = "";
         StatusLabel.Text = "";
         RecordList.SelectedItem = null;
     }

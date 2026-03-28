@@ -128,16 +128,33 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Parameterized route: "BulkHardwareEntry:{id}"
-        if (viewName.StartsWith("BulkHardwareEntry:") &&
-            int.TryParse(viewName.Substring("BulkHardwareEntry:".Length), out var bulkJobId))
+        // Parameterized route: "BulkManufacturerSession:{jobId}"
+        if (viewName.StartsWith("BulkManufacturerSession:") &&
+            int.TryParse(viewName.Substring("BulkManufacturerSession:".Length), out var sessionJobId))
         {
-            var bulk = new Views.BulkHardwareEntryView(bulkJobId);
-            bulk.NavigationRequested += NavigateTo;
-            ContentArea.Content = bulk;
-            var u2 = SessionService.ActiveUserProfile?.UserName;
-            StatusText.Text = $"Bulk Hardware Entry{(u2 != null ? $"  —  {u2}" : string.Empty)}";
+            var session = new Views.BulkManufacturerSessionView(sessionJobId);
+            session.NavigationRequested += NavigateTo;
+            ContentArea.Content = session;
+            var us = SessionService.ActiveUserProfile?.UserName;
+            StatusText.Text = $"Bulk Hardware Entry{(us != null ? $"  —  {us}" : string.Empty)}";
             return;
+        }
+
+        // Parameterized route: "BulkHardwareEntry:{jobId}:{manufacturerId}"
+        if (viewName.StartsWith("BulkHardwareEntry:"))
+        {
+            var parts = viewName.Substring("BulkHardwareEntry:".Length).Split(':');
+            if (parts.Length == 2 &&
+                int.TryParse(parts[0], out var bulkJobId) &&
+                int.TryParse(parts[1], out var bulkMfrId))
+            {
+                var bulk = new Views.BulkHardwareEntryView(bulkJobId, bulkMfrId);
+                bulk.NavigationRequested += NavigateTo;
+                ContentArea.Content = bulk;
+                var u2 = SessionService.ActiveUserProfile?.UserName;
+                StatusText.Text = $"Bulk Hardware Entry{(u2 != null ? $"  —  {u2}" : string.Empty)}";
+                return;
+            }
         }
 
         // Parameterized route: "TemplateResolutionWizard:{id}"

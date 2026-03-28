@@ -14,7 +14,7 @@
                     <StackPanel>
                         <TextBlock Text="Template Storage Location:" FontWeight="Bold" Margin="0,0,0,4" />
                         <TextBlock TextWrapping="Wrap" Foreground="#444444" FontSize="11"
-                                   Text="All downloaded template files are stored here."
+                                   Text="Shared folder where all template files are saved. All users on all machines must point to the same location (e.g. a network drive)."
                                    Margin="0,0,0,8" />
                         <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
                             <TextBox Grid.Column="0" Name="StorageLocationBox" Watermark="e.g. \\server\templates or /mnt/shared/templates" />
@@ -30,7 +30,7 @@
                     <StackPanel>
                         <TextBlock Text="Database Location:" FontWeight="Bold" Margin="0,0,0,4" />
                         <TextBlock TextWrapping="Wrap" Foreground="#444444" FontSize="11"
-                                   Text="The active SQLite database file. Use 'Move Database' to copy it to a new folder and switch to that location — useful for placing the database on a shared network drive."
+                                   Text="The shared SQLite database file used by all users. Use 'Move Database' to relocate it to a shared network drive, then point all other machines to that same file via File → Database Location."
                                    Margin="0,0,0,8" />
                         <TextBlock Text="Current location:" Margin="0,0,0,2" />
                         <TextBlock Name="CurrentDbPathLabel" TextWrapping="Wrap" Foreground="#404040"

@@ -298,6 +298,15 @@ public class PdfAssemblyService
                 var item  = hwt.Item;
                 var pages = itemBodyPages.TryGetValue(item.Id, out var p) ? p : new List<int>();
 
+                // Combine the item's shared remarks with any per-callout remark.
+                string? combinedRemarks = (item.Remarks, hwt.CalloutRemarks) switch
+                {
+                    (null or "", null or "") => null,
+                    (var a, null or "")      => a,
+                    (null or "", var b)      => b,
+                    (var a, var b)           => $"{a}; {b}"
+                };
+
                 rows.Add(new CoverSheetRow
                 {
                     Manufacturer        = item.Manufacturer?.ManufacturerName ?? string.Empty,
@@ -307,7 +316,7 @@ public class PdfAssemblyService
                                             : item.ModelNumber,
                     TemplateNumbers     = string.Join(", ", hwt.Templates.Select(t => t.TemplateNumber)),
                     PageNumbers         = FormatPageList(pages),
-                    Remarks             = item.Remarks
+                    Remarks             = combinedRemarks
                 });
             }
         }

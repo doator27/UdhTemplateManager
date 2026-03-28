@@ -1,8 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Avalonia.Controls;
-using Avalonia.Platform.Storage;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
@@ -51,7 +49,6 @@ public partial class ProfilePickerDialog : Window
 
         SelectButton.Click += (_, _) => SelectProfile();
         CreateButton.Click += (_, _) => CreateAndSelect();
-        BrowseButton.Click += async (_, _) => await BrowseFolderAsync();
     }
 
     /// <summary>
@@ -90,35 +87,20 @@ public partial class ProfilePickerDialog : Window
 
     private void CreateAndSelect()
     {
-        var name     = NewNameBox.Text?.Trim();
-        var location = NewLocationBox.Text?.Trim();
+        var name = NewNameBox.Text?.Trim();
 
-        if (string.IsNullOrEmpty(name))     { CreateStatus.Text = "Name is required."; return; }
-        if (string.IsNullOrEmpty(location)) { CreateStatus.Text = "Save location is required."; return; }
+        if (string.IsNullOrEmpty(name)) { CreateStatus.Text = "Name is required."; return; }
 
         using var context = DatabaseInitializer.CreateContext();
         var profile = new UserProfileRepository(context).Add(new UserProfile
         {
             UserName                    = name,
-            DefaultTemplateSaveLocation = location,
+            DefaultTemplateSaveLocation = string.Empty,
             MachineId                   = _machineId
         });
 
         SessionService.ActiveUserProfile = profile;
         Close();
-    }
-
-    private async Task BrowseFolderAsync()
-    {
-        var folders = await StorageProvider.OpenFolderPickerAsync(
-            new FolderPickerOpenOptions
-            {
-                Title         = "Select Job PDF Save Folder",
-                AllowMultiple = false
-            });
-
-        if (folders.Count > 0)
-            NewLocationBox.Text = folders[0].Path.LocalPath;
     }
 
     // ---------- Inner display wrapper ----------

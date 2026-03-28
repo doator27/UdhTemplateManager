@@ -16,11 +16,6 @@
                 <StackPanel>
                     <TextBlock Text="User Name:" Margin="0,0,0,2" />
                     <TextBox Name="UserNameBox" Margin="0,0,0,10" />
-                    <TextBlock Text="Default Template Save Location:" Margin="0,0,0,2" />
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-                        <TextBox Grid.Column="0" Name="SaveLocationBox" />
-                        <Button Grid.Column="1" Name="BrowseButton" Content="..." Width="30" Margin="4,0,0,0" />
-                    </Grid>
                     <StackPanel Orientation="Horizontal">
                         <Button Name="SaveButton" Content="Save" Margin="0,0,8,0" />
                         <Button Name="NewButton" Content="New" Margin="0,0,8,0" />

@@ -29,6 +29,12 @@ public class JobHardware
     public string? CustomDescription { get; set; }
 
     /// <summary>
+    /// Gets or sets an optional per-callout remark specific to this job line item.
+    /// Shown on the cover sheet alongside <c>HardwareItem.Remarks</c>.
+    /// </summary>
+    public string? CalloutRemarks { get; set; }
+
+    /// <summary>
     /// Gets or sets the optional foreign key to the <see cref="JobRelease"/> this row belongs to.
     /// Null means the row belongs to the base (original) hardware list.
     /// </summary>

@@ -86,6 +86,14 @@ public static class DatabaseInitializer
         if (conn.State != System.Data.ConnectionState.Open)
             conn.Open();
 
+        // Patch: CalloutRemarks on JobHardware (AddCalloutRemarks migration)
+        if (!ColumnExists(conn, "JobHardware", "CalloutRemarks"))
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "ALTER TABLE \"JobHardware\" ADD COLUMN \"CalloutRemarks\" TEXT";
+            cmd.ExecuteNonQuery();
+        }
+
         // Patch: Job notes columns (AddJobNotes migration — emptied to handle pre-existing columns).
         if (!ColumnExists(conn, "Jobs", "Notes"))
         {

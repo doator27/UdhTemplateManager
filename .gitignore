@@ -1,0 +1,16 @@
+# Build output
+**/bin/
+**/obj/
+
+# Publish artifacts
+publish/
+
+# User and IDE files
+*.user
+*.suo
+*.userprefs
+.vs/
+
+# OS files
+.DS_Store
+Thumbs.db

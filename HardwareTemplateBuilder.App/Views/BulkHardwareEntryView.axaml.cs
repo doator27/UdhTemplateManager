@@ -14,13 +14,17 @@ using HardwareTemplateBuilder.Core.Repositories;
 namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
-/// Scrollable bulk-entry table where the user groups hardware items by manufacturer
-/// before launching the template resolution wizard.
+/// Per-manufacturer bulk hardware entry screen.
+/// The user adds hardware item groups (description + model# + template#) and then one or
+/// more callout rows per group (custom label + per-callout remarks).
+/// Navigates back to <see cref="BulkManufacturerSessionView"/> on Back, auto-saving the draft.
 /// </summary>
 public partial class BulkHardwareEntryView : UserControl
 {
     private readonly int _jobId;
-    private List<Manufacturer> _manufacturers = new();
+    private readonly int _manufacturerId;
+    private Manufacturer? _manufacturer;
+
     private List<Description> _allDescriptions = new();
     private List<DescriptionComboItem> _allDescComboItems = new();
 
@@ -29,32 +33,43 @@ public partial class BulkHardwareEntryView : UserControl
 
     // ── Group model ───────────────────────────────────────────────────────────
 
-    /// <summary>One manufacturer section containing one or more hardware rows.</summary>
-    private sealed class MfrGroup
+    private sealed class HwItemGroup
     {
-        /// <summary>Gets or sets the currently selected manufacturer for this group.</summary>
-        public Manufacturer? Manufacturer { get; set; }
-
-        /// <summary>In-memory rows belonging to this group.</summary>
-        public List<BulkHardwareRow> Rows { get; } = new();
-
-        /// <summary>The UI panel that holds the row grids for this group.</summary>
-        public StackPanel RowsPanel { get; set; } = null!;
-
-        /// <summary>The outer border element for the whole group.</summary>
+        public Description? SelectedDescription { get; set; }
+        public string ModelNumber { get; set; } = "";
+        public string? TemplateNumber { get; set; }
+        public HardwareItem? MatchedItem { get; set; }
+        public List<CalloutRow> Callouts { get; } = new();
+        public StackPanel CalloutsPanel { get; set; } = null!;
         public Border GroupBorder { get; set; } = null!;
+        public TextBlock MatchLabel { get; set; } = null!;
 
-        /// <summary>Per-row callbacks that refresh model items and match state when the manufacturer changes.</summary>
-        public Dictionary<BulkHardwareRow, Action> RefreshActions { get; } = new();
+        // UI controls we need to write back to on restore
+        public TextBox? ModelBox { get; set; }
+        public TextBox? TemplateBox { get; set; }
+        public TextBlock? DescLabel { get; set; }
     }
 
-    private readonly List<MfrGroup> _groups = new();
-
-    /// <summary>Initializes the bulk entry view for the given job.</summary>
-    /// <param name="jobId">The job to which hardware will be added.</param>
-    public BulkHardwareEntryView(int jobId)
+    private sealed class CalloutRow
     {
-        _jobId = jobId;
+        public string? Label { get; set; }
+        public string? CalloutRemarks { get; set; }
+        // UI controls for restore
+        public TextBox? LabelBox { get; set; }
+        public TextBox? RemarksBox { get; set; }
+    }
+
+    private readonly List<HwItemGroup> _groups = new();
+
+    /// <summary>
+    /// Initializes the entry view scoped to a single manufacturer.
+    /// </summary>
+    /// <param name="jobId">The job being built.</param>
+    /// <param name="manufacturerId">The manufacturer whose hardware is being entered.</param>
+    public BulkHardwareEntryView(int jobId, int manufacturerId)
+    {
+        _jobId          = jobId;
+        _manufacturerId = manufacturerId;
         InitializeComponent();
         Loaded += (_, _) => Initialize();
     }
@@ -62,85 +77,138 @@ public partial class BulkHardwareEntryView : UserControl
     private void Initialize()
     {
         using var ctx = DatabaseInitializer.CreateContext();
-        _manufacturers     = new ManufacturerRepository(ctx).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _allDescriptions   = new DescriptionRepository(ctx).GetAll().ToList();
-        _allDescComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
+        _manufacturer        = ctx.Manufacturers.Find(_manufacturerId);
+        _allDescriptions     = new DescriptionRepository(ctx).GetAll().ToList();
+        _allDescComboItems   = DescriptionHelper.BuildComboItems(_allDescriptions);
 
-        BackButton.Click     += (_, _) => { SaveDraft(); NavigationRequested?.Invoke($"JobDetail:{_jobId}"); };
-        AddGroupButton.Click += (_, _) => AddGroup();
-        ContinueButton.Click += (_, _) => OnContinue();
-        ClearDraftButton.Click += (_, _) =>
-        {
-            using var ctx2 = DatabaseInitializer.CreateContext();
-            new BulkAddDraftRepository(ctx2).DeleteByJob(_jobId);
-            // Reset UI
-            _groups.Clear();
-            GroupsPanel.Children.Clear();
-            AddGroup();
-            StatusLabel.Text = "Draft cleared.";
-        };
+        TitleLabel.Text = $"Bulk Entry — {_manufacturer?.ManufacturerName ?? "Unknown"}";
 
-        // Restore draft if one exists; otherwise start with a blank group.
+        BackButton.Click    += (_, _) => { SaveDraft(); NavigationRequested?.Invoke($"BulkManufacturerSession:{_jobId}"); };
+        AddItemButton.Click += (_, _) => AddItemGroup();
+
         if (!RestoreDraft())
-            AddGroup();
+            AddItemGroup();
     }
 
     // ── Group building ────────────────────────────────────────────────────────
 
-    /// <summary>Appends a new manufacturer group (with one blank row) to the panel.</summary>
-    private void AddGroup()
+    /// <summary>Appends a new hardware-item group (with one blank callout) to the panel.</summary>
+    private void AddItemGroup()
     {
-        var group = new MfrGroup();
+        var group = new HwItemGroup();
         _groups.Add(group);
 
-        // Manufacturer combo for this group
-        var mfrCombo = new ComboBox
+        // ── Top row: Description | Model # | Template # | Match | Remove ──────
+
+        var descSearchBox = new TextBox
         {
-            ItemsSource = _manufacturers,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            MinWidth = 200,
+            Watermark = "Search descriptions…",
+            FontSize = 11,
+            Margin = new Avalonia.Thickness(0, 0, 0, 2)
+        };
+        var descMatchList = new ListBox { MaxHeight = 80, IsVisible = false };
+        descMatchList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+        var descLabel = new TextBlock
+        {
+            Text = "(none)",
+            Foreground = Brushes.Gray,
+            FontSize = 10,
+            TextWrapping = TextWrapping.Wrap
+        };
+        group.DescLabel = descLabel;
+        var descPickBtn = new Button { Content = "⋯", FontSize = 10, Padding = new Avalonia.Thickness(4, 1) };
+        var descNewBtn  = new Button { Content = "+", FontSize = 10, Padding = new Avalonia.Thickness(4, 1) };
+        var descBtns    = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new Avalonia.Thickness(0, 2, 0, 0) };
+        descBtns.Children.Add(descPickBtn);
+        descBtns.Children.Add(descNewBtn);
+        var descStack = new StackPanel { Orientation = Orientation.Vertical, Spacing = 2, Margin = new Avalonia.Thickness(0, 0, 8, 0) };
+        descStack.Children.Add(descSearchBox);
+        descStack.Children.Add(descMatchList);
+        descStack.Children.Add(descLabel);
+        descStack.Children.Add(descBtns);
+
+        var modelCombo = new ComboBox
+        {
+            IsEditable = true,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Top,
             Margin = new Avalonia.Thickness(0, 0, 8, 0)
         };
-        mfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
+        modelCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
 
-        var addItemBtn = new Button
+        var tplBox = new TextBox
         {
-            Content = "+ Add Item",
-            FontSize = 11,
-            Padding = new Avalonia.Thickness(6, 2)
+            Watermark = "e.g. AL-123",
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Avalonia.Thickness(0, 0, 8, 0)
         };
+        group.TemplateBox = tplBox;
+
+        var matchLabel = new TextBlock
+        {
+            Text = "—",
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Avalonia.Thickness(4, 4, 8, 0),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap
+        };
+        group.MatchLabel = matchLabel;
 
         var removeGroupBtn = new Button
         {
-            Content = "Remove Group",
+            Content = "✕ Remove",
             FontSize = 10,
             Padding = new Avalonia.Thickness(4, 1),
-            Margin = new Avalonia.Thickness(8, 0, 0, 0),
-            Foreground = Brushes.DarkRed
+            Foreground = Brushes.DarkRed,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Avalonia.Thickness(0, 0, 0, 0)
         };
 
-        var mfrHeader = new StackPanel
+        var topGrid = new Grid
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 4,
-            Margin = new Avalonia.Thickness(0, 0, 0, 4)
+            ColumnDefinitions = new ColumnDefinitions("260,180,140,80,Auto"),
+            Margin = new Avalonia.Thickness(0, 0, 0, 6)
         };
-        mfrHeader.Children.Add(new TextBlock
-        {
-            Text = "Manufacturer:",
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Avalonia.Thickness(0, 0, 4, 0)
-        });
-        mfrHeader.Children.Add(mfrCombo);
-        mfrHeader.Children.Add(addItemBtn);
-        mfrHeader.Children.Add(removeGroupBtn);
+        Grid.SetColumn(descStack,      0);
+        Grid.SetColumn(modelCombo,     1);
+        Grid.SetColumn(tplBox,         2);
+        Grid.SetColumn(matchLabel,     3);
+        Grid.SetColumn(removeGroupBtn, 4);
+        topGrid.Children.Add(descStack);
+        topGrid.Children.Add(modelCombo);
+        topGrid.Children.Add(tplBox);
+        topGrid.Children.Add(matchLabel);
+        topGrid.Children.Add(removeGroupBtn);
 
-        var rowsPanel = new StackPanel();
-        group.RowsPanel = rowsPanel;
+        // ── Callout sub-section ────────────────────────────────────────────────
+
+        var calloutHeader = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*,28"),
+            Margin = new Avalonia.Thickness(0, 4, 0, 2)
+        };
+        calloutHeader.Children.Add(new TextBlock { Text = "Custom Label", FontSize = 10, FontWeight = FontWeight.SemiBold, Foreground = Brushes.DimGray, Margin = new Avalonia.Thickness(2, 0) });
+        var calloutRemarksHeader = new TextBlock { Text = "Callout Remarks", FontSize = 10, FontWeight = FontWeight.SemiBold, Foreground = Brushes.DimGray, Margin = new Avalonia.Thickness(2, 0) };
+        Grid.SetColumn(calloutRemarksHeader, 1);
+        calloutHeader.Children.Add(calloutRemarksHeader);
+
+        var calloutsPanel = new StackPanel();
+        group.CalloutsPanel = calloutsPanel;
+
+        var addCalloutBtn = new Button
+        {
+            Content = "+ Add Callout",
+            FontSize = 10,
+            Padding = new Avalonia.Thickness(6, 2),
+            Margin = new Avalonia.Thickness(0, 4, 0, 0)
+        };
+        addCalloutBtn.Click += (_, _) => AddCalloutRow(group);
 
         var groupContent = new StackPanel { Margin = new Avalonia.Thickness(4) };
-        groupContent.Children.Add(mfrHeader);
-        groupContent.Children.Add(rowsPanel);
+        groupContent.Children.Add(topGrid);
+        groupContent.Children.Add(calloutHeader);
+        groupContent.Children.Add(calloutsPanel);
+        groupContent.Children.Add(addCalloutBtn);
 
         var groupBorder = new Border
         {
@@ -154,216 +222,53 @@ public partial class BulkHardwareEntryView : UserControl
         group.GroupBorder = groupBorder;
         GroupsPanel.Children.Add(groupBorder);
 
-        // When the manufacturer changes, propagate to all rows in this group.
-        mfrCombo.SelectionChanged += (_, _) =>
-        {
-            group.Manufacturer = mfrCombo.SelectedItem as Manufacturer;
-            foreach (var row in group.Rows)
-            {
-                row.SelectedManufacturer = group.Manufacturer;
-                if (group.RefreshActions.TryGetValue(row, out var refresh))
-                    refresh();
-            }
-            RefreshContinue();
-        };
+        // Add first callout row automatically
+        AddCalloutRow(group);
 
-        addItemBtn.Click += (_, _) => AddRowToGroup(group);
-
-        removeGroupBtn.Click += (_, _) =>
-        {
-            _groups.Remove(group);
-            GroupsPanel.Children.Remove(groupBorder);
-            RefreshContinue();
-        };
-
-        AddRowToGroup(group);
-    }
-
-    // ── Row building ──────────────────────────────────────────────────────────
-
-    /// <summary>Appends a new blank hardware row to <paramref name="group"/>.</summary>
-    private void AddRowToGroup(MfrGroup group)
-    {
-        var row = new BulkHardwareRow { SelectedManufacturer = group.Manufacturer };
-        group.Rows.Add(row);
-
-        // Column widths: Description, Model#, Match, Custom Label, Remarks, Remove
-        // These must match the header grid in the AXAML.
-        var grid = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("260,210,90,170,210,36"),
-            Margin = new Avalonia.Thickness(0, 0, 0, 8)
-        };
-
-        // ── Col 0: Description picker (search + tree + new) ──────────────────
-        var descSearchBox = new TextBox
-        {
-            Watermark = "Search descriptions…",
-            FontSize = 11,
-            Margin = new Avalonia.Thickness(0, 0, 0, 2)
-        };
-        var descMatchList = new ListBox { MaxHeight = 80, IsVisible = false };
-        descMatchList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-        var descSelectedLabel = new TextBlock
-        {
-            Text = "(none)",
-            Foreground = Brushes.Gray,
-            FontSize = 10,
-            TextWrapping = TextWrapping.Wrap
-        };
-        var descPickTreeBtn = new Button
-        {
-            Content = "⋯ Tree",
-            FontSize = 10,
-            Padding = new Avalonia.Thickness(4, 1)
-        };
-        var descNewBtn = new Button
-        {
-            Content = "+ New",
-            FontSize = 10,
-            Padding = new Avalonia.Thickness(4, 1)
-        };
-        var descBtnRow = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 4,
-            Margin = new Avalonia.Thickness(0, 2, 0, 0)
-        };
-        descBtnRow.Children.Add(descPickTreeBtn);
-        descBtnRow.Children.Add(descNewBtn);
-        var descStack = new StackPanel
-        {
-            Orientation = Orientation.Vertical,
-            Spacing = 2,
-            Margin = new Avalonia.Thickness(0, 0, 8, 0)
-        };
-        descStack.Children.Add(descSearchBox);
-        descStack.Children.Add(descMatchList);
-        descStack.Children.Add(descSelectedLabel);
-        descStack.Children.Add(descBtnRow);
-        Grid.SetColumn(descStack, 0);
-
-        // ── Col 1: Model # — editable ComboBox ───────────────────────────────
-        var modelCombo = new ComboBox
-        {
-            IsEditable = true,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Avalonia.Thickness(0, 0, 8, 0)
-        };
-        modelCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
-        Grid.SetColumn(modelCombo, 1);
-
-        // ── Col 2: Match status ───────────────────────────────────────────────
-        var matchLabel = new TextBlock
-        {
-            Text = "—",
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Avalonia.Thickness(4, 4, 8, 0),
-            FontSize = 11,
-            TextWrapping = TextWrapping.Wrap
-        };
-        Grid.SetColumn(matchLabel, 2);
-
-        // ── Col 3: Custom label ───────────────────────────────────────────────
-        var customBox = new TextBox
-        {
-            Watermark = "Optional",
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Avalonia.Thickness(0, 0, 8, 0),
-            TextWrapping = TextWrapping.Wrap
-        };
-        Grid.SetColumn(customBox, 3);
-
-        // ── Col 4: Remarks ────────────────────────────────────────────────────
-        var remarksBox = new TextBox
-        {
-            Watermark = "Optional",
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Avalonia.Thickness(0, 0, 8, 0),
-            TextWrapping = TextWrapping.Wrap
-        };
-        Grid.SetColumn(remarksBox, 4);
-
-        // ── Col 5: Remove button ──────────────────────────────────────────────
-        var removeBtn = new Button
-        {
-            Content = "×",
-            Width = 28,
-            HorizontalContentAlignment = HorizontalAlignment.Center
-        };
-        Grid.SetColumn(removeBtn, 5);
-
-        grid.Children.Add(descStack);
-        grid.Children.Add(modelCombo);
-        grid.Children.Add(matchLabel);
-        grid.Children.Add(customBox);
-        grid.Children.Add(remarksBox);
-        grid.Children.Add(removeBtn);
-        group.RowsPanel.Children.Add(grid);
-
-        // ── Local helpers ─────────────────────────────────────────────────────
+        // ── Events ────────────────────────────────────────────────────────────
 
         void RefreshModelItems()
         {
-            if (row.SelectedManufacturer == null && row.SelectedDescription == null)
-            {
-                modelCombo.ItemsSource = null;
-                return;
-            }
             using var ctx = DatabaseInitializer.CreateContext();
-            var q = ctx.HardwareItems.AsQueryable();
-            if (row.SelectedManufacturer != null)
-                q = q.Where(h => h.ManufacturerId == row.SelectedManufacturer.Id);
-            if (row.SelectedDescription != null)
-                q = q.Where(h => h.DescriptionId == row.SelectedDescription.Id);
+            var q = ctx.HardwareItems.Where(h => h.ManufacturerId == _manufacturerId);
+            if (group.SelectedDescription != null)
+                q = q.Where(h => h.DescriptionId == group.SelectedDescription.Id);
             modelCombo.ItemsSource = q.OrderBy(h => h.ModelNumber).ToList();
         }
 
-        void SyncModelState()
+        void SyncMatchState()
         {
             var text = modelCombo.Text?.Trim() ?? "";
-            row.ModelNumber = text;
-
+            group.ModelNumber = text;
             if (string.IsNullOrWhiteSpace(text))
             {
-                row.MatchedItem = null;
+                group.MatchedItem = null;
             }
             else if (modelCombo.SelectedItem is HardwareItem h && h.ModelNumber == text)
             {
-                row.MatchedItem = h;
+                group.MatchedItem = h;
             }
             else
             {
-                row.MatchedItem = null;
-                if (row.SelectedManufacturer != null && row.SelectedDescription != null)
-                {
-                    using var ctx = DatabaseInitializer.CreateContext();
-                    row.MatchedItem = ctx.HardwareItems.FirstOrDefault(item =>
-                        item.ManufacturerId == row.SelectedManufacturer.Id &&
-                        item.DescriptionId  == row.SelectedDescription.Id &&
-                        item.ModelNumber    == text);
-                }
+                using var ctx = DatabaseInitializer.CreateContext();
+                group.MatchedItem = ctx.HardwareItems.FirstOrDefault(item =>
+                    item.ManufacturerId == _manufacturerId &&
+                    item.ModelNumber    == text &&
+                    (group.SelectedDescription == null || item.DescriptionId == group.SelectedDescription.Id));
             }
-
-            UpdateMatchLabel(row, matchLabel);
-            RefreshContinue();
+            matchLabel.Text       = group.MatchedItem != null ? "✓ Matched" : (string.IsNullOrWhiteSpace(text) ? "—" : "(new)");
+            matchLabel.Foreground = group.MatchedItem != null ? Brushes.DarkGreen : Brushes.Gray;
         }
-
-        // Register with group so manufacturer changes can trigger refresh.
-        group.RefreshActions[row] = () => { RefreshModelItems(); SyncModelState(); };
-
-        // ── Description picker events ─────────────────────────────────────────
 
         void SelectDescription(Description? desc)
         {
-            row.SelectedDescription      = desc;
-            descSelectedLabel.Text       = desc != null ? BuildDescPath(desc) : "(none)";
-            descSelectedLabel.Foreground = desc != null ? Brushes.Black : Brushes.Gray;
-            descSearchBox.Text           = "";
-            descMatchList.IsVisible      = false;
+            group.SelectedDescription = desc;
+            descLabel.Text       = desc != null ? BuildDescPath(desc) : "(none)";
+            descLabel.Foreground = desc != null ? Brushes.Black : Brushes.Gray;
+            descSearchBox.Text   = "";
+            descMatchList.IsVisible = false;
             RefreshModelItems();
-            SyncModelState();
+            SyncMatchState();
         }
 
         descSearchBox.TextChanged += (_, _) =>
@@ -376,171 +281,151 @@ public partial class BulkHardwareEntryView : UserControl
             descMatchList.ItemsSource = matches;
             descMatchList.IsVisible   = matches.Count > 0;
         };
-
         descMatchList.SelectionChanged += (_, _) =>
         {
             if (descMatchList.SelectedItem is DescriptionComboItem item)
                 SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == item.Id));
         };
-
-        descPickTreeBtn.Click += async (_, _) =>
+        descPickBtn.Click += async (_, _) =>
         {
             var picked = await OpenDescriptionPickerAsync();
             if (picked.HasValue)
                 SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == picked.Value));
         };
-
         descNewBtn.Click += (_, _) =>
         {
             var name = descSearchBox.Text?.Trim();
             if (string.IsNullOrEmpty(name)) return;
             using var ctx = DatabaseInitializer.CreateContext();
-            var newDesc = new DescriptionRepository(ctx).Add(new Description { DescriptionText = name, ParentId = null });
+            var newDesc = new DescriptionRepository(ctx).Add(new Description { DescriptionText = name });
             RefreshDescriptions();
             SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == newDesc.Id));
         };
 
-        // ── Model combo events ────────────────────────────────────────────────
+        modelCombo.PropertyChanged += (_, e) => { if (e.Property == ComboBox.TextProperty) SyncMatchState(); };
+        modelCombo.SelectionChanged += (_, _) => SyncMatchState();
 
-        modelCombo.PropertyChanged += (_, e) =>
+        tplBox.TextChanged += (_, _) =>
+            group.TemplateNumber = string.IsNullOrWhiteSpace(tplBox.Text) ? null : tplBox.Text.Trim();
+
+        removeGroupBtn.Click += (_, _) =>
         {
-            if (e.Property == ComboBox.TextProperty)
-                SyncModelState();
-        };
-        modelCombo.SelectionChanged += (_, _) => SyncModelState();
-
-        // ── Other column events ───────────────────────────────────────────────
-
-        customBox.TextChanged += (_, _) =>
-        {
-            row.CustomLabel = string.IsNullOrWhiteSpace(customBox.Text) ? null : customBox.Text.Trim();
+            _groups.Remove(group);
+            GroupsPanel.Children.Remove(groupBorder);
         };
 
-        remarksBox.TextChanged += (_, _) =>
+        // Store model combo reference for restore
+        group.ModelBox = new TextBox(); // placeholder — we'll write directly to modelCombo.Text
+        // We need a reference to modelCombo for restore; store it via a closure capture
+        // by using a small helper on the group object.
+        _groupModelComboMap[group] = modelCombo;
+    }
+
+    // Maps each group to its model ComboBox so restore can set the text.
+    private readonly Dictionary<HwItemGroup, ComboBox> _groupModelComboMap = new();
+
+    // ── Callout row ───────────────────────────────────────────────────────────
+
+    private void AddCalloutRow(HwItemGroup group, string? label = null, string? remarks = null)
+    {
+        var callout = new CalloutRow { Label = label, CalloutRemarks = remarks };
+        group.Callouts.Add(callout);
+
+        var labelBox = new TextBox
         {
-            row.Remarks = string.IsNullOrWhiteSpace(remarksBox.Text) ? null : remarksBox.Text.Trim();
+            Text = label ?? "",
+            Watermark = "Custom label (optional)",
+            Margin = new Avalonia.Thickness(0, 0, 8, 0),
+            TextWrapping = TextWrapping.Wrap
         };
+        var remarksBox = new TextBox
+        {
+            Text = remarks ?? "",
+            Watermark = "Callout remarks (optional)",
+            Margin = new Avalonia.Thickness(0, 0, 8, 0),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var removeBtn = new Button
+        {
+            Content = "×",
+            Width = 28,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*,28"),
+            Margin = new Avalonia.Thickness(0, 0, 0, 4)
+        };
+        Grid.SetColumn(labelBox,   0);
+        Grid.SetColumn(remarksBox, 1);
+        Grid.SetColumn(removeBtn,  2);
+        grid.Children.Add(labelBox);
+        grid.Children.Add(remarksBox);
+        grid.Children.Add(removeBtn);
+        group.CalloutsPanel.Children.Add(grid);
+
+        callout.LabelBox   = labelBox;
+        callout.RemarksBox = remarksBox;
+
+        labelBox.TextChanged   += (_, _) => callout.Label          = string.IsNullOrWhiteSpace(labelBox.Text) ? null : labelBox.Text.Trim();
+        remarksBox.TextChanged += (_, _) => callout.CalloutRemarks = string.IsNullOrWhiteSpace(remarksBox.Text) ? null : remarksBox.Text.Trim();
 
         removeBtn.Click += (_, _) =>
         {
-            group.Rows.Remove(row);
-            group.RefreshActions.Remove(row);
-            group.RowsPanel.Children.Remove(grid);
-            // Remove the entire group if it now has no rows.
-            if (group.Rows.Count == 0)
-            {
-                _groups.Remove(group);
-                GroupsPanel.Children.Remove(group.GroupBorder);
-            }
-            RefreshContinue();
+            group.Callouts.Remove(callout);
+            group.CalloutsPanel.Children.Remove(grid);
+            // Always keep at least one callout row per group.
+            if (group.Callouts.Count == 0)
+                AddCalloutRow(group);
         };
     }
 
-    // ── State helpers ──────────────────────────────────────────────────────────
+    // ── Draft persistence ─────────────────────────────────────────────────────
 
-    private static void UpdateMatchLabel(BulkHardwareRow row, TextBlock label)
-    {
-        if (string.IsNullOrWhiteSpace(row.ModelNumber))
-        {
-            label.Text       = "—";
-            label.Foreground = Brushes.Gray;
-        }
-        else if (row.MatchedItem != null)
-        {
-            label.Text       = "✓ Matched";
-            label.Foreground = Brushes.DarkGreen;
-        }
-        else
-        {
-            label.Text       = "(new)";
-            label.Foreground = Brushes.Gray;
-        }
-    }
-
-    private void RefreshContinue()
-    {
-        ContinueButton.IsEnabled = _groups
-            .SelectMany(g => g.Rows)
-            .Any(r =>
-                r.SelectedManufacturer != null &&
-                r.SelectedDescription  != null &&
-                !string.IsNullOrWhiteSpace(r.ModelNumber));
-    }
-
-    private void OnContinue()
-    {
-        var complete = _groups
-            .SelectMany(g => g.Rows)
-            .Where(r =>
-                r.SelectedManufacturer != null &&
-                r.SelectedDescription  != null &&
-                !string.IsNullOrWhiteSpace(r.ModelNumber))
-            .ToList();
-
-        if (complete.Count == 0)
-        {
-            StatusLabel.Text = "Add at least one complete row.";
-            return;
-        }
-
-        // Clear the draft when the user explicitly continues.
-        using (var ctx = DatabaseInitializer.CreateContext())
-            new BulkAddDraftRepository(ctx).DeleteByJob(_jobId);
-
-        BulkAddSession.JobId       = _jobId;
-        BulkAddSession.PendingRows = complete;
-        NavigationRequested?.Invoke($"TemplateResolutionWizard:{_jobId}");
-    }
-
-    // ── Draft persistence (Phase 25) ──────────────────────────────────────────
-
-    /// <summary>A minimal serialisable snapshot of one group for draft persistence.</summary>
-    private sealed class DraftGroup
-    {
-        public int? ManufacturerId { get; set; }
-        public List<DraftRow> Rows { get; set; } = new();
-    }
-
-    /// <summary>A minimal serialisable snapshot of one row for draft persistence.</summary>
-    private sealed class DraftRow
-    {
-        public int? DescriptionId  { get; set; }
-        public string ModelNumber  { get; set; } = string.Empty;
-        public string? CustomLabel { get; set; }
-        public string? Remarks     { get; set; }
-    }
-
-    /// <summary>Serialises current groups to the database draft table.</summary>
     private void SaveDraft()
     {
         try
         {
-            var snapshot = _groups.Select(g => new DraftGroup
-            {
-                ManufacturerId = g.Manufacturer?.Id,
-                Rows = g.Rows.Select(r => new DraftRow
-                {
-                    DescriptionId = r.SelectedDescription?.Id,
-                    ModelNumber   = r.ModelNumber,
-                    CustomLabel   = r.CustomLabel,
-                    Remarks       = r.Remarks
-                }).ToList()
-            }).ToList();
-
-            var json = JsonSerializer.Serialize(snapshot);
             using var ctx = DatabaseInitializer.CreateContext();
-            new BulkAddDraftRepository(ctx).Upsert(_jobId, json);
+            var draft = new BulkAddDraftRepository(ctx).GetByJob(_jobId);
+            BulkSessionDraft session;
+            try
+            {
+                session = (draft != null && !string.IsNullOrWhiteSpace(draft.DraftJson) && draft.DraftJson != "[]")
+                    ? JsonSerializer.Deserialize<BulkSessionDraft>(draft.DraftJson) ?? new BulkSessionDraft()
+                    : new BulkSessionDraft();
+            }
+            catch { session = new BulkSessionDraft(); }
+
+            // Replace this manufacturer's section.
+            session.Manufacturers.RemoveAll(m => m.ManufacturerId == _manufacturerId);
+            session.Manufacturers.Add(new BulkSessionMfr
+            {
+                ManufacturerId   = _manufacturerId,
+                ManufacturerName = _manufacturer?.ManufacturerName ?? "",
+                Groups           = _groups
+                    .Where(g => g.SelectedDescription != null || !string.IsNullOrWhiteSpace(g.ModelNumber))
+                    .Select(g => new BulkSessionGroup
+                    {
+                        DescriptionId  = g.SelectedDescription?.Id,
+                        ModelNumber    = g.ModelNumber,
+                        TemplateNumber = g.TemplateNumber,
+                        Callouts       = g.Callouts
+                            .Select(c => new BulkSessionCallout
+                            {
+                                Label          = c.Label,
+                                CalloutRemarks = c.CalloutRemarks
+                            }).ToList()
+                    }).ToList()
+            });
+
+            new BulkAddDraftRepository(ctx).Upsert(_jobId, JsonSerializer.Serialize(session));
         }
-        catch
-        {
-            // Draft save failure is non-fatal.
-        }
+        catch { }
     }
 
-    /// <summary>
-    /// Attempts to restore groups from a saved draft.
-    /// Returns true if any groups were restored; false if no draft exists.
-    /// </summary>
     private bool RestoreDraft()
     {
         try
@@ -550,85 +435,64 @@ public partial class BulkHardwareEntryView : UserControl
             if (draft == null || string.IsNullOrWhiteSpace(draft.DraftJson) || draft.DraftJson == "[]")
                 return false;
 
-            var snapshots = JsonSerializer.Deserialize<List<DraftGroup>>(draft.DraftJson);
-            if (snapshots == null || snapshots.Count == 0) return false;
+            var session = JsonSerializer.Deserialize<BulkSessionDraft>(draft.DraftJson);
+            var mfrSection = session?.Manufacturers.FirstOrDefault(m => m.ManufacturerId == _manufacturerId);
+            if (mfrSection == null || mfrSection.Groups.Count == 0) return false;
 
-            var mfrLookup  = _manufacturers.ToDictionary(m => m.Id);
             var descLookup = _allDescriptions.ToDictionary(d => d.Id);
 
-            foreach (var sg in snapshots)
+            foreach (var sg in mfrSection.Groups)
             {
-                AddGroup();   // creates a blank group and selects no manufacturer
+                AddItemGroup();
                 var group = _groups.Last();
 
-                if (sg.ManufacturerId.HasValue && mfrLookup.TryGetValue(sg.ManufacturerId.Value, out var mfr))
+                if (sg.DescriptionId.HasValue && descLookup.TryGetValue(sg.DescriptionId.Value, out var desc))
                 {
-                    group.Manufacturer = mfr;
-                    // Find the manufacturer ComboBox in the group border and set its selection.
-                    var mfrComboInPanel = FindMfrComboInGroup(group);
-                    if (mfrComboInPanel != null)
-                        mfrComboInPanel.SelectedItem = mfr;
-                }
-
-                // The AddGroup already added one blank row; remove it before restoring.
-                if (group.Rows.Count > 0)
-                {
-                    var blankRow = group.Rows[0];
-                    group.Rows.Remove(blankRow);
-                    group.RefreshActions.Remove(blankRow);
-                    if (group.RowsPanel.Children.Count > 0)
-                        group.RowsPanel.Children.RemoveAt(0);
-                }
-
-                foreach (var sr in sg.Rows)
-                {
-                    AddRowToGroup(group);
-                    var row = group.Rows.Last();
-
-                    if (sr.DescriptionId.HasValue && descLookup.TryGetValue(sr.DescriptionId.Value, out var desc))
+                    group.SelectedDescription = desc;
+                    if (group.DescLabel != null)
                     {
-                        row.SelectedDescription = desc;
-                        // Trigger the UI label refresh via the stored refresh action.
-                        if (group.RefreshActions.TryGetValue(row, out var refresh))
-                            refresh();
+                        group.DescLabel.Text       = BuildDescPath(desc);
+                        group.DescLabel.Foreground = Brushes.Black;
                     }
+                }
 
-                    row.ModelNumber = sr.ModelNumber;
-                    row.CustomLabel = sr.CustomLabel;
-                    row.Remarks     = sr.Remarks;
+                if (!string.IsNullOrWhiteSpace(sg.ModelNumber))
+                {
+                    group.ModelNumber = sg.ModelNumber;
+                    if (_groupModelComboMap.TryGetValue(group, out var modelCombo))
+                        modelCombo.Text = sg.ModelNumber;
+                }
+
+                if (!string.IsNullOrWhiteSpace(sg.TemplateNumber))
+                {
+                    group.TemplateNumber = sg.TemplateNumber;
+                    if (group.TemplateBox != null)
+                        group.TemplateBox.Text = sg.TemplateNumber;
+                }
+
+                // Replace the default blank callout with restored ones.
+                group.Callouts.Clear();
+                group.CalloutsPanel.Children.Clear();
+
+                if (sg.Callouts.Count > 0)
+                {
+                    foreach (var sc in sg.Callouts)
+                        AddCalloutRow(group, sc.Label, sc.CalloutRemarks);
+                }
+                else
+                {
+                    AddCalloutRow(group);
                 }
             }
 
             StatusLabel.Text = "Draft restored.";
-            RefreshContinue();
             return true;
         }
-        catch
-        {
-            return false;
-        }
+        catch { return false; }
     }
 
-    /// <summary>
-    /// Finds the manufacturer ComboBox within a group's border by traversing the visual tree.
-    /// </summary>
-    private static ComboBox? FindMfrComboInGroup(MfrGroup group)
-    {
-        if (group.GroupBorder.Child is StackPanel content)
-        {
-            // First child of content is the mfrHeader StackPanel.
-            if (content.Children.Count > 0 && content.Children[0] is StackPanel header)
-            {
-                foreach (var child in header.Children)
-                    if (child is ComboBox cb) return cb;
-            }
-        }
-        return null;
-    }
+    // ── Utilities ─────────────────────────────────────────────────────────────
 
-    // ── Utilities ──────────────────────────────────────────────────────────────
-
-    /// <summary>Reloads descriptions from the database and rebuilds the combo item list.</summary>
     private void RefreshDescriptions()
     {
         using var ctx = DatabaseInitializer.CreateContext();

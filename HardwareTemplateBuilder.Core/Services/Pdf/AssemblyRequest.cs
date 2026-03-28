@@ -21,6 +21,12 @@ public class HardwareWithTemplates
     /// When set, overrides the item's model number in the <c>HardwareDescription</c> column.
     /// </summary>
     public string? CustomDescription { get; init; }
+
+    /// <summary>
+    /// Gets or sets the per-callout remark for this job line item.
+    /// Combined with <c>Item.Remarks</c> on the cover sheet when both are set.
+    /// </summary>
+    public string? CalloutRemarks { get; init; }
 }
 
 /// <summary>

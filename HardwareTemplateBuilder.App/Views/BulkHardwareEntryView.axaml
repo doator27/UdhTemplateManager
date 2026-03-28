@@ -2,38 +2,37 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="HardwareTemplateBuilder.App.Views.BulkHardwareEntryView">
     <DockPanel Margin="8">
+
         <!-- Top toolbar -->
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Left" Name="BackButton" Content="← Back to Job" Margin="0,0,8,0"/>
-            <TextBlock DockPanel.Dock="Left" Text="Bulk Hardware Entry" FontSize="16" FontWeight="Bold"
-                       VerticalAlignment="Center"/>
+            <Button DockPanel.Dock="Left" Name="BackButton" Content="← Back" Margin="0,0,8,0"/>
+            <TextBlock Name="TitleLabel" DockPanel.Dock="Left"
+                       FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
 
         <!-- Bottom action bar -->
         <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-            <Button DockPanel.Dock="Left"  Name="AddGroupButton"   Content="+ Add Manufacturer" Margin="0,0,8,0"/>
-            <Button DockPanel.Dock="Left"  Name="ClearDraftButton" Content="Clear Draft"         Margin="0,0,8,0"/>
-            <Button DockPanel.Dock="Right" Name="ContinueButton"   Content="Continue →"          IsEnabled="False"/>
-            <TextBlock Name="StatusLabel" VerticalAlignment="Center" Foreground="#800000" TextWrapping="Wrap"/>
+            <Button DockPanel.Dock="Left" Name="AddItemButton" Content="+ Add Item" Margin="0,0,8,0"/>
+            <TextBlock Name="StatusLabel" VerticalAlignment="Center"
+                       Foreground="#800000" TextWrapping="Wrap"/>
         </DockPanel>
 
         <!--
-            Header and groups are both inside the ScrollViewer so they share
-            exactly the same available width — no scrollbar-offset misalignment.
+            Column header row — widths must match the grid in AddItemGroup().
+            Description | Model # | Template # | Match
         -->
+        <Grid DockPanel.Dock="Top"
+              ColumnDefinitions="260,180,140,80"
+              Margin="0,0,0,4">
+            <TextBlock Grid.Column="0" Text="Description"  FontWeight="Bold" Margin="4,0"/>
+            <TextBlock Grid.Column="1" Text="Model #"      FontWeight="Bold" Margin="4,0"/>
+            <TextBlock Grid.Column="2" Text="Template #"   FontWeight="Bold" Margin="4,0"/>
+            <TextBlock Grid.Column="3" Text="Match"        FontWeight="Bold" Margin="4,0"/>
+        </Grid>
+
+        <!-- Hardware item groups added in code-behind -->
         <ScrollViewer HorizontalScrollBarVisibility="Auto">
-            <StackPanel>
-                <!-- Item column header row (no Manufacturer column — that is the group header) -->
-                <Grid ColumnDefinitions="260,210,90,170,210,36" Margin="0,0,0,4">
-                    <TextBlock Grid.Column="0" Text="Description"  FontWeight="Bold" Margin="4,0"/>
-                    <TextBlock Grid.Column="1" Text="Model #"      FontWeight="Bold" Margin="4,0"/>
-                    <TextBlock Grid.Column="2" Text="Match"        FontWeight="Bold" Margin="4,0"/>
-                    <TextBlock Grid.Column="3" Text="Custom Label" FontWeight="Bold" Margin="4,0"/>
-                    <TextBlock Grid.Column="4" Text="Remarks"      FontWeight="Bold" Margin="4,0"/>
-                </Grid>
-                <!-- Manufacturer groups added in code-behind -->
-                <StackPanel Name="GroupsPanel"/>
-            </StackPanel>
+            <StackPanel Name="GroupsPanel"/>
         </ScrollViewer>
     </DockPanel>
 </UserControl>
