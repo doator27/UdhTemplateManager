@@ -4,7 +4,20 @@ using HardwareTemplateBuilder.Core.Models;
 namespace HardwareTemplateBuilder.App;
 
 /// <summary>
-/// Represents one row entered in <see cref="Views.BulkHardwareEntryView"/>.
+/// A single custom-label entry for a hardware item on a bulk-add row.
+/// One <see cref="BulkHardwareLabel"/> becomes one <see cref="JobHardware"/> record.
+/// </summary>
+public class BulkHardwareLabel
+{
+    /// <summary>Gets or sets the custom label for this line item.</summary>
+    public string CustomLabel { get; set; } = "";
+
+    /// <summary>Gets or sets optional remarks displayed alongside the label on the cover sheet.</summary>
+    public string? Remarks { get; set; }
+}
+
+/// <summary>
+/// Represents one row entered in the bulk hardware entry view.
 /// Carries the user's input plus resolved state for the wizard.
 /// </summary>
 public class BulkHardwareRow
@@ -18,11 +31,11 @@ public class BulkHardwareRow
     /// <summary>Gets or sets the model number typed by the user.</summary>
     public string ModelNumber { get; set; } = "";
 
-    /// <summary>Gets or sets the optional custom label for the job link.</summary>
-    public string? CustomLabel { get; set; }
-
-    /// <summary>Gets or sets optional remarks to store on the hardware item.</summary>
-    public string? Remarks { get; set; }
+    /// <summary>
+    /// Gets or sets the list of custom labels for this row.
+    /// Each label becomes a distinct <see cref="JobHardware"/> line item on the job.
+    /// </summary>
+    public List<BulkHardwareLabel> Labels { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the existing <see cref="HardwareItem"/> that exactly matches this row,
@@ -44,9 +57,7 @@ public class BulkHardwareRow
 }
 
 /// <summary>
-/// Static session state shared between <see cref="Views.BulkHardwareEntryView"/> and
-/// <see cref="Views.TemplateResolutionWizardView"/>. Mirrors the pattern used by
-/// <see cref="SessionService"/>.
+/// Static session state shared between the bulk-add views and the template resolution wizard.
 /// </summary>
 public static class BulkAddSession
 {
@@ -55,4 +66,10 @@ public static class BulkAddSession
 
     /// <summary>Gets or sets the job ID that the rows will be linked to.</summary>
     public static int JobId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ordered list of manufacturers selected for the current bulk-add session.
+    /// Populated by <c>BulkManufacturerSelectionView</c> and consumed by the hub and item entry views.
+    /// </summary>
+    public static List<Manufacturer> SelectedManufacturers { get; set; } = new();
 }

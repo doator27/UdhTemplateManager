@@ -106,7 +106,7 @@ public partial class JobDetailView : UserControl
 
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
-        BulkAddButton.Click += (_, _) => NavigationRequested?.Invoke($"BulkManufacturerSession:{_jobId}");
+        BulkAddButton.Click += (_, _) => NavigationRequested?.Invoke($"BulkManufacturerSelection:{_jobId}");
 
         // Phase 20: Mark complete / Reactivate
         MarkCompleteButton.Click  += async (_, _) => await MarkCompleteAsync();

@@ -25,18 +25,37 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Database location / migrate -->
+                <!-- Database location -->
                 <Border BorderBrush="#808080" BorderThickness="1" Padding="16">
                     <StackPanel>
                         <TextBlock Text="Database Location:" FontWeight="Bold" Margin="0,0,0,4" />
                         <TextBlock TextWrapping="Wrap" Foreground="#444444" FontSize="11"
-                                   Text="The shared SQLite database file used by all users. Use 'Move Database' to relocate it to a shared network drive, then point all other machines to that same file via File → Database Location."
+                                   Text="The shared SQLite database file used by all users. If the app runs from a shared network drive, the pointer file can also be shared there so other machines pick up the path automatically."
                                    Margin="0,0,0,8" />
-                        <TextBlock Text="Current location:" Margin="0,0,0,2" />
+                        <TextBlock Text="Active database:" FontWeight="SemiBold" Margin="0,0,0,2" />
                         <TextBlock Name="CurrentDbPathLabel" TextWrapping="Wrap" Foreground="#404040"
-                                   FontSize="11" Margin="0,0,0,12" />
-                        <TextBlock Text="Move to folder:" Margin="0,0,0,4" />
-                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                                   FontSize="11" Margin="0,0,0,4" />
+                        <TextBlock Text="Pointer file:" FontSize="10" Margin="0,0,0,2" />
+                        <TextBlock Name="PointerFilePathLabel" TextWrapping="Wrap" Foreground="#606060"
+                                   FontSize="10" Margin="0,0,0,16" />
+
+                        <TextBlock Text="Connect to existing database:" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="#444444" FontSize="11"
+                                   Text="Points this installation at an existing .db file without copying anything."
+                                   Margin="0,0,0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                            <TextBox Grid.Column="0" Name="DbConnectPathBox" Watermark="Path to existing .db file" />
+                            <Button Grid.Column="1" Name="DbConnectBrowseButton" Content="Browse..." Width="80" Margin="6,0,0,0" />
+                        </Grid>
+                        <Button Name="DbConnectButton" Content="Connect" HorizontalAlignment="Left" />
+
+                        <Separator Margin="0,16,0,12" Background="#C0C0C0" Height="1"/>
+
+                        <TextBlock Text="Move database to a new folder:" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="#444444" FontSize="11"
+                                   Text="Copies the current database to the chosen folder, then switches to that copy."
+                                   Margin="0,0,0,6"/>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
                             <TextBox Grid.Column="0" Name="DbMoveTargetBox" Watermark="Target folder for database file" />
                             <Button Grid.Column="1" Name="DbMoveBrowseButton" Content="Browse..." Width="80" Margin="6,0,0,0" />
                         </Grid>

@@ -19,12 +19,14 @@
         <ScrollViewer>
             <StackPanel Spacing="8">
 
-                <!-- Custom label field -->
+                <!-- Labels (read-only, set in item entry view) -->
                 <Border BorderBrush="#B0B0B0" BorderThickness="1" Padding="8">
-                    <Grid ColumnDefinitions="Auto,*">
-                        <TextBlock Grid.Column="0" Text="Custom Label:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBox   Grid.Column="1" Name="CustomLabelBox" Watermark="Leave blank to use model number"/>
-                    </Grid>
+                    <StackPanel>
+                        <TextBlock Text="Labels / Line Items:" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <StackPanel Name="LabelsDisplayPanel" Spacing="2"/>
+                        <TextBlock Name="NoLabelsHint" Text="(no custom labels — will use model number)"
+                                   Foreground="#808080" FontStyle="Italic" FontSize="11"/>
+                    </StackPanel>
                 </Border>
 
                 <!-- Status panel (shown for both cases) -->

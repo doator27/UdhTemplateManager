@@ -5,34 +5,20 @@
 
         <!-- Top toolbar -->
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Left" Name="BackButton" Content="← Back" Margin="0,0,8,0"/>
-            <TextBlock Name="TitleLabel" DockPanel.Dock="Left"
-                       FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+            <Button DockPanel.Dock="Left"  Name="BackButton" Content="← Back to Hub" Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Right" Name="SaveButton" Content="Save"/>
+            <TextBlock Name="HeaderLabel" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
 
         <!-- Bottom action bar -->
         <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
             <Button DockPanel.Dock="Left" Name="AddItemButton" Content="+ Add Item" Margin="0,0,8,0"/>
-            <TextBlock Name="StatusLabel" VerticalAlignment="Center"
-                       Foreground="#800000" TextWrapping="Wrap"/>
+            <TextBlock Name="StatusLabel" VerticalAlignment="Center" Foreground="#800000" TextWrapping="Wrap"/>
         </DockPanel>
 
-        <!--
-            Column header row — widths must match the grid in AddItemGroup().
-            Description | Model # | Template # | Match
-        -->
-        <Grid DockPanel.Dock="Top"
-              ColumnDefinitions="260,180,140,80"
-              Margin="0,0,0,4">
-            <TextBlock Grid.Column="0" Text="Description"  FontWeight="Bold" Margin="4,0"/>
-            <TextBlock Grid.Column="1" Text="Model #"      FontWeight="Bold" Margin="4,0"/>
-            <TextBlock Grid.Column="2" Text="Template #"   FontWeight="Bold" Margin="4,0"/>
-            <TextBlock Grid.Column="3" Text="Match"        FontWeight="Bold" Margin="4,0"/>
-        </Grid>
-
-        <!-- Hardware item groups added in code-behind -->
-        <ScrollViewer HorizontalScrollBarVisibility="Auto">
-            <StackPanel Name="GroupsPanel"/>
+        <!-- Item cards added in code-behind -->
+        <ScrollViewer>
+            <StackPanel Name="ItemsPanel" Spacing="8"/>
         </ScrollViewer>
     </DockPanel>
 </UserControl>

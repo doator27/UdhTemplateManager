@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.BulkManufacturerSelectionView">
+    <DockPanel Margin="8">
+        <!-- Top toolbar -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left"  Name="BackButton"     Content="← Back to Job"   Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Right" Name="ContinueButton" Content="Continue →"       IsEnabled="False"/>
+            <TextBlock Text="Bulk Add — Select Manufacturers" FontSize="16" FontWeight="Bold"
+                       VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <!-- Status bar -->
+        <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Margin="0,6,0,0"
+                   Foreground="#800000" TextWrapping="Wrap"/>
+
+        <Grid ColumnDefinitions="*,Auto,*">
+
+            <!-- Left: all manufacturers (searchable) -->
+            <DockPanel Grid.Column="0">
+                <TextBlock DockPanel.Dock="Top" Text="All Manufacturers:" FontWeight="Bold" Margin="0,0,0,4"/>
+                <TextBox DockPanel.Dock="Top" Name="SearchBox" Watermark="Search…" Margin="0,0,0,4"/>
+
+                <!-- Create new -->
+                <Border DockPanel.Dock="Bottom" BorderBrush="#B0B0B0" BorderThickness="1"
+                        Padding="8" Margin="0,8,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Create new manufacturer:" FontSize="11" Margin="0,0,0,4"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Grid.Column="0" Name="NewMfrNameBox" Watermark="Manufacturer name"/>
+                            <Button  Grid.Column="1" Name="CreateMfrButton" Content="Add New"
+                                     Width="70" Margin="6,0,0,0"/>
+                        </Grid>
+                        <TextBlock Name="CreateStatusLabel" FontSize="11" Foreground="#800000" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <ListBox Name="AllMfrList"/>
+            </DockPanel>
+
+            <!-- Middle: add/remove buttons -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                <Button Name="AddButton"    Content="→" Width="36" HorizontalContentAlignment="Center"/>
+                <Button Name="RemoveButton" Content="←" Width="36" HorizontalContentAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Right: selected manufacturers -->
+            <DockPanel Grid.Column="2">
+                <TextBlock DockPanel.Dock="Top" Text="Selected (for this job):" FontWeight="Bold" Margin="0,0,0,4"/>
+                <TextBlock DockPanel.Dock="Top" Name="SelectedCountLabel" FontSize="11"
+                           Foreground="#404040" Margin="0,0,0,4"/>
+                <ListBox Name="SelectedMfrList"/>
+            </DockPanel>
+
+        </Grid>
+    </DockPanel>
+</UserControl>

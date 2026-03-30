@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.BulkJobHubView">
+    <DockPanel Margin="8">
+        <!-- Top toolbar -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left"  Name="BackButton"     Content="← Change Manufacturers" Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Right" Name="ContinueButton" Content="Continue to Templates →"/>
+            <TextBlock Name="HeaderLabel" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Margin="0,6,0,0"
+                   Foreground="#800000" TextWrapping="Wrap"/>
+
+        <!-- Manufacturer cards (added in code-behind) -->
+        <ScrollViewer>
+            <StackPanel Name="CardsPanel" Spacing="6"/>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

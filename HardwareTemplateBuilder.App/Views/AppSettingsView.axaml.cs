@@ -30,8 +30,9 @@ public partial class AppSettingsView : UserControl
         var context = DatabaseInitializer.CreateContext();
         _repo = new AppSettingRepository(context);
 
-        StorageLocationBox.Text = _repo.GetValue("TemplateStorageLocation");
-        CurrentDbPathLabel.Text = DatabaseInitializer.GetDatabasePath();
+        StorageLocationBox.Text  = _repo.GetValue("TemplateStorageLocation");
+        CurrentDbPathLabel.Text  = DatabaseInitializer.GetDatabasePath();
+        PointerFilePathLabel.Text = DatabaseLocationService.GetActivePointerFilePath();
 
         // Load SMTP settings
         SmtpHostBox.Text       = _repo.GetValue("SmtpHost");
@@ -41,12 +42,60 @@ public partial class AppSettingsView : UserControl
         AlertEmailToBox.Text   = _repo.GetValue("AlertEmailTo");
         AlertEmailFromBox.Text = _repo.GetValue("AlertEmailFrom");
 
-        MainMenuButton.Click     += (_, _) => NavigationRequested?.Invoke("Dashboard");
-        SaveButton.Click         += (_, _) => Save();
-        BrowseButton.Click       += async (_, _) => await BrowseStorageFolderAsync();
-        DbMoveBrowseButton.Click += async (_, _) => await BrowseDbTargetFolderAsync();
-        MoveDbButton.Click       += (_, _) => MoveDatabase();
-        SaveSmtpButton.Click     += (_, _) => SaveSmtp();
+        MainMenuButton.Click        += (_, _) => NavigationRequested?.Invoke("Dashboard");
+        SaveButton.Click            += (_, _) => Save();
+        BrowseButton.Click          += async (_, _) => await BrowseStorageFolderAsync();
+        DbConnectBrowseButton.Click += async (_, _) => await BrowseConnectFileAsync();
+        DbConnectButton.Click       += (_, _) => ConnectDatabase();
+        DbMoveBrowseButton.Click    += async (_, _) => await BrowseDbTargetFolderAsync();
+        MoveDbButton.Click          += (_, _) => MoveDatabase();
+        SaveSmtpButton.Click        += (_, _) => SaveSmtp();
+    }
+
+    private async Task BrowseConnectFileAsync()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(
+            new Avalonia.Platform.Storage.FilePickerOpenOptions
+            {
+                Title = "Select Existing Database File",
+                AllowMultiple = false,
+                FileTypeFilter = new[]
+                {
+                    new Avalonia.Platform.Storage.FilePickerFileType("SQLite Database")
+                        { Patterns = new[] { "*.db" } }
+                }
+            });
+
+        if (files.Count > 0)
+            DbConnectPathBox.Text = files[0].Path.LocalPath;
+    }
+
+    private void ConnectDatabase()
+    {
+        DbStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+        DbStatusLabel.Text = string.Empty;
+
+        var path = DbConnectPathBox.Text?.Trim();
+        if (string.IsNullOrEmpty(path)) { DbStatusLabel.Text = "Choose a database file first."; return; }
+        if (!System.IO.File.Exists(path)) { DbStatusLabel.Text = "File not found or not accessible."; return; }
+
+        try
+        {
+            DatabaseInitializer.InitializeAtPath(path);
+            DatabaseLocationService.SetConfiguredPath(path);
+            CurrentDbPathLabel.Text   = path;
+            PointerFilePathLabel.Text = DatabaseLocationService.GetActivePointerFilePath();
+            DbConnectPathBox.Text     = string.Empty;
+            DbStatusLabel.Foreground  = Avalonia.Media.Brushes.DarkGreen;
+            DbStatusLabel.Text = $"Connected. Restart the app to use the new database.";
+        }
+        catch (System.Exception ex)
+        {
+            DbStatusLabel.Text = $"Error connecting: {ex.Message}";
+        }
     }
 
     private async Task BrowseStorageFolderAsync()

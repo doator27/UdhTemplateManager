@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -14,61 +13,60 @@ using HardwareTemplateBuilder.Core.Repositories;
 namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
-/// Per-manufacturer bulk hardware entry screen.
-/// The user adds hardware item groups (description + model# + template#) and then one or
-/// more callout rows per group (custom label + per-callout remarks).
-/// Navigates back to <see cref="BulkManufacturerSessionView"/> on Back, auto-saving the draft.
+/// Per-manufacturer bulk hardware entry view. Displays item cards for a single
+/// manufacturer — no manufacturer picker is shown. Each item supports multiple
+/// custom labels, each of which becomes a distinct <see cref="JobHardware"/> line item.
 /// </summary>
 public partial class BulkHardwareEntryView : UserControl
 {
     private readonly int _jobId;
     private readonly int _manufacturerId;
     private Manufacturer? _manufacturer;
-
     private List<Description> _allDescriptions = new();
-    private List<DescriptionComboItem> _allDescComboItems = new();
+    private List<DescriptionComboItem> _descComboItems = new();
+
+    /// <summary>In-memory item with its matched state and UI restore callback.</summary>
+    private sealed class ItemEntry
+    {
+        public int? DescriptionId { get; set; }
+
+        public Description? Description { get; set; }
+
+        public string ModelNumber { get; set; } = string.Empty;
+
+        public HardwareItem? MatchedItem { get; set; }
+
+        /// <summary>Label rows; always contains at least one entry.</summary>
+        public List<LabelEntry> Labels { get; } = new();
+
+        /// <summary>Callback to update all UI controls from model state after restore.</summary>
+        public Action? RestoreUI { get; set; }
+
+        /// <summary>The card border element in the scroll panel.</summary>
+        public Border Card { get; set; } = null!;
+    }
+
+    private sealed class LabelEntry
+    {
+        public string CustomLabel { get; set; } = string.Empty;
+
+        public string? Remarks { get; set; }
+
+        /// <summary>Removes this label from the UI panel; set after the row is built.</summary>
+        public Action? RemoveFromUI { get; set; }
+    }
+
+    private readonly List<ItemEntry> _items = new();
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event Action<string>? NavigationRequested;
 
-    // ── Group model ───────────────────────────────────────────────────────────
-
-    private sealed class HwItemGroup
-    {
-        public Description? SelectedDescription { get; set; }
-        public string ModelNumber { get; set; } = "";
-        public string? TemplateNumber { get; set; }
-        public HardwareItem? MatchedItem { get; set; }
-        public List<CalloutRow> Callouts { get; } = new();
-        public StackPanel CalloutsPanel { get; set; } = null!;
-        public Border GroupBorder { get; set; } = null!;
-        public TextBlock MatchLabel { get; set; } = null!;
-
-        // UI controls we need to write back to on restore
-        public TextBox? ModelBox { get; set; }
-        public TextBox? TemplateBox { get; set; }
-        public TextBlock? DescLabel { get; set; }
-    }
-
-    private sealed class CalloutRow
-    {
-        public string? Label { get; set; }
-        public string? CalloutRemarks { get; set; }
-        // UI controls for restore
-        public TextBox? LabelBox { get; set; }
-        public TextBox? RemarksBox { get; set; }
-    }
-
-    private readonly List<HwItemGroup> _groups = new();
-
-    /// <summary>
-    /// Initializes the entry view scoped to a single manufacturer.
-    /// </summary>
-    /// <param name="jobId">The job being built.</param>
-    /// <param name="manufacturerId">The manufacturer whose hardware is being entered.</param>
+    /// <summary>Initializes the view for the given job and manufacturer.</summary>
+    /// <param name="jobId">Job being edited.</param>
+    /// <param name="manufacturerId">The single manufacturer whose items are shown.</param>
     public BulkHardwareEntryView(int jobId, int manufacturerId)
     {
-        _jobId          = jobId;
+        _jobId = jobId;
         _manufacturerId = manufacturerId;
         InitializeComponent();
         Loaded += (_, _) => Initialize();
@@ -77,35 +75,39 @@ public partial class BulkHardwareEntryView : UserControl
     private void Initialize()
     {
         using var ctx = DatabaseInitializer.CreateContext();
-        _manufacturer        = ctx.Manufacturers.Find(_manufacturerId);
-        _allDescriptions     = new DescriptionRepository(ctx).GetAll().ToList();
-        _allDescComboItems   = DescriptionHelper.BuildComboItems(_allDescriptions);
+        _manufacturer = new ManufacturerRepository(ctx).GetById(_manufacturerId);
+        _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
+        _descComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
 
-        TitleLabel.Text = $"Bulk Entry — {_manufacturer?.ManufacturerName ?? "Unknown"}";
+        HeaderLabel.Text = _manufacturer != null
+            ? $"{_manufacturer.ManufacturerName} — Items"
+            : "Items";
 
-        BackButton.Click    += (_, _) => { SaveDraft(); NavigationRequested?.Invoke($"BulkManufacturerSession:{_jobId}"); };
-        AddItemButton.Click += (_, _) => AddItemGroup();
+        BackButton.Click += (_, _) =>
+        {
+            SaveDraft();
+            NavigationRequested?.Invoke($"BulkJobHub:{_jobId}");
+        };
+        SaveButton.Click += (_, _) =>
+        {
+            SaveDraft();
+            StatusLabel.Text = "Saved.";
+        };
+        AddItemButton.Click += (_, _) => AddItem(null);
 
-        if (!RestoreDraft())
-            AddItemGroup();
+        if (!RestoreFromDraft())
+        {
+            AddItem(null);
+        }
     }
 
-    // ── Group building ────────────────────────────────────────────────────────
-
-    /// <summary>Appends a new hardware-item group (with one blank callout) to the panel.</summary>
-    private void AddItemGroup()
+    /// <summary>Appends a new item card to the panel, optionally pre-populated from a draft item.</summary>
+    private void AddItem(BulkDraftItem? draft)
     {
-        var group = new HwItemGroup();
-        _groups.Add(group);
+        var entry = new ItemEntry();
+        _items.Add(entry);
 
-        // ── Top row: Description | Model # | Template # | Match | Remove ──────
-
-        var descSearchBox = new TextBox
-        {
-            Watermark = "Search descriptions…",
-            FontSize = 11,
-            Margin = new Avalonia.Thickness(0, 0, 0, 2)
-        };
+        var descSearchBox = new TextBox { Watermark = "Search descriptions…", FontSize = 11 };
         var descMatchList = new ListBox { MaxHeight = 80, IsVisible = false };
         descMatchList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
         var descLabel = new TextBlock
@@ -115,409 +117,408 @@ public partial class BulkHardwareEntryView : UserControl
             FontSize = 10,
             TextWrapping = TextWrapping.Wrap
         };
-        group.DescLabel = descLabel;
-        var descPickBtn = new Button { Content = "⋯", FontSize = 10, Padding = new Avalonia.Thickness(4, 1) };
-        var descNewBtn  = new Button { Content = "+", FontSize = 10, Padding = new Avalonia.Thickness(4, 1) };
-        var descBtns    = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new Avalonia.Thickness(0, 2, 0, 0) };
-        descBtns.Children.Add(descPickBtn);
-        descBtns.Children.Add(descNewBtn);
-        var descStack = new StackPanel { Orientation = Orientation.Vertical, Spacing = 2, Margin = new Avalonia.Thickness(0, 0, 8, 0) };
+        var pickTreeBtn = new Button { Content = "⋯ Tree", FontSize = 10, Padding = new Avalonia.Thickness(4, 1) };
+        var newDescBtn = new Button { Content = "+ New", FontSize = 10, Padding = new Avalonia.Thickness(4, 1) };
+        var descBtnRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 4,
+            Margin = new Avalonia.Thickness(0, 2, 0, 0)
+        };
+        descBtnRow.Children.Add(pickTreeBtn);
+        descBtnRow.Children.Add(newDescBtn);
+        var descStack = new StackPanel { Spacing = 2 };
         descStack.Children.Add(descSearchBox);
         descStack.Children.Add(descMatchList);
         descStack.Children.Add(descLabel);
-        descStack.Children.Add(descBtns);
+        descStack.Children.Add(descBtnRow);
 
         var modelCombo = new ComboBox
         {
             IsEditable = true,
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Avalonia.Thickness(0, 0, 8, 0)
+            VerticalAlignment = VerticalAlignment.Top
         };
         modelCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
-
-        var tplBox = new TextBox
-        {
-            Watermark = "e.g. AL-123",
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Avalonia.Thickness(0, 0, 8, 0)
-        };
-        group.TemplateBox = tplBox;
 
         var matchLabel = new TextBlock
         {
             Text = "—",
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Avalonia.Thickness(4, 4, 8, 0),
             FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Top,
+            Foreground = Brushes.Gray,
             TextWrapping = TextWrapping.Wrap
         };
-        group.MatchLabel = matchLabel;
 
-        var removeGroupBtn = new Button
+        var removeItemBtn = new Button
         {
-            Content = "✕ Remove",
+            Content = "× Remove",
             FontSize = 10,
-            Padding = new Avalonia.Thickness(4, 1),
             Foreground = Brushes.DarkRed,
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Avalonia.Thickness(0, 0, 0, 0)
+            Padding = new Avalonia.Thickness(6, 2)
         };
 
-        var topGrid = new Grid
+        var topRow = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("260,180,140,80,Auto"),
-            Margin = new Avalonia.Thickness(0, 0, 0, 6)
+            ColumnDefinitions = new ColumnDefinitions("250,200,80,Auto"),
+            Margin = new Avalonia.Thickness(0, 0, 0, 8)
         };
-        Grid.SetColumn(descStack,      0);
-        Grid.SetColumn(modelCombo,     1);
-        Grid.SetColumn(tplBox,         2);
-        Grid.SetColumn(matchLabel,     3);
-        Grid.SetColumn(removeGroupBtn, 4);
-        topGrid.Children.Add(descStack);
-        topGrid.Children.Add(modelCombo);
-        topGrid.Children.Add(tplBox);
-        topGrid.Children.Add(matchLabel);
-        topGrid.Children.Add(removeGroupBtn);
+        topRow.Children.Add(descStack);
+        Grid.SetColumn(modelCombo, 1);
+        topRow.Children.Add(modelCombo);
+        Grid.SetColumn(matchLabel, 2);
+        topRow.Children.Add(matchLabel);
+        Grid.SetColumn(removeItemBtn, 3);
+        topRow.Children.Add(removeItemBtn);
 
-        // ── Callout sub-section ────────────────────────────────────────────────
-
-        var calloutHeader = new Grid
+        var labelsPanel = new StackPanel { Spacing = 4, Margin = new Avalonia.Thickness(0, 4, 0, 0) };
+        var labelsHeader = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        labelsHeader.Children.Add(new TextBlock
         {
-            ColumnDefinitions = new ColumnDefinitions("*,*,28"),
-            Margin = new Avalonia.Thickness(0, 4, 0, 2)
-        };
-        calloutHeader.Children.Add(new TextBlock { Text = "Custom Label", FontSize = 10, FontWeight = FontWeight.SemiBold, Foreground = Brushes.DimGray, Margin = new Avalonia.Thickness(2, 0) });
-        var calloutRemarksHeader = new TextBlock { Text = "Callout Remarks", FontSize = 10, FontWeight = FontWeight.SemiBold, Foreground = Brushes.DimGray, Margin = new Avalonia.Thickness(2, 0) };
-        Grid.SetColumn(calloutRemarksHeader, 1);
-        calloutHeader.Children.Add(calloutRemarksHeader);
-
-        var calloutsPanel = new StackPanel();
-        group.CalloutsPanel = calloutsPanel;
-
-        var addCalloutBtn = new Button
+            Text = "Labels:",
+            FontWeight = FontWeight.SemiBold,
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        var addLabelBtn = new Button
         {
-            Content = "+ Add Callout",
+            Content = "+ Add Label",
             FontSize = 10,
-            Padding = new Avalonia.Thickness(6, 2),
-            Margin = new Avalonia.Thickness(0, 4, 0, 0)
+            Padding = new Avalonia.Thickness(6, 2)
         };
-        addCalloutBtn.Click += (_, _) => AddCalloutRow(group);
+        labelsHeader.Children.Add(addLabelBtn);
+        labelsPanel.Children.Add(labelsHeader);
 
-        var groupContent = new StackPanel { Margin = new Avalonia.Thickness(4) };
-        groupContent.Children.Add(topGrid);
-        groupContent.Children.Add(calloutHeader);
-        groupContent.Children.Add(calloutsPanel);
-        groupContent.Children.Add(addCalloutBtn);
+        var cardContent = new StackPanel();
+        cardContent.Children.Add(topRow);
+        cardContent.Children.Add(labelsPanel);
 
-        var groupBorder = new Border
+        var card = new Border
         {
             BorderBrush = Brushes.Gray,
             BorderThickness = new Avalonia.Thickness(1),
             CornerRadius = new Avalonia.CornerRadius(2),
-            Margin = new Avalonia.Thickness(0, 0, 0, 10),
-            Padding = new Avalonia.Thickness(8, 6),
-            Child = groupContent
+            Padding = new Avalonia.Thickness(10, 8),
+            Child = cardContent
         };
-        group.GroupBorder = groupBorder;
-        GroupsPanel.Children.Add(groupBorder);
-
-        // Add first callout row automatically
-        AddCalloutRow(group);
-
-        // ── Events ────────────────────────────────────────────────────────────
+        entry.Card = card;
+        ItemsPanel.Children.Add(card);
 
         void RefreshModelItems()
         {
+            if (_manufacturer == null && entry.Description == null)
+            {
+                modelCombo.ItemsSource = null;
+                return;
+            }
+
             using var ctx = DatabaseInitializer.CreateContext();
-            var q = ctx.HardwareItems.Where(h => h.ManufacturerId == _manufacturerId);
-            if (group.SelectedDescription != null)
-                q = q.Where(h => h.DescriptionId == group.SelectedDescription.Id);
+            var q = ctx.HardwareItems.AsQueryable()
+                .Where(h => h.ManufacturerId == _manufacturerId);
+
+            if (entry.Description != null)
+            {
+                q = q.Where(h => h.DescriptionId == entry.Description.Id);
+            }
+
             modelCombo.ItemsSource = q.OrderBy(h => h.ModelNumber).ToList();
         }
 
-        void SyncMatchState()
+        void SyncMatch()
         {
-            var text = modelCombo.Text?.Trim() ?? "";
-            group.ModelNumber = text;
+            var text = modelCombo.Text?.Trim() ?? string.Empty;
+            entry.ModelNumber = text;
             if (string.IsNullOrWhiteSpace(text))
             {
-                group.MatchedItem = null;
+                entry.MatchedItem = null;
             }
             else if (modelCombo.SelectedItem is HardwareItem h && h.ModelNumber == text)
             {
-                group.MatchedItem = h;
+                entry.MatchedItem = h;
             }
             else
             {
-                using var ctx = DatabaseInitializer.CreateContext();
-                group.MatchedItem = ctx.HardwareItems.FirstOrDefault(item =>
-                    item.ManufacturerId == _manufacturerId &&
-                    item.ModelNumber    == text &&
-                    (group.SelectedDescription == null || item.DescriptionId == group.SelectedDescription.Id));
+                entry.MatchedItem = null;
+                if (entry.Description != null)
+                {
+                    using var ctx = DatabaseInitializer.CreateContext();
+                    entry.MatchedItem = ctx.HardwareItems.FirstOrDefault(i =>
+                        i.ManufacturerId == _manufacturerId &&
+                        i.DescriptionId == entry.Description.Id &&
+                        i.ModelNumber == text);
+                }
             }
-            matchLabel.Text       = group.MatchedItem != null ? "✓ Matched" : (string.IsNullOrWhiteSpace(text) ? "—" : "(new)");
-            matchLabel.Foreground = group.MatchedItem != null ? Brushes.DarkGreen : Brushes.Gray;
+
+            UpdateMatchLabel(matchLabel, entry.MatchedItem, text);
         }
 
         void SelectDescription(Description? desc)
         {
-            group.SelectedDescription = desc;
-            descLabel.Text       = desc != null ? BuildDescPath(desc) : "(none)";
+            entry.Description = desc;
+            entry.DescriptionId = desc?.Id;
+            descLabel.Text = desc != null ? BuildDescPath(desc) : "(none)";
             descLabel.Foreground = desc != null ? Brushes.Black : Brushes.Gray;
-            descSearchBox.Text   = "";
+            descSearchBox.Text = string.Empty;
             descMatchList.IsVisible = false;
             RefreshModelItems();
-            SyncMatchState();
+            SyncMatch();
         }
 
         descSearchBox.TextChanged += (_, _) =>
         {
-            var q = descSearchBox.Text?.Trim() ?? "";
-            if (string.IsNullOrEmpty(q)) { descMatchList.IsVisible = false; return; }
-            var matches = _allDescComboItems
+            var q = descSearchBox.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(q))
+            {
+                descMatchList.IsVisible = false;
+                return;
+            }
+
+            var hits = _descComboItems
                 .Where(d => d.DisplayText.Contains(q, StringComparison.OrdinalIgnoreCase))
-                .Take(8).ToList();
-            descMatchList.ItemsSource = matches;
-            descMatchList.IsVisible   = matches.Count > 0;
+                .Take(8)
+                .ToList();
+            descMatchList.ItemsSource = hits;
+            descMatchList.IsVisible = hits.Count > 0;
         };
         descMatchList.SelectionChanged += (_, _) =>
         {
             if (descMatchList.SelectedItem is DescriptionComboItem item)
+            {
                 SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == item.Id));
+            }
         };
-        descPickBtn.Click += async (_, _) =>
+        pickTreeBtn.Click += async (_, _) =>
         {
             var picked = await OpenDescriptionPickerAsync();
             if (picked.HasValue)
+            {
                 SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == picked.Value));
+            }
         };
-        descNewBtn.Click += (_, _) =>
+        newDescBtn.Click += (_, _) =>
         {
             var name = descSearchBox.Text?.Trim();
-            if (string.IsNullOrEmpty(name)) return;
+            if (string.IsNullOrEmpty(name))
+            {
+                return;
+            }
+
             using var ctx = DatabaseInitializer.CreateContext();
             var newDesc = new DescriptionRepository(ctx).Add(new Description { DescriptionText = name });
             RefreshDescriptions();
             SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == newDesc.Id));
         };
 
-        modelCombo.PropertyChanged += (_, e) => { if (e.Property == ComboBox.TextProperty) SyncMatchState(); };
-        modelCombo.SelectionChanged += (_, _) => SyncMatchState();
-
-        tplBox.TextChanged += (_, _) =>
-            group.TemplateNumber = string.IsNullOrWhiteSpace(tplBox.Text) ? null : tplBox.Text.Trim();
-
-        removeGroupBtn.Click += (_, _) =>
+        modelCombo.PropertyChanged += (_, e) =>
         {
-            _groups.Remove(group);
-            GroupsPanel.Children.Remove(groupBorder);
+            if (e.Property == ComboBox.TextProperty)
+            {
+                SyncMatch();
+            }
+        };
+        modelCombo.SelectionChanged += (_, _) => SyncMatch();
+
+        addLabelBtn.Click += (_, _) => AddLabelRow(entry, labelsPanel, null);
+
+        removeItemBtn.Click += (_, _) =>
+        {
+            _items.Remove(entry);
+            ItemsPanel.Children.Remove(card);
         };
 
-        // Store model combo reference for restore
-        group.ModelBox = new TextBox(); // placeholder — we'll write directly to modelCombo.Text
-        // We need a reference to modelCombo for restore; store it via a closure capture
-        // by using a small helper on the group object.
-        _groupModelComboMap[group] = modelCombo;
+        entry.RestoreUI = () =>
+        {
+            modelCombo.Text = entry.ModelNumber;
+            SelectDescription(entry.Description);
+        };
+
+        if (draft != null)
+        {
+            if (draft.DescriptionId.HasValue)
+            {
+                entry.Description = _allDescriptions.FirstOrDefault(d => d.Id == draft.DescriptionId.Value);
+            }
+
+            entry.DescriptionId = draft.DescriptionId;
+            entry.ModelNumber = draft.ModelNumber;
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => entry.RestoreUI?.Invoke());
+
+            foreach (var lbl in draft.Labels)
+            {
+                AddLabelRow(entry, labelsPanel, lbl);
+            }
+
+            if (draft.Labels.Count == 0)
+            {
+                AddLabelRow(entry, labelsPanel, null);
+            }
+        }
+        else
+        {
+            AddLabelRow(entry, labelsPanel, null);
+        }
     }
 
-    // Maps each group to its model ComboBox so restore can set the text.
-    private readonly Dictionary<HwItemGroup, ComboBox> _groupModelComboMap = new();
-
-    // ── Callout row ───────────────────────────────────────────────────────────
-
-    private void AddCalloutRow(HwItemGroup group, string? label = null, string? remarks = null)
+    private void AddLabelRow(ItemEntry item, StackPanel labelsPanel, BulkDraftLabel? draft)
     {
-        var callout = new CalloutRow { Label = label, CalloutRemarks = remarks };
-        group.Callouts.Add(callout);
-
-        var labelBox = new TextBox
+        var label = new LabelEntry
         {
-            Text = label ?? "",
+            CustomLabel = draft?.CustomLabel ?? string.Empty,
+            Remarks = draft?.Remarks
+        };
+        item.Labels.Add(label);
+
+        var customBox = new TextBox
+        {
             Watermark = "Custom label (optional)",
-            Margin = new Avalonia.Thickness(0, 0, 8, 0),
-            TextWrapping = TextWrapping.Wrap
+            MinWidth = 160,
+            Text = label.CustomLabel
         };
         var remarksBox = new TextBox
         {
-            Text = remarks ?? "",
-            Watermark = "Callout remarks (optional)",
-            Margin = new Avalonia.Thickness(0, 0, 8, 0),
-            TextWrapping = TextWrapping.Wrap
+            Watermark = "Remarks (optional)",
+            MinWidth = 140,
+            Text = label.Remarks ?? string.Empty
         };
         var removeBtn = new Button
         {
             Content = "×",
-            Width = 28,
+            Width = 24,
             HorizontalContentAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Top
+            FontSize = 10,
+            IsVisible = item.Labels.Count > 1
         };
 
-        var grid = new Grid
+        var row = new StackPanel
         {
-            ColumnDefinitions = new ColumnDefinitions("*,*,28"),
-            Margin = new Avalonia.Thickness(0, 0, 0, 4)
+            Orientation = Orientation.Horizontal,
+            Spacing = 6,
+            Margin = new Avalonia.Thickness(0, 2, 0, 0)
         };
-        Grid.SetColumn(labelBox,   0);
-        Grid.SetColumn(remarksBox, 1);
-        Grid.SetColumn(removeBtn,  2);
-        grid.Children.Add(labelBox);
-        grid.Children.Add(remarksBox);
-        grid.Children.Add(removeBtn);
-        group.CalloutsPanel.Children.Add(grid);
+        row.Children.Add(customBox);
+        row.Children.Add(remarksBox);
+        row.Children.Add(removeBtn);
+        labelsPanel.Children.Add(row);
 
-        callout.LabelBox   = labelBox;
-        callout.RemarksBox = remarksBox;
-
-        labelBox.TextChanged   += (_, _) => callout.Label          = string.IsNullOrWhiteSpace(labelBox.Text) ? null : labelBox.Text.Trim();
-        remarksBox.TextChanged += (_, _) => callout.CalloutRemarks = string.IsNullOrWhiteSpace(remarksBox.Text) ? null : remarksBox.Text.Trim();
-
-        removeBtn.Click += (_, _) =>
+        label.RemoveFromUI = () =>
         {
-            group.Callouts.Remove(callout);
-            group.CalloutsPanel.Children.Remove(grid);
-            // Always keep at least one callout row per group.
-            if (group.Callouts.Count == 0)
-                AddCalloutRow(group);
+            item.Labels.Remove(label);
+            labelsPanel.Children.Remove(row);
+            UpdateLabelRemoveButtons(item, labelsPanel);
         };
+
+        customBox.TextChanged += (_, _) => label.CustomLabel = customBox.Text?.Trim() ?? string.Empty;
+        remarksBox.TextChanged += (_, _) =>
+            label.Remarks = string.IsNullOrWhiteSpace(remarksBox.Text) ? null : remarksBox.Text.Trim();
+        removeBtn.Click += (_, _) => label.RemoveFromUI?.Invoke();
+
+        UpdateLabelRemoveButtons(item, labelsPanel);
     }
 
-    // ── Draft persistence ─────────────────────────────────────────────────────
+    private static void UpdateLabelRemoveButtons(ItemEntry item, StackPanel labelsPanel)
+    {
+        for (int i = 1; i < labelsPanel.Children.Count; i++)
+        {
+            if (labelsPanel.Children[i] is StackPanel rowPanel && rowPanel.Children.LastOrDefault() is Button btn)
+            {
+                btn.IsVisible = item.Labels.Count > 1;
+            }
+        }
+    }
 
     private void SaveDraft()
     {
-        try
-        {
-            using var ctx = DatabaseInitializer.CreateContext();
-            var draft = new BulkAddDraftRepository(ctx).GetByJob(_jobId);
-            BulkSessionDraft session;
-            try
-            {
-                session = (draft != null && !string.IsNullOrWhiteSpace(draft.DraftJson) && draft.DraftJson != "[]")
-                    ? JsonSerializer.Deserialize<BulkSessionDraft>(draft.DraftJson) ?? new BulkSessionDraft()
-                    : new BulkSessionDraft();
-            }
-            catch { session = new BulkSessionDraft(); }
+        var draft = BulkDraftService.Load(_jobId);
+        draft.Items.RemoveAll(i => i.ManufacturerId == _manufacturerId);
 
-            // Replace this manufacturer's section.
-            session.Manufacturers.RemoveAll(m => m.ManufacturerId == _manufacturerId);
-            session.Manufacturers.Add(new BulkSessionMfr
+        foreach (var item in _items.Where(i => !string.IsNullOrWhiteSpace(i.ModelNumber)))
+        {
+            draft.Items.Add(new BulkDraftItem
             {
-                ManufacturerId   = _manufacturerId,
-                ManufacturerName = _manufacturer?.ManufacturerName ?? "",
-                Groups           = _groups
-                    .Where(g => g.SelectedDescription != null || !string.IsNullOrWhiteSpace(g.ModelNumber))
-                    .Select(g => new BulkSessionGroup
-                    {
-                        DescriptionId  = g.SelectedDescription?.Id,
-                        ModelNumber    = g.ModelNumber,
-                        TemplateNumber = g.TemplateNumber,
-                        Callouts       = g.Callouts
-                            .Select(c => new BulkSessionCallout
-                            {
-                                Label          = c.Label,
-                                CalloutRemarks = c.CalloutRemarks
-                            }).ToList()
-                    }).ToList()
+                ManufacturerId = _manufacturerId,
+                DescriptionId = item.DescriptionId,
+                ModelNumber = item.ModelNumber,
+                Labels = item.Labels.Select(l => new BulkDraftLabel
+                {
+                    CustomLabel = l.CustomLabel,
+                    Remarks = l.Remarks
+                }).ToList()
             });
-
-            new BulkAddDraftRepository(ctx).Upsert(_jobId, JsonSerializer.Serialize(session));
         }
-        catch { }
+
+        BulkDraftService.Save(_jobId, draft);
     }
 
-    private bool RestoreDraft()
+    private bool RestoreFromDraft()
     {
-        try
+        var draft = BulkDraftService.Load(_jobId);
+        var myItems = draft.Items.Where(i => i.ManufacturerId == _manufacturerId).ToList();
+        if (myItems.Count == 0)
         {
-            using var ctx = DatabaseInitializer.CreateContext();
-            var draft = new BulkAddDraftRepository(ctx).GetByJob(_jobId);
-            if (draft == null || string.IsNullOrWhiteSpace(draft.DraftJson) || draft.DraftJson == "[]")
-                return false;
-
-            var session = JsonSerializer.Deserialize<BulkSessionDraft>(draft.DraftJson);
-            var mfrSection = session?.Manufacturers.FirstOrDefault(m => m.ManufacturerId == _manufacturerId);
-            if (mfrSection == null || mfrSection.Groups.Count == 0) return false;
-
-            var descLookup = _allDescriptions.ToDictionary(d => d.Id);
-
-            foreach (var sg in mfrSection.Groups)
-            {
-                AddItemGroup();
-                var group = _groups.Last();
-
-                if (sg.DescriptionId.HasValue && descLookup.TryGetValue(sg.DescriptionId.Value, out var desc))
-                {
-                    group.SelectedDescription = desc;
-                    if (group.DescLabel != null)
-                    {
-                        group.DescLabel.Text       = BuildDescPath(desc);
-                        group.DescLabel.Foreground = Brushes.Black;
-                    }
-                }
-
-                if (!string.IsNullOrWhiteSpace(sg.ModelNumber))
-                {
-                    group.ModelNumber = sg.ModelNumber;
-                    if (_groupModelComboMap.TryGetValue(group, out var modelCombo))
-                        modelCombo.Text = sg.ModelNumber;
-                }
-
-                if (!string.IsNullOrWhiteSpace(sg.TemplateNumber))
-                {
-                    group.TemplateNumber = sg.TemplateNumber;
-                    if (group.TemplateBox != null)
-                        group.TemplateBox.Text = sg.TemplateNumber;
-                }
-
-                // Replace the default blank callout with restored ones.
-                group.Callouts.Clear();
-                group.CalloutsPanel.Children.Clear();
-
-                if (sg.Callouts.Count > 0)
-                {
-                    foreach (var sc in sg.Callouts)
-                        AddCalloutRow(group, sc.Label, sc.CalloutRemarks);
-                }
-                else
-                {
-                    AddCalloutRow(group);
-                }
-            }
-
-            StatusLabel.Text = "Draft restored.";
-            return true;
+            return false;
         }
-        catch { return false; }
+
+        foreach (var item in myItems)
+        {
+            AddItem(item);
+        }
+
+        StatusLabel.Text = "Draft restored.";
+        return true;
     }
 
-    // ── Utilities ─────────────────────────────────────────────────────────────
+    private static void UpdateMatchLabel(TextBlock label, HardwareItem? matched, string model)
+    {
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            label.Text = "—";
+            label.Foreground = Brushes.Gray;
+        }
+        else if (matched != null)
+        {
+            label.Text = "✓ Matched";
+            label.Foreground = Brushes.DarkGreen;
+        }
+        else
+        {
+            label.Text = "(new)";
+            label.Foreground = Brushes.Gray;
+        }
+    }
 
     private void RefreshDescriptions()
     {
         using var ctx = DatabaseInitializer.CreateContext();
-        _allDescriptions   = new DescriptionRepository(ctx).GetAll().ToList();
-        _allDescComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
+        _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
+        _descComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
     }
 
     private async Task<int?> OpenDescriptionPickerAsync()
     {
         var window = TopLevel.GetTopLevel(this) as Window;
-        if (window == null) return null;
+        if (window == null)
+        {
+            return null;
+        }
+
         var picker = new DescriptionPickerWindow(_allDescriptions);
         return await picker.ShowDialog<int?>(window);
     }
 
     private string BuildDescPath(Description target)
     {
-        var lookup  = _allDescriptions.ToDictionary(d => d.Id);
-        var parts   = new List<string>();
+        var lookup = _allDescriptions.ToDictionary(d => d.Id);
+        var parts = new List<string>();
         var current = target;
         while (current != null)
         {
             parts.Insert(0, current.DescriptionText);
-            current = current.ParentId.HasValue && lookup.TryGetValue(current.ParentId.Value, out var p) ? p : null;
+            current = current.ParentId.HasValue && lookup.TryGetValue(current.ParentId.Value, out var parent)
+                ? parent
+                : null;
         }
+
         return string.Join(" / ", parts);
     }
 }

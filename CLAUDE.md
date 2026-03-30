@@ -37,12 +37,16 @@ dotnet ef database update --project HardwareTemplateBuilder.Core        # Apply 
 
 ### Data Layer (Core/Data/ and Core/Models/)
 
-- **AppDbContext** manages 13 SQLite tables via EF Core
-- **DatabaseInitializer** handles creation, migration, and post-migration schema patches on startup
+- **AppDbContext** manages 16 SQLite tables via EF Core
+- **DatabaseInitializer** handles creation, migration, and post-migration schema patches (`EnsureSchemaPatches()`) on startup; patches are idempotent and used for retroactive schema fixes
+- **DatabaseInitializer.CreateContext()** is the standard way to obtain a db context — contexts are created per-operation, not shared
 - **DatabaseLocationService** manages the configurable database file path (default: `%AppData%/HardwareTemplateBuilder/hardware_templates.db`)
+- **MachineIdentityService** generates a stable machine UUID stored in `UserProfile.MachineId`, enabling auto-selection of the matching profile on login
 - **Generic `IRepository<T>`** with `GetById`, `GetAll`, `Add`, `Update`, `Delete`; `IHardwareItemRepository` adds `Search(manufacturer, description, modelNumber)` returning results sorted by `Frequency` descending
 - All `Add()` methods include duplicate detection — return existing record if already present
 - `JobTemplateSnapshot` records are written once at PDF generation and **never modified**
+- `JobRelease` records model addenda/revisions to a job; `JobHardware` rows can reference a `JobRelease` via nullable FK (SetNull on release delete)
+- **App configuration is stored in the `AppSetting` table** (key-value), not in appsettings.json. Keys include `TemplateStorageLocation`, `LastRefreshTimestamp`, and SMTP settings seeded by `DatabaseInitializer`
 
 ### Key Services (Core/Services/)
 
@@ -66,16 +70,24 @@ Orchestrated by `PdfAssemblyService`, which accepts an `AssemblyRequest` and exe
 
 ### UI (App/)
 
+- **Architecture is code-behind, not MVVM** — views directly instantiate repositories and call services; there are no ViewModels or data-binding commands
 - `MainWindow` hosts a persistent menu bar (File, Jobs, Maintenance, Admin) and a content area
 - `ViewRouter` swaps child `UserControl` views for navigation — 17 views total
-- `SessionService` (static) holds the active `UserProfile` for the session lifetime
-- On first launch with no `UserProfile` records, `ProfilePickerDialog` prompts creation before proceeding
+- `SessionService` (static) holds the active `UserProfile` for the session lifetime; `BulkAddSession` (static) holds transient bulk-entry state
+- On first launch with no `UserProfile` records, `ProfilePickerDialog` prompts creation before proceeding; `DatabaseSetupDialog` handles unreachable DB paths at startup
 - Visual style: `#C0C0C0` background, beveled buttons, Tahoma/Arial fonts (Windows 98 aesthetic) via Avalonia `ControlTheme`/`Style`
 - Standard search pattern throughout: Manufacturer/Description/ModelNumber comboboxes → listbox sorted by `Frequency` desc
+- `DescriptionPickerWindow` is a modal window (not a UserControl) used wherever a `Description` tree selection is needed
 
 ### Description Hierarchy
 
 `Description` is a self-referential tree used for categorizing hardware items. `DescriptionPathService` resolves full paths. The hierarchy is also how `WeightTemplateSortStrategy` groups templates for sorting.
+
+## Releases
+
+See `RELEASING.md`. Releases are produced by the GitHub Actions workflow in `.github/workflows/release.yml` — triggered by a `v*` tag push or manual dispatch. The artifact is a self-contained single-file Windows x64 executable zipped as `HardwareTemplateBuilder-{VERSION}-win-x64.zip`.
+
+The `HardwareTemplateBuilder.SmokeTest` console project runs full CRUD against all entity types to validate schema and relationships — run it manually against a real database when testing migrations or repository changes.
 
 ## Code Quality Requirements
 

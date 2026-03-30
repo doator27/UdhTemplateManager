@@ -140,10 +140,34 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Parameterized route: "BulkHardwareEntry:{jobId}:{manufacturerId}"
+        // Parameterized route: "BulkManufacturerSelection:{jobId}"
+        if (viewName.StartsWith("BulkManufacturerSelection:") &&
+            int.TryParse(viewName["BulkManufacturerSelection:".Length..], out var bmsJobId))
+        {
+            var sel = new Views.BulkManufacturerSelectionView(bmsJobId);
+            sel.NavigationRequested += NavigateTo;
+            ContentArea.Content = sel;
+            var uBms = SessionService.ActiveUserProfile?.UserName;
+            StatusText.Text = $"Bulk Add — Select Manufacturers{(uBms != null ? $"  —  {uBms}" : string.Empty)}";
+            return;
+        }
+
+        // Parameterized route: "BulkJobHub:{jobId}"
+        if (viewName.StartsWith("BulkJobHub:") &&
+            int.TryParse(viewName["BulkJobHub:".Length..], out var hubJobId))
+        {
+            var hub = new Views.BulkJobHubView(hubJobId);
+            hub.NavigationRequested += NavigateTo;
+            ContentArea.Content = hub;
+            var uHub = SessionService.ActiveUserProfile?.UserName;
+            StatusText.Text = $"Bulk Add — Hub{(uHub != null ? $"  —  {uHub}" : string.Empty)}";
+            return;
+        }
+
+        // Parameterized route: "BulkHardwareEntry:{jobId}:{mfrId}"
         if (viewName.StartsWith("BulkHardwareEntry:"))
         {
-            var parts = viewName.Substring("BulkHardwareEntry:".Length).Split(':');
+            var parts = viewName["BulkHardwareEntry:".Length..].Split(':');
             if (parts.Length == 2 &&
                 int.TryParse(parts[0], out var bulkJobId) &&
                 int.TryParse(parts[1], out var bulkMfrId))
@@ -151,8 +175,8 @@ public partial class MainWindow : Window
                 var bulk = new Views.BulkHardwareEntryView(bulkJobId, bulkMfrId);
                 bulk.NavigationRequested += NavigateTo;
                 ContentArea.Content = bulk;
-                var u2 = SessionService.ActiveUserProfile?.UserName;
-                StatusText.Text = $"Bulk Hardware Entry{(u2 != null ? $"  —  {u2}" : string.Empty)}";
+                var uBulk = SessionService.ActiveUserProfile?.UserName;
+                StatusText.Text = $"Bulk Add — Items{(uBulk != null ? $"  —  {uBulk}" : string.Empty)}";
                 return;
             }
         }

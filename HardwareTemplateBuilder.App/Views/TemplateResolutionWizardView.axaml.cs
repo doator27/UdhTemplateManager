@@ -72,9 +72,6 @@ public partial class TemplateResolutionWizardView : UserControl
 
     private void Navigate(int delta)
     {
-        // Capture custom label before leaving
-        SaveCustomLabel(_currentIndex);
-
         var next = _currentIndex + delta;
         if (next < 0 || next >= _rows.Count) return;
         ShowItem(next);
@@ -89,7 +86,27 @@ public partial class TemplateResolutionWizardView : UserControl
         var model   = row.ModelNumber;
         ItemHeaderLabel.Text = $"Item {index + 1} of {_rows.Count}  —  {mfrName}  {model}";
 
-        CustomLabelBox.Text = row.CustomLabel ?? "";
+        // Populate read-only labels display.
+        LabelsDisplayPanel.Children.Clear();
+        if (row.Labels.Count > 0)
+        {
+            NoLabelsHint.IsVisible = false;
+            foreach (var lbl in row.Labels)
+            {
+                var line = string.IsNullOrWhiteSpace(lbl.CustomLabel) ? "(blank label)" : lbl.CustomLabel;
+                if (!string.IsNullOrWhiteSpace(lbl.Remarks)) line += $"  —  {lbl.Remarks}";
+                LabelsDisplayPanel.Children.Add(new TextBlock
+                {
+                    Text      = $"• {line}",
+                    FontSize  = 11,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap
+                });
+            }
+        }
+        else
+        {
+            NoLabelsHint.IsVisible = true;
+        }
 
         PrevButton.IsEnabled  = index > 0;
         NextButton.IsVisible  = index < _rows.Count - 1;
@@ -244,8 +261,6 @@ public partial class TemplateResolutionWizardView : UserControl
 
     private async void OnFinish()
     {
-        SaveCustomLabel(_currentIndex);
-
         var skipped = new List<string>();
 
         using var ctx = DatabaseInitializer.CreateContext();
@@ -260,18 +275,11 @@ public partial class TemplateResolutionWizardView : UserControl
 
             if (row.MatchedItem != null)
             {
-                // Case A — matched; increment frequency, update remarks if provided
+                // Case A — matched; increment frequency
                 hwItemId = row.MatchedItem.Id;
                 var existing = ctx.HardwareItems.Find(hwItemId);
                 if (existing != null)
-                {
                     freqService.IncrementFrequency(existing);
-                    if (!string.IsNullOrWhiteSpace(row.Remarks))
-                    {
-                        existing.Remarks = row.Remarks;
-                        ctx.SaveChanges();
-                    }
-                }
             }
             else
             {
@@ -282,8 +290,7 @@ public partial class TemplateResolutionWizardView : UserControl
                     {
                         ManufacturerId = row.SelectedManufacturer!.Id,
                         DescriptionId  = row.SelectedDescription!.Id,
-                        ModelNumber    = row.ModelNumber,
-                        Remarks        = string.IsNullOrWhiteSpace(row.Remarks) ? null : row.Remarks
+                        ModelNumber    = row.ModelNumber
                     });
                     row.CreatedItem = newItem;
                 }
@@ -300,25 +307,36 @@ public partial class TemplateResolutionWizardView : UserControl
                 }
             }
 
-            // Duplicate check: same item + same custom label already in the job → skip.
-            var customLabel = string.IsNullOrWhiteSpace(row.CustomLabel) ? null : row.CustomLabel;
-            bool isDuplicate = ctx.JobHardware.Any(jh =>
-                jh.JobId             == _jobId  &&
-                jh.HardwareItemId    == hwItemId &&
-                jh.CustomDescription == customLabel);
+            // Create one JobHardware record per label. Skip any that already exist.
+            var labelsToSave = row.Labels.Count > 0
+                ? row.Labels
+                : new System.Collections.Generic.List<BulkHardwareLabel>
+                    { new() { CustomLabel = "", Remarks = null } };
 
-            if (isDuplicate)
+            foreach (var lbl in labelsToSave)
             {
-                skipped.Add(row.ModelNumber + (customLabel != null ? $" ({customLabel})" : string.Empty));
-                continue;
+                var customLabel = string.IsNullOrWhiteSpace(lbl.CustomLabel) ? null : lbl.CustomLabel;
+                var remarks     = string.IsNullOrWhiteSpace(lbl.Remarks)     ? null : lbl.Remarks;
+
+                bool isDuplicate = ctx.JobHardware.Any(jh =>
+                    jh.JobId             == _jobId &&
+                    jh.HardwareItemId    == hwItemId &&
+                    jh.CustomDescription == customLabel);
+
+                if (isDuplicate)
+                {
+                    skipped.Add(row.ModelNumber + (customLabel != null ? $" ({customLabel})" : string.Empty));
+                    continue;
+                }
+
+                jhRepo.Add(new JobHardware
+                {
+                    JobId             = _jobId,
+                    HardwareItemId    = hwItemId,
+                    CustomDescription = customLabel,
+                    Remarks           = remarks
+                });
             }
-
-            jhRepo.Add(new JobHardware
-            {
-                JobId             = _jobId,
-                HardwareItemId    = hwItemId,
-                CustomDescription = customLabel
-            });
         }
 
         if (skipped.Count > 0)
@@ -408,13 +426,6 @@ public partial class TemplateResolutionWizardView : UserControl
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-
-    private void SaveCustomLabel(int index)
-    {
-        if (index < 0 || index >= _rows.Count) return;
-        var text = CustomLabelBox.Text?.Trim();
-        _rows[index].CustomLabel = string.IsNullOrWhiteSpace(text) ? null : text;
-    }
 
     private async Task BrowseLocalFileAsync()
     {
