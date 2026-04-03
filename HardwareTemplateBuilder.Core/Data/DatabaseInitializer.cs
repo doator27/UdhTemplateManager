@@ -36,12 +36,22 @@ public static class DatabaseInitializer
         DatabaseLocationService.GetConfiguredPath() ?? GetDefaultPath();
 
     /// <summary>
+    /// Builds a SQLite connection string for <paramref name="dbPath"/>.
+    /// WAL journal mode and busy timeout are applied via PRAGMA in
+    /// <see cref="EnsureSchemaPatches"/> — <c>Microsoft.Data.Sqlite</c> does not accept
+    /// these as connection string keywords.
+    /// </summary>
+    private static string BuildConnectionString(string dbPath) =>
+        $"Data Source={dbPath}";
+
+    /// <summary>
     /// Creates a configured <see cref="AppDbContext"/> pointed at the active database file.
     /// </summary>
     public static AppDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlite($"Data Source={GetDatabasePath()}")
+            .UseSqlite(BuildConnectionString(GetDatabasePath()))
+            .AddInterceptors(new SqlitePragmaInterceptor())
             .Options;
         return new AppDbContext(options);
     }
@@ -68,7 +78,8 @@ public static class DatabaseInitializer
     public static void InitializeAtPath(string dbPath)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlite($"Data Source={dbPath}")
+            .UseSqlite(BuildConnectionString(dbPath))
+            .AddInterceptors(new SqlitePragmaInterceptor())
             .Options;
         using var context = new AppDbContext(options);
         context.Database.Migrate();
@@ -85,6 +96,21 @@ public static class DatabaseInitializer
         var conn = context.Database.GetDbConnection();
         if (conn.State != System.Data.ConnectionState.Open)
             conn.Open();
+
+        // Patch: Enable WAL journal mode for concurrent multi-user access.
+        // Idempotent — SQLite silently keeps WAL if already set.
+        using (var walCmd = conn.CreateCommand())
+        {
+            walCmd.CommandText = "PRAGMA journal_mode=WAL;";
+            walCmd.ExecuteNonQuery();
+        }
+
+        // Patch: 5-second busy timeout so concurrent writers queue rather than fail immediately.
+        using (var busyCmd = conn.CreateCommand())
+        {
+            busyCmd.CommandText = "PRAGMA busy_timeout=5000;";
+            busyCmd.ExecuteNonQuery();
+        }
 
         // Patch: CalloutRemarks on JobHardware (AddCalloutRemarks migration)
         if (!ColumnExists(conn, "JobHardware", "CalloutRemarks"))

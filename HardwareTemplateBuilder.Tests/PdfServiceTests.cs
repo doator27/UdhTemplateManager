@@ -1,3 +1,4 @@
+using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
 using HardwareTemplateBuilder.Core.Services.Pdf;
@@ -227,5 +228,47 @@ public class PdfServiceTests : IDisposable
 
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             _numberer.StampPageNumbers(source, skipPages: -1, output));
+    }
+
+    [Fact]
+    public void StampPageNumbers_FullBleedPage_PreservesPageCount()
+    {
+        // Arrange: a PDF whose single page has a full-bleed filled rectangle (simulating a
+        // scanned spec sheet where background image content covers the entire page).
+        var source = Path.Combine(_tempDir, "fullbleed.pdf");
+        using (var doc = new PdfDocument())
+        {
+            var page = doc.AddPage();
+            using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
+            gfx.DrawRectangle(XBrushes.LightGray, 0, 0, page.Width.Point, page.Height.Point);
+            doc.Save(source);
+        }
+
+        var output = Path.Combine(_tempDir, "fullbleed_numbered.pdf");
+        _numberer.StampPageNumbers(source, skipPages: 0, output);
+
+        Assert.Equal(1, GetPageCount(output));
+    }
+
+    [Fact]
+    public void StampPageNumbers_PageWithCropBox_DoesNotThrow()
+    {
+        // Arrange: a two-page PDF where the first page has a CropBox smaller than its MediaBox.
+        var source = CreateSamplePdf(2, "cropbox_source");
+        using (var doc = PdfReader.Open(source, PdfDocumentOpenMode.Modify))
+        {
+            var cropArr = new PdfArray(doc);
+            cropArr.Elements.Add(new PdfInteger(36));
+            cropArr.Elements.Add(new PdfInteger(36));
+            cropArr.Elements.Add(new PdfInteger(558));
+            cropArr.Elements.Add(new PdfInteger(756));
+            doc.Pages[0].Elements["/CropBox"] = cropArr;
+            doc.Save(source);
+        }
+
+        var output = Path.Combine(_tempDir, "cropbox_numbered.pdf");
+        _numberer.StampPageNumbers(source, skipPages: 0, output);
+
+        Assert.Equal(2, GetPageCount(output));
     }
 }

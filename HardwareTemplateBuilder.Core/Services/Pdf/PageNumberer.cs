@@ -40,7 +40,16 @@ public class PageNumberer
             if (i < skipPages)
                 continue;
 
-            StampNumber(page, font, pageNumber);
+            try
+            {
+                StampNumber(page, font, pageNumber);
+            }
+            catch (Exception)
+            {
+                // A single unreadable page should not abort stamping of the rest of the package.
+                // The page is still included in the output; it just carries no number.
+            }
+
             pageNumber++;
         }
 
@@ -76,7 +85,9 @@ public class PageNumberer
         const double bottomMargin = 16;
 
         var label = pageNumber.ToString();
-        using var gfx = XGraphics.FromPdfPage(page);
+        // XGraphicsPdfPageOptions.Append ensures the stamp content stream is placed AFTER
+        // the page's existing streams so it renders on top of full-bleed background images.
+        using var gfx = XGraphics.FromPdfPage(page, XGraphicsPdfPageOptions.Append);
         var s = gfx.MeasureString(label, font);
 
         var W = page.Width.Point;
@@ -104,6 +115,11 @@ public class PageNumberer
 
         var state = gfx.Save();
         gfx.MultiplyTransform(matrix);
+        // Opaque white backing so the number is legible over any background colour.
+        const double padX = 3, padY = 2;
+        gfx.DrawRectangle(XBrushes.White,
+            drawX - padX, drawY - s.Height - padY,
+            s.Width + padX * 2, s.Height + padY * 2);
         gfx.DrawString(label, font, XBrushes.Red, drawX, drawY);
         gfx.Restore(state);
     }

@@ -7,6 +7,7 @@ using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace HardwareTemplateBuilder.App.Views;
 
@@ -23,6 +24,7 @@ public partial class JobsView : UserControl
     private sealed class JobRow
     {
         public Job Job { get; }
+        public string CreatorName { get; }
         public string Display => Job.JobNumber + (string.IsNullOrWhiteSpace(Job.JobName) ? "" : $"  —  {Job.JobName}");
 
         /// <summary>
@@ -33,14 +35,18 @@ public partial class JobsView : UserControl
             Job.NotesUpdatedAt.HasValue &&
             (DateTime.UtcNow - Job.NotesUpdatedAt.Value).TotalDays > 7;
 
-        public JobRow(Job job) => Job = job;
+        public JobRow(Job job, string creatorName) { Job = job; CreatorName = creatorName; }
     }
 
     private JobRepository? _repo;
     private List<Customer> _customers = new();
     private List<ProjectManager> _projectManagers = new();
+    private List<UserProfile> _userProfiles = new();
     private int _selectedJobId;
     private bool _selectedJobIsComplete;
+    private DateTime _lastRefreshed = DateTime.MinValue;
+    /// <summary>Null = default job-number sort; true = creator ascending; false = creator descending.</summary>
+    private bool? _creatorSort = null;
 
     /// <summary>Raised when the user requests navigation to a named view (e.g. "JobDetail:42").</summary>
     public event System.Action<string>? NavigationRequested;
@@ -59,6 +65,7 @@ public partial class JobsView : UserControl
 
         LoadCustomers();
         LoadProjectManagers();
+        LoadUserProfiles();
         LoadJobList();
 
         // Set the ListBox item template once — rows with overdue notes render in dark red.
@@ -78,6 +85,23 @@ public partial class JobsView : UserControl
         MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         FilterBox.TextChanged += (_, _) => LoadJobList();
         ShowCompletedCheck.IsCheckedChanged += (_, _) => LoadJobList();
+        CreatorFilterCombo.SelectionChanged += (_, _) => LoadJobList();
+        SortByCreatorButton.Click += (_, _) =>
+        {
+            _creatorSort = _creatorSort switch
+            {
+                null  => true,   // job# → creator ↑
+                true  => false,  // creator ↑ → creator ↓
+                false => null    // creator ↓ → job#
+            };
+            SortByCreatorButton.Content = _creatorSort switch
+            {
+                true  => "Sort: Creator ↑",
+                false => "Sort: Creator ↓",
+                null  => "Sort: Job # ↑"
+            };
+            LoadJobList();
+        };
         JobList.SelectionChanged += (_, _) => OnJobSelected();
         SaveButton.Click += (_, _) => Save();
         NewButton.Click += (_, _) => ClearForm();
@@ -103,6 +127,41 @@ public partial class JobsView : UserControl
         AddProjectManagerButton.Click      += (_, _) => TogglePanel(NewProjectManagerPanel, NewProjectManagerBox);
         CancelProjectManagerButton.Click   += (_, _) => HidePanel(NewProjectManagerPanel, NewProjectManagerBox);
         SaveProjectManagerButton.Click     += (_, _) => AddProjectManager();
+
+        CopyHardwareCheck.IsCheckedChanged += (_, _) =>
+        {
+            CopySourceCombo.IsVisible = CopyHardwareCheck.IsChecked == true;
+        };
+
+        // Auto-refresh when the window regains focus so changes made by other users on the
+        // shared database are visible without a manual reload. Only reloads if the view has
+        // been inactive for at least 30 seconds to avoid redundant queries during normal use.
+        if (TopLevel.GetTopLevel(this) is Window parentWindow)
+            parentWindow.Activated += (_, _) => RefreshIfStale();
+    }
+
+    /// <summary>
+    /// Reloads the job list if the view has been inactive for more than 30 seconds.
+    /// Called when the parent window regains focus.
+    /// </summary>
+    private void RefreshIfStale()
+    {
+        if ((DateTime.UtcNow - _lastRefreshed).TotalSeconds < 30) return;
+        var ctx = DatabaseInitializer.CreateContext();
+        _repo = new JobRepository(ctx);
+        LoadJobList();
+    }
+
+    private void LoadUserProfiles()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        _userProfiles = new UserProfileRepository(ctx).GetAll().OrderBy(p => p.UserName).ToList();
+
+        // Populate creator filter: "(Any)" sentinel at the top, then each profile by name.
+        var items = new List<UserProfile?> { null }.Concat(_userProfiles.Cast<UserProfile?>()).ToList();
+        CreatorFilterCombo.ItemsSource = items;
+        CreatorFilterCombo.DisplayMemberBinding = new Avalonia.Data.Binding("UserName");
+        CreatorFilterCombo.SelectedIndex = 0; // (Any)
     }
 
     private void LoadCustomers(Customer? selectAfter = null)
@@ -161,19 +220,30 @@ public partial class JobsView : UserControl
 
     private void LoadJobList()
     {
-        var filter       = FilterBox.Text?.ToLower() ?? "";
-        var showComplete = ShowCompletedCheck.IsChecked == true;
+        var filter           = FilterBox.Text?.ToLower() ?? "";
+        var showComplete     = ShowCompletedCheck.IsChecked == true;
+        var creatorFilter    = CreatorFilterCombo.SelectedItem as UserProfile;
 
-        var rows = _repo!.GetAll()
+        var jobs = _repo!.GetAll()
             .Where(j => showComplete || !j.IsComplete)
             .Where(j => string.IsNullOrEmpty(filter) ||
                         j.JobNumber.ToLower().Contains(filter) ||
                         j.JobName.ToLower().Contains(filter))
-            .OrderBy(j => j.JobNumber)
-            .Select(j => new JobRow(j))
+            .Where(j => creatorFilter == null || j.UserProfileId == creatorFilter.Id)
             .ToList();
 
+        var unsorted = jobs.Select(j => new JobRow(j,
+            _userProfiles.FirstOrDefault(p => p.Id == j.UserProfileId)?.UserName ?? ""));
+
+        IEnumerable<JobRow> rows = _creatorSort switch
+        {
+            true  => unsorted.OrderBy(r => r.CreatorName).ThenBy(r => r.Job.JobNumber),
+            false => unsorted.OrderByDescending(r => r.CreatorName).ThenBy(r => r.Job.JobNumber),
+            _     => unsorted.OrderBy(r => r.Job.JobNumber)
+        };
+
         JobList.ItemsSource = rows;
+        _lastRefreshed = DateTime.UtcNow;
     }
 
     private void OnJobSelected()
@@ -198,6 +268,9 @@ public partial class JobsView : UserControl
         NotesDateLabel.Foreground = (row.IsOverdue)
             ? Avalonia.Media.Brushes.DarkRed
             : Avalonia.Media.Brushes.Gray;
+
+        // Hide copy section when editing an existing job.
+        CopyHardwareSection.IsVisible = false;
     }
 
     private void ToggleJobComplete()
@@ -227,7 +300,7 @@ public partial class JobsView : UserControl
 
         if (_selectedJobId == 0)
         {
-            _repo!.Add(new Job
+            var newJob = _repo!.Add(new Job
             {
                 JobNumber        = jobNumber,
                 JobName          = jobName,
@@ -235,6 +308,9 @@ public partial class JobsView : UserControl
                 ProjectManagerId = pm.Id,
                 UserProfileId    = userProfileId
             });
+
+            if (CopyHardwareCheck.IsChecked == true && CopySourceCombo.SelectedItem is Job sourceJob)
+                CopyHardwareFromJob(sourceJob.Id, newJob.Id);
         }
         else
         {
@@ -250,6 +326,34 @@ public partial class JobsView : UserControl
         }
         StatusLabel.Text = "Saved.";
         LoadJobList();
+    }
+
+    /// <summary>
+    /// Copies all base-release <see cref="JobHardware"/> rows from <paramref name="sourceJobId"/>
+    /// into <paramref name="targetJobId"/>. Only rows with <c>ReleaseId IS NULL</c> are copied.
+    /// </summary>
+    private static void CopyHardwareFromJob(int sourceJobId, int targetJobId)
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var sourceRows = ctx.JobHardware
+            .Where(jh => jh.JobId == sourceJobId && jh.ReleaseId == null)
+            .AsNoTracking()
+            .ToList();
+
+        foreach (var row in sourceRows)
+        {
+            ctx.JobHardware.Add(new JobHardware
+            {
+                JobId              = targetJobId,
+                HardwareItemId     = row.HardwareItemId,
+                CustomDescription  = row.CustomDescription,
+                Remarks            = row.Remarks,
+                CalloutRemarks     = row.CalloutRemarks,
+                ReleaseId          = null
+            });
+        }
+
+        ctx.SaveChanges();
     }
 
     private void DeleteSelected()
@@ -310,5 +414,25 @@ public partial class JobsView : UserControl
         NotesDateLabel.Text   = "";
         NotesStatusLabel.Text = "";
         JobList.SelectedItem  = null;
+
+        // Show the copy-hardware section when starting a new job.
+        LoadAllJobsForCopy();
+        CopyHardwareSection.IsVisible  = true;
+        CopyHardwareCheck.IsChecked    = false;
+        CopySourceCombo.IsVisible      = false;
+        CopySourceCombo.SelectedItem   = null;
+    }
+
+    /// <summary>
+    /// Populates <see cref="CopySourceCombo"/> with all existing jobs, ordered by number.
+    /// </summary>
+    private void LoadAllJobsForCopy()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var jobs = new JobRepository(ctx).GetAll()
+            .OrderBy(j => j.JobNumber)
+            .ToList();
+        CopySourceCombo.ItemsSource = jobs;
+        CopySourceCombo.DisplayMemberBinding = new Avalonia.Data.Binding("JobNumber");
     }
 }

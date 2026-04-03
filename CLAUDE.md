@@ -73,15 +73,47 @@ Orchestrated by `PdfAssemblyService`, which accepts an `AssemblyRequest` and exe
 - **Architecture is code-behind, not MVVM** — views directly instantiate repositories and call services; there are no ViewModels or data-binding commands
 - `MainWindow` hosts a persistent menu bar (File, Jobs, Maintenance, Admin) and a content area
 - `ViewRouter` swaps child `UserControl` views for navigation — 17 views total
-- `SessionService` (static) holds the active `UserProfile` for the session lifetime; `BulkAddSession` (static) holds transient bulk-entry state
+- `SessionService` (static) holds the active `UserProfile` for the session lifetime; `BulkAddSession` (static) holds transient bulk-entry state across the multi-step bulk-add flow
 - On first launch with no `UserProfile` records, `ProfilePickerDialog` prompts creation before proceeding; `DatabaseSetupDialog` handles unreachable DB paths at startup
 - Visual style: `#C0C0C0` background, beveled buttons, Tahoma/Arial fonts (Windows 98 aesthetic) via Avalonia `ControlTheme`/`Style`
 - Standard search pattern throughout: Manufacturer/Description/ModelNumber comboboxes → listbox sorted by `Frequency` desc
 - `DescriptionPickerWindow` is a modal window (not a UserControl) used wherever a `Description` tree selection is needed
 
+#### View Initialization Pattern
+
+All views follow this convention:
+```csharp
+public MyView() {
+    InitializeComponent();
+    Loaded += (_, _) => Initialize();
+}
+private void Initialize() { /* repo creation, data loading */ }
+```
+Heavy initialization is deferred to `Loaded` so XAML controls are fully constructed first.
+
+#### Navigation
+
+`ViewRouter` uses string-based routing. Parameterized routes follow the `"ViewName:{id}"` pattern (e.g., `"JobDetail:42"`), parsed in `MainWindow.NavigateTo()`. Views raise `NavigationRequested` (`Action<string>`) to trigger navigation from the parent.
+
+#### Dialogs
+
+Modal windows (`Window` subclasses) are shown with `ShowDialog<T>(parentWindow)` and return typed results (null = canceled). `DialogHelper` creates simple OK/Cancel dialogs programmatically without XAML.
+
+#### Long-Running Operations
+
+Views that launch background work store a `CancellationTokenSource?` field and toggle button states (`StartButton.IsEnabled`, `CancelButton.IsEnabled`). Background tasks use `IProgress<T>` + `Dispatcher.UIThread.Post()` to marshal UI updates. `OperationCanceledException` is caught separately from unexpected exceptions.
+
+#### Error Handling
+
+Batch operations (PDF assembly, template refresh) collect all per-item failures into a list and throw a single `InvalidOperationException` with a consolidated report — not fail-fast. Background startup tasks (missing-template alert, auto-refresh) swallow all exceptions to avoid disrupting the UI.
+
 ### Description Hierarchy
 
 `Description` is a self-referential tree used for categorizing hardware items. `DescriptionPathService` resolves full paths. The hierarchy is also how `WeightTemplateSortStrategy` groups templates for sorting.
+
+### App Startup Sequence
+
+`App.OnFrameworkInitializationCompleted()` defers startup to `mainWindow.Opened`. Phases: database location resolution → migration + schema patches → machine ID lookup → profile selection → background refresh check.
 
 ## Releases
 

@@ -743,4 +743,174 @@ Phase 12 (Polish) — baseline
 > Phases 21, 22, 25, and 26 are self-contained and can be done in any order or in parallel.
 > Phase 20 should precede Phase 23 since the release UI builds on the job status concept.
 > Phase 24 depends on the AppSettings infrastructure introduced in v2-changes-plan Phase 14.
+
+---
+
+## Phase 30 — Concurrent Multi-User Database Access
+
+**Goal:** Multiple users on separate machines can open the app against the same shared SQLite database simultaneously without conflicts, deadlocks, or silent data loss.
+
+### Problem
+
+SQLite's default journal mode (`DELETE`) serializes all writes through a single exclusive lock. With multiple concurrent users this produces `SQLITE_BUSY` / `SQLITE_LOCKED` errors that EF Core surfaces as unhandled exceptions. Read operations also block during a write. WAL (Write-Ahead Logging) mode fixes this by allowing concurrent reads alongside one writer and queuing additional writers with a configurable timeout.
+
+### Schema / Connection Changes
+
+**`AppDbContext` (or `DatabaseInitializer.CreateContext()`):**
+- Set the SQLite connection string to include `Journal Mode=WAL;Busy Timeout=5000;` (5-second retry window before throwing a lock error).
+- After the first `EnsureCreated`/migration run, execute `PRAGMA journal_mode=WAL;` once via raw SQL so existing databases are upgraded automatically. The pragma is idempotent and survives app restarts.
+
+**`DatabaseInitializer.EnsureSchemaPatches()`:**
+- Add a one-time patch that issues `PRAGMA journal_mode=WAL;` if the current mode is not already `wal`. Log the result (no-op if already set).
+
+### Code Changes
+
+**`DatabaseInitializer.cs`:**
+- In `InitializeAsync()`, after migrations are applied, call the WAL patch unconditionally — it is safe to repeat.
+
+**`RetryHelper` (new, `Core/Data/`):**
+- Static helper: `ExecuteWithRetry(Func<T>, maxRetries: 3, delayMs: 200)` — catches `Microsoft.Data.Sqlite.SqliteException` with `SqliteErrorCode.Busy` or `SqliteErrorCode.Locked` and retries with exponential back-off before re-throwing.
+- Used by any repository `Add`/`Update`/`Delete` call that writes; reads do not need it under WAL.
+
+**`JobsView.axaml.cs` and other list views:**
+- Subscribe to the parent `Window.Activated` event in `Initialize()`.
+- On `Activated`, call a lightweight `RefreshIfStale()` method: re-query the DB only if the view has been inactive for ≥ 30 seconds (`_lastRefreshed` timestamp field). This keeps the jobs list current for a user who leaves the app in the background while a colleague adds a job.
+
+### Deliverable
+Two app instances pointing at the same `.db` file can run concurrently. Writes queue cleanly under the 5-second busy timeout. List views auto-refresh when the window regains focus after 30 seconds so each user sees the latest data without a manual reload.
+
+---
+
+## Phase 31 — Bulk Add: Manufacturer-Scoped Description Suggestions
+
+**Goal:** In the per-manufacturer hardware entry cards inside `BulkHardwareEntryView`, the Description field becomes an editable combo box that pre-populates with descriptions already used by items belonging to that manufacturer, while still accepting any free-text value.
+
+### Problem
+
+Currently the Description field in each bulk-add row is a plain `TextBox`. Users must remember or retype descriptions they have already used for the same manufacturer, leading to inconsistencies. A filtered suggestion list reduces typos and speeds entry.
+
+### Code Changes
+
+**`BulkHardwareEntryView.axaml`:**
+- Replace the `TextBox` used for the description cell in each row template with an Avalonia `AutoCompleteBox`.
+- Set `FilterMode="Contains"` and `MinimumPrefixLength="0"` so the full list appears on focus/empty.
+- Bind `ItemsSource` to a per-manufacturer description list resolved at row-creation time.
+- Keep `IsTextCompletionEnabled="False"` so the user can type a value not in the list without it being rejected.
+
+**`BulkHardwareEntryView.axaml.cs`:**
+- Add a private method `GetDescriptionsForManufacturer(int manufacturerId) → IList<string>`: queries `HardwareItemRepository.GetAll()` filtering by `ManufacturerId`, projects `Description.DescriptionText`, deduplicates, and sorts alphabetically.
+- Call this method when a manufacturer card is created and pass the result as the `ItemsSource` for every `AutoCompleteBox` in that card.
+- The existing `SyncModelState` row logic is unchanged — it already reads the `AutoCompleteBox.Text` property the same way it read `TextBox.Text`.
+
+**Draft restore (`BulkHardwareEntryView.cs` — `RestoreDraft`):**
+- After recreating each row, re-set `AutoCompleteBox.Text` from the saved draft value. The list will populate from the manufacturer query as usual; the saved text just pre-fills the field.
+
+### Deliverable
+When entering hardware for a manufacturer, users see a dropdown of description strings already associated with that manufacturer's items. Selecting one fills the field; typing anything else is accepted as-is. Bulk entry of repeat hardware is faster and more consistent.
+
+---
+
+## Phase 32 — Page Numbering Fix for Non-Standard PDFs
+
+**Goal:** Page number stamps that silently fail or are hidden on certain PDFs (e.g., those with full-bleed images, unusual content stream structures, or non-standard page boxes) are applied reliably and visibly across all templates in a package.
+
+### Problem
+
+`PageNumberer` draws a stamp via `PdfSharp.Drawing.XGraphics` and appends it to the page's content stream. For PDFs where existing content streams paint over the full page (common in scanned or fully-imaged spec sheets like those from AA Americas), the stamp is drawn behind the raster content and is invisible. Additionally, if a page defines a `CropBox` smaller than its `MediaBox`, coordinates calculated from `MediaBox` dimensions may place the stamp outside the visible area.
+
+### Code Changes
+
+**`PageNumberer.cs` (Core/Services/Pdf/):**
+- When creating the `XGraphics` context for each page, call `page.MediaBox` **and** check for a `CropBox`; use the `CropBox` dimensions when present as the authoritative visible rectangle.
+- Draw a small filled white rectangle (e.g., 36 × 14 pt) immediately before the page number text so the stamp has an opaque background regardless of what is beneath it.
+- Change the content stream insertion strategy from the default (which may prepend or append depending on PdfSharp version) to explicitly **append** by accessing `page.Contents.Append()` (a new `PdfContentStream`) so the stamp is the last thing drawn and therefore on top of all existing content.
+- Wrap the per-page stamping block in a `try/catch (Exception ex)` that logs the page index and continues rather than aborting the entire numbering pass — a single unreadable page should not prevent the rest of the package from getting numbers.
+
+**`PdfAssemblyService.cs`:**
+- After calling `PageNumberer`, inspect its result for any skipped pages and include a count in the assembly summary (e.g., append `"(N page(s) could not be numbered)"` to the output message if non-zero).
+
+**Tests (`HardwareTemplateBuilder.Tests/`):**
+- Add a test fixture that creates a minimal PDF whose single page has a full-page `XObject` image as its only content stream entry, then asserts the stamp text is present in the merged output.
+- Add a test verifying the stamper does not throw when given a PDF with a `CropBox` smaller than `MediaBox`.
+
+### Deliverable
+Page numbers appear on top of content for all standard and fully-imaged PDFs in the package. The rare PDF that cannot be stamped is skipped gracefully and reported in the assembly summary rather than silently missing its number.
+
+---
+
+## Phase 33 — Copy Existing Job on Creation
+
+**Goal:** When creating a new job, the user may optionally clone an existing job so the new job starts with the same base hardware list. Hardware items can then be added, removed, or edited before the job is used.
+
+### Code Changes
+
+**`JobCreationView.axaml`:**
+- Add a **"Copy hardware from existing job"** `CheckBox` below the standard new-job fields.
+- When checked, show a `ComboBox` (or searchable list) populated with all existing jobs (`JobNumber — JobName`), sorted by most recent first.
+- The combo is hidden and its value cleared when the checkbox is unchecked.
+
+**`JobCreationView.axaml.cs`:**
+- On `SaveButton.Click`, after inserting the new `Job` record, check if the copy checkbox is checked and a source job is selected.
+- If so, call `CopyHardwareFromJob(sourceJobId, newJobId)`:
+  - Load all `JobHardware` rows for the source job where `ReleaseId IS NULL` (base release only).
+  - Insert a duplicate row for each into the new job with the same `HardwareItemId`, `CustomDescription`, `SortOrder`, and `Remarks`; set `ReleaseId = null` and `JobId = newJobId`.
+  - Use `DatabaseInitializer.CreateContext()` per the standard context pattern; no new repository needed — use `JobHardwareRepository` directly.
+- Navigate to `"JobDetail:{newJobId}"` as usual after saving.
+
+**`JobDetailView.axaml.cs`:**
+- No changes required — the copied `JobHardware` rows are loaded by the existing `LoadLinkedHardware()` query.
+
+### Deliverable
+Creating a follow-on job for a repeat customer or similar project no longer requires re-entering every hardware item. The copied job is fully independent — changes to one do not affect the other.
+
+---
+
+## Phase 34 — Job Creator Tracking and Sort
+
+**Goal:** Each job records which user profile created it. The Jobs list can be sorted by creator, making it easy to see one's own jobs or audit another user's workload in a shared-database environment.
+
+### Schema Changes
+
+- Add nullable column `CreatedByProfileId (int? FK → UserProfile, SetNull on delete)` to `Job`.
+- EF Core migration; existing rows get `NULL` (no data migration needed — unknown creator is acceptable for historical records).
+
+### Code Changes
+
+**`Job.cs` (model):**
+- Add `CreatedByProfileId (int?)` and navigation property `CreatedBy (UserProfile?)`.
+
+**`AppDbContext.cs`:**
+- Configure the FK with `OnDelete(DeleteBehavior.SetNull)`.
+
+**`JobRepository.cs` (or `JobCreationView.axaml.cs`):**
+- Wherever a new `Job` is inserted, set `CreatedByProfileId = SessionService.ActiveUserProfile?.Id` before calling `Add()`.
+
+**`JobsView.axaml`:**
+- Add a **"Sort by Creator"** button to the toolbar alongside the existing sort options.
+- Optionally add a **"Creator"** filter `ComboBox` populated with all distinct `CreatedBy` profile names from the current job list (plus an `"(Any)"` entry); filters the displayed rows client-side.
+
+**`JobsView.axaml.cs`:**
+- `SortByCreator()`: re-orders `_jobs` by `CreatedBy?.UserName ?? ""` ascending.
+- `FilterByCreator(profileId)`: filters the display list to jobs where `CreatedByProfileId == profileId` (or shows all when `"(Any)"` is selected).
+- Eager-load `CreatedBy` in the initial `JobRepository.GetAll()` query using `.Include(j => j.CreatedBy)`.
+
+### Deliverable
+Every new job is stamped with the creating user's profile. The Jobs list can be sorted or filtered by creator, which is especially useful in the shared-database multi-user environment introduced in Phase 30.
+
+---
+
+## Dependency Map (Phases 30–34)
+
+```
+Phase 26 (Jobs Home Page) — baseline for this group
+  ├── Phase 30 (Multi-User DB Access)    ← foundational; recommended before Phase 34
+  ├── Phase 31 (Description Combobox)   ← UI-only within BulkHardwareEntryView; independent
+  ├── Phase 32 (Page Numbering Fix)      ← service-only; independent
+  ├── Phase 33 (Copy Job on Creation)   ← extends JobCreationView; independent
+  └── Phase 34 (Job Creator Tracking)   ← Phase 30 recommended first (shared DB gives it value)
+```
+
+> Phases 31, 32, and 33 are fully self-contained and can be done in any order.
+> Phase 30 should precede Phase 34 — creator tracking is most useful once multiple users share the same database.
+> Phase 32 has no schema changes and does not affect any other phase.
 > Phase 23 is the most complex of the group — plan a dedicated session for schema migration + UI work.

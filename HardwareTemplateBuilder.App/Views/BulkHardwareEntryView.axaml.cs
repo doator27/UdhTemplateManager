@@ -107,7 +107,20 @@ public partial class BulkHardwareEntryView : UserControl
         var entry = new ItemEntry();
         _items.Add(entry);
 
-        var descSearchBox = new TextBox { Watermark = "Search descriptions…", FontSize = 11 };
+        // Editable ComboBox seeded with descriptions already used by this manufacturer's items.
+        // The user may also type any text not in the list — the full-tree fallback list below
+        // then shows matching descriptions from the global hierarchy.
+        var descCombo = new ComboBox
+        {
+            IsEditable = true,
+            PlaceholderText = "Description…",
+            FontSize = 11,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            ItemsSource = GetDescriptionsForManufacturer(_manufacturerId)
+        };
+        descCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+
+        // Full-tree fallback: shown when typed text doesn't match any manufacturer description.
         var descMatchList = new ListBox { MaxHeight = 80, IsVisible = false };
         descMatchList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
         var descLabel = new TextBlock
@@ -128,7 +141,7 @@ public partial class BulkHardwareEntryView : UserControl
         descBtnRow.Children.Add(pickTreeBtn);
         descBtnRow.Children.Add(newDescBtn);
         var descStack = new StackPanel { Spacing = 2 };
-        descStack.Children.Add(descSearchBox);
+        descStack.Children.Add(descCombo);
         descStack.Children.Add(descMatchList);
         descStack.Children.Add(descLabel);
         descStack.Children.Add(descBtnRow);
@@ -252,27 +265,43 @@ public partial class BulkHardwareEntryView : UserControl
             UpdateMatchLabel(matchLabel, entry.MatchedItem, text);
         }
 
+        // Guard to prevent re-entrant calls when SelectDescription programmatically
+        // clears descCombo.Text and SelectedItem after a selection is made.
+        bool suppressDescSync = false;
+
         void SelectDescription(Description? desc)
         {
+            if (suppressDescSync) return;
+            suppressDescSync = true;
             entry.Description = desc;
             entry.DescriptionId = desc?.Id;
             descLabel.Text = desc != null ? BuildDescPath(desc) : "(none)";
             descLabel.Foreground = desc != null ? Brushes.Black : Brushes.Gray;
-            descSearchBox.Text = string.Empty;
+            descCombo.Text = string.Empty;
+            descCombo.SelectedItem = null;
             descMatchList.IsVisible = false;
+            suppressDescSync = false;
             RefreshModelItems();
             SyncMatch();
         }
 
-        descSearchBox.TextChanged += (_, _) =>
+        // When the user picks a manufacturer description from the dropdown.
+        descCombo.SelectionChanged += (_, _) =>
         {
-            var q = descSearchBox.Text?.Trim() ?? string.Empty;
+            if (!suppressDescSync && descCombo.SelectedItem is DescriptionComboItem item)
+                SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == item.Id));
+        };
+
+        // When the user types text: show full-tree matches as a fallback list.
+        descCombo.PropertyChanged += (_, e) =>
+        {
+            if (e.Property != ComboBox.TextProperty || suppressDescSync) return;
+            var q = descCombo.Text?.Trim() ?? string.Empty;
             if (string.IsNullOrEmpty(q))
             {
                 descMatchList.IsVisible = false;
                 return;
             }
-
             var hits = _descComboItems
                 .Where(d => d.DisplayText.Contains(q, StringComparison.OrdinalIgnoreCase))
                 .Take(8)
@@ -280,6 +309,7 @@ public partial class BulkHardwareEntryView : UserControl
             descMatchList.ItemsSource = hits;
             descMatchList.IsVisible = hits.Count > 0;
         };
+
         descMatchList.SelectionChanged += (_, _) =>
         {
             if (descMatchList.SelectedItem is DescriptionComboItem item)
@@ -297,7 +327,7 @@ public partial class BulkHardwareEntryView : UserControl
         };
         newDescBtn.Click += (_, _) =>
         {
-            var name = descSearchBox.Text?.Trim();
+            var name = descCombo.Text?.Trim();
             if (string.IsNullOrEmpty(name))
             {
                 return;
@@ -504,6 +534,22 @@ public partial class BulkHardwareEntryView : UserControl
 
         var picker = new DescriptionPickerWindow(_allDescriptions);
         return await picker.ShowDialog<int?>(window);
+    }
+
+    /// <summary>
+    /// Returns the subset of <see cref="_descComboItems"/> whose descriptions are already used
+    /// by hardware items belonging to <paramref name="manufacturerId"/>. These are offered as
+    /// quick-select options in the per-item description ComboBox.
+    /// </summary>
+    private List<DescriptionComboItem> GetDescriptionsForManufacturer(int manufacturerId)
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var usedDescIds = ctx.HardwareItems
+            .Where(h => h.ManufacturerId == manufacturerId)
+            .Select(h => h.DescriptionId)
+            .Distinct()
+            .ToHashSet();
+        return _descComboItems.Where(d => usedDescIds.Contains(d.Id)).ToList();
     }
 
     private string BuildDescPath(Description target)

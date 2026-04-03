@@ -12,6 +12,12 @@
                 <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2"/>
                 <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4"/>
                 <CheckBox DockPanel.Dock="Top" Name="ShowCompletedCheck" Content="Show completed" Margin="0,0,0,4"/>
+                <TextBlock DockPanel.Dock="Top" Text="Creator:" Margin="0,0,0,2"/>
+                <ComboBox DockPanel.Dock="Top" Name="CreatorFilterCombo" HorizontalAlignment="Stretch"
+                          PlaceholderText="(Any)" Margin="0,0,0,4"/>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="4" Margin="0,0,0,6">
+                    <Button Name="SortByCreatorButton" Content="Sort: Creator ↑" FontSize="11" Padding="6,2"/>
+                </StackPanel>
                 <ListBox Name="JobList" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
             </DockPanel>
             <!-- Right: metadata form -->
@@ -53,6 +59,14 @@
                             <Button Name="OpenJobButton" Content="Open Job" Margin="0,0,8,0"/>
                             <Button Name="ToggleCompleteButton" Content="Mark Complete" Margin="0,0,0,0"/>
                         </StackPanel>
+
+                        <!-- Copy hardware — only visible when creating a new job -->
+                        <StackPanel Name="CopyHardwareSection" Margin="0,8,0,0" IsVisible="False">
+                            <CheckBox Name="CopyHardwareCheck" Content="Copy hardware from existing job" Margin="0,0,0,4"/>
+                            <ComboBox Name="CopySourceCombo" HorizontalAlignment="Stretch"
+                                      PlaceholderText="Select source job..." IsVisible="False"/>
+                        </StackPanel>
+
                         <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
 
                         <!-- Notes -->
