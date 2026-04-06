@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using HardwareTemplateBuilder.App.Helpers;
@@ -47,6 +48,15 @@ public partial class BulkHardwareEntryView : UserControl
 
         /// <summary>The card border element in the scroll panel.</summary>
         public Border Card { get; set; } = null!;
+
+        /// <summary>Single-line summary row shown when this card is collapsed.</summary>
+        public Control? CompactPanel { get; set; }
+
+        /// <summary>Full-detail panel shown when this card is expanded.</summary>
+        public Control? ExpandedPanel { get; set; }
+
+        /// <summary>Refreshes the compact summary text blocks from current entry state.</summary>
+        public Action? UpdateCompact { get; set; }
     }
 
     private sealed class LabelEntry
@@ -60,6 +70,9 @@ public partial class BulkHardwareEntryView : UserControl
     }
 
     private readonly List<ItemEntry> _items = new();
+
+    /// <summary>The item card currently shown in expanded (edit) state.</summary>
+    private ItemEntry? _activeEntry;
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event Action<string>? NavigationRequested;
@@ -102,6 +115,25 @@ public partial class BulkHardwareEntryView : UserControl
         {
             AddItem(null);
         }
+    }
+
+    /// <summary>
+    /// Expands <paramref name="entry"/>, collapsing whichever entry was previously active.
+    /// </summary>
+    private void SetActiveEntry(ItemEntry entry)
+    {
+        if (_activeEntry == entry) return;
+
+        if (_activeEntry != null)
+        {
+            _activeEntry.UpdateCompact?.Invoke();
+            if (_activeEntry.CompactPanel  != null) _activeEntry.CompactPanel.IsVisible  = true;
+            if (_activeEntry.ExpandedPanel != null) _activeEntry.ExpandedPanel.IsVisible = false;
+        }
+
+        _activeEntry = entry;
+        if (entry.CompactPanel  != null) entry.CompactPanel.IsVisible  = false;
+        if (entry.ExpandedPanel != null) entry.ExpandedPanel.IsVisible = true;
     }
 
     /// <summary>Appends a new item card to the panel, optionally pre-populated from a draft item.</summary>
@@ -215,9 +247,85 @@ public partial class BulkHardwareEntryView : UserControl
         labelsHeader.Children.Add(addLabelBtn);
         labelsPanel.Children.Add(labelsHeader);
 
+        // ── Compact summary row (shown when this card is not the active/focused one) ──
+        var compactDescText = new TextBlock
+        {
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        var compactModelText = new TextBlock
+        {
+            FontSize = 11,
+            FontWeight = FontWeight.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        var compactRemarksText = new TextBlock
+        {
+            FontSize = 11,
+            Foreground = Brushes.DimGray,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        var compactMatchText = new TextBlock
+        {
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var compactRow = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("200,150,*,70"),
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        Grid.SetColumn(compactDescText,   0); compactRow.Children.Add(compactDescText);
+        Grid.SetColumn(compactModelText,  1); compactRow.Children.Add(compactModelText);
+        Grid.SetColumn(compactRemarksText, 2); compactRow.Children.Add(compactRemarksText);
+        Grid.SetColumn(compactMatchText,  3); compactRow.Children.Add(compactMatchText);
+
+        entry.UpdateCompact = () =>
+        {
+            compactDescText.Text = entry.Description != null
+                ? BuildDescPath(entry.Description)
+                : "(no description)";
+            compactDescText.Foreground = entry.Description != null ? Brushes.Black : Brushes.Gray;
+
+            compactModelText.Text = string.IsNullOrWhiteSpace(entry.ModelNumber)
+                ? "(no model)" : entry.ModelNumber;
+
+            compactRemarksText.Text = entry.HardwareItemRemarks ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(entry.ModelNumber))
+            {
+                compactMatchText.Text = "—";
+                compactMatchText.Foreground = Brushes.Gray;
+            }
+            else if (entry.MatchedItem != null)
+            {
+                compactMatchText.Text = "✓ Matched";
+                compactMatchText.Foreground = Brushes.DarkGreen;
+            }
+            else
+            {
+                compactMatchText.Text = "(new)";
+                compactMatchText.Foreground = Brushes.Gray;
+            }
+        };
+
+        compactRow.PointerPressed += (_, _) => SetActiveEntry(entry);
+
+        // ── Expanded content (full editor) ──────────────────────────────────────
+        var expandedPanel = new StackPanel();
+        expandedPanel.Children.Add(topRow);
+        expandedPanel.Children.Add(labelsPanel);
+
+        entry.CompactPanel  = compactRow;
+        entry.ExpandedPanel = expandedPanel;
+
         var cardContent = new StackPanel();
-        cardContent.Children.Add(topRow);
-        cardContent.Children.Add(labelsPanel);
+        cardContent.Children.Add(compactRow);
+        cardContent.Children.Add(expandedPanel);
 
         var card = new Border
         {
@@ -229,6 +337,10 @@ public partial class BulkHardwareEntryView : UserControl
         };
         entry.Card = card;
         ItemsPanel.Children.Add(card);
+
+        // New item is immediately the active (expanded) entry; any previously
+        // active entry collapses to its summary row.
+        SetActiveEntry(entry);
 
         void RefreshModelItems()
         {
@@ -283,6 +395,7 @@ public partial class BulkHardwareEntryView : UserControl
             }
 
             UpdateMatchLabel(matchLabel, entry.MatchedItem, text);
+            entry.UpdateCompact?.Invoke();
         }
 
         // Guard to prevent re-entrant calls when SelectDescription programmatically
@@ -369,13 +482,17 @@ public partial class BulkHardwareEntryView : UserControl
         modelCombo.SelectionChanged += (_, _) => SyncMatch();
 
         itemRemarksBox.TextChanged += (_, _) =>
+        {
             entry.HardwareItemRemarks = string.IsNullOrWhiteSpace(itemRemarksBox.Text)
                 ? null : itemRemarksBox.Text.Trim();
+            entry.UpdateCompact?.Invoke();
+        };
 
         addLabelBtn.Click += (_, _) => AddLabelRow(entry, labelsPanel, null);
 
         removeItemBtn.Click += (_, _) =>
         {
+            if (_activeEntry == entry) _activeEntry = null;
             _items.Remove(entry);
             ItemsPanel.Children.Remove(card);
         };

@@ -10,15 +10,18 @@
             <TextBlock Name="HeaderLabel" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
 
-        <!-- Bottom action bar -->
-        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-            <Button DockPanel.Dock="Left" Name="AddItemButton" Content="+ Add Item" Margin="0,0,8,0"/>
-            <TextBlock Name="StatusLabel" VerticalAlignment="Center" Foreground="#800000" TextWrapping="Wrap"/>
-        </DockPanel>
+        <!-- Status label -->
+        <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Margin="0,6,0,0"
+                   VerticalAlignment="Center" Foreground="#800000" TextWrapping="Wrap"/>
 
-        <!-- Item cards added in code-behind -->
+        <!-- Item cards with Add button pinned below the last card -->
         <ScrollViewer>
-            <StackPanel Name="ItemsPanel" Spacing="8"/>
+            <StackPanel Spacing="8">
+                <StackPanel Name="ItemsPanel" Spacing="8"/>
+                <Button Name="AddItemButton" Content="+ Add Item"
+                        HorizontalAlignment="Left" Margin="0,2,0,0"/>
+            </StackPanel>
         </ScrollViewer>
+
     </DockPanel>
 </UserControl>
