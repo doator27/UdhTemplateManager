@@ -275,23 +275,46 @@ public partial class TemplateResolutionWizardView : UserControl
 
             if (row.MatchedItem != null)
             {
-                // Case A — matched; increment frequency
+                // Case A — matched; increment frequency and persist any remark the user set.
                 hwItemId = row.MatchedItem.Id;
                 var existing = ctx.HardwareItems.Find(hwItemId);
                 if (existing != null)
+                {
                     freqService.IncrementFrequency(existing);
+                    if (!string.IsNullOrWhiteSpace(row.HardwareItemRemarks) &&
+                        existing.Remarks != row.HardwareItemRemarks)
+                    {
+                        existing.Remarks = row.HardwareItemRemarks;
+                        ctx.SaveChanges();
+                    }
+                }
             }
             else
             {
-                // Case B — create new HardwareItem if not yet created
+                // Case B — create new HardwareItem if not yet created.
+                // hwRepo.Add() returns an existing record when a duplicate is found,
+                // so explicitly update Remarks afterward to ensure the user's value is saved.
                 if (row.CreatedItem == null)
                 {
                     var newItem = hwRepo.Add(new HardwareItem
                     {
                         ManufacturerId = row.SelectedManufacturer!.Id,
                         DescriptionId  = row.SelectedDescription!.Id,
-                        ModelNumber    = row.ModelNumber
+                        ModelNumber    = row.ModelNumber,
+                        Remarks        = row.HardwareItemRemarks
                     });
+
+                    if (!string.IsNullOrWhiteSpace(row.HardwareItemRemarks) &&
+                        newItem.Remarks != row.HardwareItemRemarks)
+                    {
+                        var tracked = ctx.HardwareItems.Find(newItem.Id);
+                        if (tracked != null)
+                        {
+                            tracked.Remarks = row.HardwareItemRemarks;
+                            ctx.SaveChanges();
+                        }
+                    }
+
                     row.CreatedItem = newItem;
                 }
                 hwItemId = row.CreatedItem.Id;

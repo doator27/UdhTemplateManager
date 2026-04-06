@@ -31,6 +31,9 @@ public class BulkHardwareRow
     /// <summary>Gets or sets the model number typed by the user.</summary>
     public string ModelNumber { get; set; } = "";
 
+    /// <summary>Gets or sets the standard remarks for the hardware item (stored on <see cref="HardwareItem.Remarks"/>).</summary>
+    public string? HardwareItemRemarks { get; set; }
+
     /// <summary>
     /// Gets or sets the list of custom labels for this row.
     /// Each label becomes a distinct <see cref="JobHardware"/> line item on the job.

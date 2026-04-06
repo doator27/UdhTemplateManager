@@ -144,6 +144,7 @@ public partial class BulkJobHubView : UserControl
                     SelectedManufacturer = mfr,
                     SelectedDescription  = desc,
                     ModelNumber          = item.ModelNumber,
+                    HardwareItemRemarks  = item.HardwareItemRemarks,
                     MatchedItem          = matched,
                     Labels = item.Labels.Select(l => new BulkHardwareLabel
                     {

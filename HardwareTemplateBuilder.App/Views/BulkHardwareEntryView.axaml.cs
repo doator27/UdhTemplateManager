@@ -34,6 +34,9 @@ public partial class BulkHardwareEntryView : UserControl
 
         public string ModelNumber { get; set; } = string.Empty;
 
+        /// <summary>Remarks for the <see cref="HardwareItem"/> itself (not per-label).</summary>
+        public string? HardwareItemRemarks { get; set; }
+
         public HardwareItem? MatchedItem { get; set; }
 
         /// <summary>Label rows; always contains at least one entry.</summary>
@@ -154,6 +157,14 @@ public partial class BulkHardwareEntryView : UserControl
         };
         modelCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
 
+        var itemRemarksBox = new TextBox
+        {
+            Watermark = "Item remarks (optional)",
+            VerticalAlignment = VerticalAlignment.Top,
+            TextWrapping = TextWrapping.Wrap,
+            MaxHeight = 60
+        };
+
         var matchLabel = new TextBlock
         {
             Text = "—",
@@ -173,15 +184,17 @@ public partial class BulkHardwareEntryView : UserControl
 
         var topRow = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("250,200,80,Auto"),
+            ColumnDefinitions = new ColumnDefinitions("250,160,*,70,Auto"),
             Margin = new Avalonia.Thickness(0, 0, 0, 8)
         };
         topRow.Children.Add(descStack);
         Grid.SetColumn(modelCombo, 1);
         topRow.Children.Add(modelCombo);
-        Grid.SetColumn(matchLabel, 2);
+        Grid.SetColumn(itemRemarksBox, 2);
+        topRow.Children.Add(itemRemarksBox);
+        Grid.SetColumn(matchLabel, 3);
         topRow.Children.Add(matchLabel);
-        Grid.SetColumn(removeItemBtn, 3);
+        Grid.SetColumn(removeItemBtn, 4);
         topRow.Children.Add(removeItemBtn);
 
         var labelsPanel = new StackPanel { Spacing = 4, Margin = new Avalonia.Thickness(0, 4, 0, 0) };
@@ -260,6 +273,13 @@ public partial class BulkHardwareEntryView : UserControl
                         i.DescriptionId == entry.Description.Id &&
                         i.ModelNumber == text);
                 }
+            }
+
+            // Populate the remarks box from the matched item. If no match, leave
+            // the current text so the user's manually typed remarks are preserved.
+            if (entry.MatchedItem != null)
+            {
+                itemRemarksBox.Text = entry.MatchedItem.Remarks ?? string.Empty;
             }
 
             UpdateMatchLabel(matchLabel, entry.MatchedItem, text);
@@ -348,6 +368,10 @@ public partial class BulkHardwareEntryView : UserControl
         };
         modelCombo.SelectionChanged += (_, _) => SyncMatch();
 
+        itemRemarksBox.TextChanged += (_, _) =>
+            entry.HardwareItemRemarks = string.IsNullOrWhiteSpace(itemRemarksBox.Text)
+                ? null : itemRemarksBox.Text.Trim();
+
         addLabelBtn.Click += (_, _) => AddLabelRow(entry, labelsPanel, null);
 
         removeItemBtn.Click += (_, _) =>
@@ -358,8 +382,13 @@ public partial class BulkHardwareEntryView : UserControl
 
         entry.RestoreUI = () =>
         {
+            // Capture before SyncMatch (triggered by setting modelCombo.Text or
+            // SelectDescription) overwrites entry.HardwareItemRemarks with the DB value.
+            var savedRemarks = entry.HardwareItemRemarks;
             modelCombo.Text = entry.ModelNumber;
             SelectDescription(entry.Description);
+            // Restore draft remarks AFTER SyncMatch has run so the draft value wins.
+            itemRemarksBox.Text = savedRemarks ?? string.Empty;
         };
 
         if (draft != null)
@@ -369,8 +398,9 @@ public partial class BulkHardwareEntryView : UserControl
                 entry.Description = _allDescriptions.FirstOrDefault(d => d.Id == draft.DescriptionId.Value);
             }
 
-            entry.DescriptionId = draft.DescriptionId;
-            entry.ModelNumber = draft.ModelNumber;
+            entry.DescriptionId       = draft.DescriptionId;
+            entry.ModelNumber         = draft.ModelNumber;
+            entry.HardwareItemRemarks = draft.HardwareItemRemarks;
 
             Avalonia.Threading.Dispatcher.UIThread.Post(() => entry.RestoreUI?.Invoke());
 
@@ -466,9 +496,10 @@ public partial class BulkHardwareEntryView : UserControl
         {
             draft.Items.Add(new BulkDraftItem
             {
-                ManufacturerId = _manufacturerId,
-                DescriptionId = item.DescriptionId,
-                ModelNumber = item.ModelNumber,
+                ManufacturerId      = _manufacturerId,
+                DescriptionId       = item.DescriptionId,
+                ModelNumber         = item.ModelNumber,
+                HardwareItemRemarks = item.HardwareItemRemarks,
                 Labels = item.Labels.Select(l => new BulkDraftLabel
                 {
                     CustomLabel = l.CustomLabel,

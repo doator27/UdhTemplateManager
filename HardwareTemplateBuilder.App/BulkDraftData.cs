@@ -22,9 +22,10 @@ internal sealed class BulkDraftV2
 /// <summary>One hardware item row in the draft.</summary>
 internal sealed class BulkDraftItem
 {
-    public int  ManufacturerId { get; set; }
-    public int? DescriptionId  { get; set; }
-    public string ModelNumber  { get; set; } = "";
+    public int     ManufacturerId      { get; set; }
+    public int?    DescriptionId       { get; set; }
+    public string  ModelNumber         { get; set; } = "";
+    public string? HardwareItemRemarks { get; set; }
     public List<BulkDraftLabel> Labels { get; set; } = new();
 }
 
