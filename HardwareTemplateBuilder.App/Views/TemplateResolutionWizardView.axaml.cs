@@ -131,7 +131,8 @@ public partial class TemplateResolutionWizardView : UserControl
         using var ctx = DatabaseInitializer.CreateContext();
         var linked = ctx.HardwareItemTemplates
             .Include(hit => hit.IndividualTemplate)
-            .Where(hit => hit.HardwareItemId == row.MatchedItem!.Id)
+            .Where(hit => hit.HardwareItemId == row.MatchedItem!.Id &&
+                          (hit.JobId == null || hit.JobId == _jobId))
             .Select(hit => hit.IndividualTemplate)
             .OrderBy(t => t.TemplateNumber)
             .ToList();
@@ -192,6 +193,7 @@ public partial class TemplateResolutionWizardView : UserControl
         var online   = TplOnlineLinkBox.Text?.Trim();
         var local    = TplLocalLinkBox.Text?.Trim();
         var pagesToRotate = TplPagesToRotateBox.Text?.Trim();
+        var isJobSpecific = TplJobSpecificCheck.IsChecked == true;
 
         int numPages = int.TryParse(TplNumPagesBox.Text?.Trim(), out var np) && np > 0 ? np : 1;
         int rotDir   = int.TryParse(TplRotationDirectionBox.Text?.Trim(), out var rd) ? rd : 0;
@@ -206,9 +208,15 @@ public partial class TemplateResolutionWizardView : UserControl
         var mfrId = row.SelectedManufacturer?.Id ?? 0;
         if (mfrId == 0) { AddTemplateStatusLabel.Text = "Row has no manufacturer."; return; }
 
-        // Create and persist the template immediately
         using var ctx = DatabaseInitializer.CreateContext();
         var templateRepo = new IndividualTemplateRepository(ctx);
+
+        // Check if a duplicate already exists before calling Add so we know if this is a new record.
+        bool isDedupHit = ctx.IndividualTemplates.Any(t =>
+            t.ManufacturerId == mfrId &&
+            t.TemplateNumber == number &&
+            t.DoorMaterialId == material.Id);
+
         var candidate = new IndividualTemplate
         {
             ManufacturerId    = mfrId,
@@ -224,8 +232,15 @@ public partial class TemplateResolutionWizardView : UserControl
         };
         var saved = templateRepo.Add(candidate);
 
-        if (!row.PendingTemplates.Any(t => t.Id == saved.Id))
-            row.PendingTemplates.Add(saved);
+        // Only mark OriginJobId on truly new (not deduped) job-specific templates.
+        if (isJobSpecific && !isDedupHit && saved.OriginJobId == null)
+        {
+            saved.OriginJobId = _jobId;
+            ctx.SaveChanges();
+        }
+
+        if (!row.PendingTemplates.Any(p => p.Template.Id == saved.Id))
+            row.PendingTemplates.Add(new BulkPendingTemplate { Template = saved, IsJobSpecific = isJobSpecific });
 
         RefreshPendingList(row);
         AddTemplateStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
@@ -238,14 +253,15 @@ public partial class TemplateResolutionWizardView : UserControl
         TplRotationDirectionBox.Text   = "";
         TplOnlineLinkBox.Text          = "";
         TplLocalLinkBox.Text           = "";
+        TplJobSpecificCheck.IsChecked  = false;
     }
 
     private void RemovePendingTemplate()
     {
         var row = _rows[_currentIndex];
-        if (PendingTemplatesList.SelectedItem is IndividualTemplate t)
+        if (PendingTemplatesList.SelectedItem is BulkPendingTemplate p)
         {
-            row.PendingTemplates.Remove(t);
+            row.PendingTemplates.Remove(p);
             RefreshPendingList(row);
         }
     }
@@ -254,7 +270,7 @@ public partial class TemplateResolutionWizardView : UserControl
     {
         PendingTemplatesList.ItemsSource = null;
         PendingTemplatesList.ItemsSource = row.PendingTemplates;
-        PendingTemplatesList.DisplayMemberBinding = new Avalonia.Data.Binding("TemplateNumber");
+        PendingTemplatesList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
     }
 
     // ── Finish ───────────────────────────────────────────────────────────────
@@ -320,12 +336,13 @@ public partial class TemplateResolutionWizardView : UserControl
                 hwItemId = row.CreatedItem.Id;
 
                 // Link staged templates to the new hardware item
-                foreach (var tpl in row.PendingTemplates)
+                foreach (var pending in row.PendingTemplates)
                 {
                     hitRepo.Add(new HardwareItemTemplate
                     {
                         HardwareItemId       = hwItemId,
-                        IndividualTemplateId = tpl.Id
+                        IndividualTemplateId = pending.Template.Id,
+                        JobId                = pending.IsJobSpecific ? _jobId : null
                     });
                 }
             }
@@ -401,21 +418,22 @@ public partial class TemplateResolutionWizardView : UserControl
         var descId   = (descItem == null || descItem.Id == 0) ? (int?)null : descItem.Id;
 
         using var ctx = DatabaseInitializer.CreateContext();
-        var query = ctx.IndividualTemplates
+        var templateRepo = new IndividualTemplateRepository(ctx);
+        var query = templateRepo.GetVisibleForJob(_jobId)
             .Include(t => t.Manufacturer)
-            .Include(t => t.Description)
-            .AsQueryable();
+            .Include(t => t.Description);
 
+        IQueryable<IndividualTemplate> filtered = query;
         if (mfrId > 0)
-            query = query.Where(t => t.ManufacturerId == mfrId);
+            filtered = filtered.Where(t => t.ManufacturerId == mfrId);
 
         if (descId.HasValue)
-            query = query.Where(t => t.DescriptionId == descId.Value);
+            filtered = filtered.Where(t => t.DescriptionId == descId.Value);
 
         if (!string.IsNullOrEmpty(num))
-            query = query.Where(t => t.TemplateNumber.Contains(num));
+            filtered = filtered.Where(t => t.TemplateNumber.Contains(num));
 
-        var results = query.OrderBy(t => t.TemplateNumber).ToList();
+        var results = filtered.OrderBy(t => t.TemplateNumber).ToList();
         SearchTplResultsList.ItemsSource = results;
         SearchTplResultsList.DisplayMemberBinding = new Avalonia.Data.Binding("TemplateNumber");
         SearchTplStatusLabel.Text = "";
@@ -435,14 +453,15 @@ public partial class TemplateResolutionWizardView : UserControl
             return;
         }
 
-        if (row.PendingTemplates.Any(p => p.Id == t.Id))
+        if (row.PendingTemplates.Any(p => p.Template.Id == t.Id))
         {
             SearchTplStatusLabel.Text = $"Already staged: {t.TemplateNumber}";
             SearchTplStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
             return;
         }
 
-        row.PendingTemplates.Add(t);
+        // Staged-from-search templates are not job-specific by default.
+        row.PendingTemplates.Add(new BulkPendingTemplate { Template = t, IsJobSpecific = false });
         RefreshPendingList(row);
         SearchTplStatusLabel.Text = $"Staged: {t.TemplateNumber}";
         SearchTplStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;

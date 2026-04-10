@@ -21,4 +21,14 @@ public class HardwareItemTemplate
 
     /// <summary>Gets or sets the associated individual template.</summary>
     public IndividualTemplate IndividualTemplate { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the optional foreign key to the job this link is scoped to.
+    /// Null means the link is globally visible (included in all jobs' PDF packages).
+    /// Non-null means the link is only included when generating packages for that specific job.
+    /// </summary>
+    public int? JobId { get; set; }
+
+    /// <summary>Gets or sets the job this link is scoped to (null = global).</summary>
+    public Job? Job { get; set; }
 }

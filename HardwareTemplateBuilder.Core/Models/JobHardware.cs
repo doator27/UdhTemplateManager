@@ -57,4 +57,15 @@ public class JobHardware
         !string.IsNullOrWhiteSpace(CustomDescription)
             ? CustomDescription
             : HardwareItem?.ModelNumber ?? $"Item #{HardwareItemId}";
+
+    /// <summary>
+    /// Returns a full display string in the form
+    /// "{Manufacturer} - {Description} - {ModelNumber}" for the linked hardware list.
+    /// Requires <see cref="HardwareItem"/> with <c>Manufacturer</c> and <c>Description</c>
+    /// navigation properties loaded.
+    /// </summary>
+    public string FullDisplayLabel =>
+        $"{HardwareItem?.Manufacturer?.ManufacturerName ?? "?"} - " +
+        $"{HardwareItem?.Description?.DescriptionText ?? "?"} - " +
+        $"{HardwareItem?.ModelNumber ?? "?"}";
 }

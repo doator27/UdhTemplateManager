@@ -62,6 +62,15 @@ public class IndividualTemplate
     /// <summary>Gets or sets the local filesystem path to a cached copy of the PDF.</summary>
     public string? LocalLink { get; set; }
 
+    /// <summary>
+    /// Gets or sets the optional foreign key to the job that originally created this template.
+    /// Null means the template is globally visible; non-null means it is hidden from other jobs' searches.
+    /// </summary>
+    public int? OriginJobId { get; set; }
+
+    /// <summary>Gets or sets the job that originally created this template (null = global).</summary>
+    public Job? OriginJob { get; set; }
+
     /// <summary>Gets or sets the junction records linking this template to hardware items.</summary>
     public ICollection<HardwareItemTemplate> HardwareItemTemplates { get; set; } = new List<HardwareItemTemplate>();
 

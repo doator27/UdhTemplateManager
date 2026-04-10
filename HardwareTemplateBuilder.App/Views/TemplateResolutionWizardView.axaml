@@ -47,35 +47,40 @@
                     <StackPanel>
                         <TextBlock Text="Add Templates for this new item:" FontWeight="Bold" Margin="0,0,0,6"/>
 
-                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
                               Margin="0,0,0,6">
                             <!-- Row 0–1: Template # (full width) -->
                             <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Text="Template #:" Margin="0,0,0,2"/>
-                            <TextBox   Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Name="TplNumberBox" Margin="0,0,0,8"/>
+                            <TextBox   Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Name="TplNumberBox" Margin="0,0,0,4"/>
 
-                            <!-- Row 2–3: Description | Door Material -->
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Description:"   Margin="0,0,8,2"/>
-                            <ComboBox  Grid.Row="3" Grid.Column="0" Name="TplDescCombo"   HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Door Material:" Margin="0,0,0,2"/>
-                            <ComboBox  Grid.Row="3" Grid.Column="1" Name="TplMaterialCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+                            <!-- Row 2: Job-specific toggle -->
+                            <CheckBox  Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Name="TplJobSpecificCheck"
+                                       Content="Job-specific (hidden from other jobs' template searches)"
+                                       Margin="0,0,0,8"/>
 
-                            <!-- Row 4–5: Num Pages | Pages To Print -->
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Num Pages:"     Margin="0,0,8,2"/>
-                            <TextBox   Grid.Row="5" Grid.Column="0" Name="TplNumPagesBox" Text="1" Margin="0,0,8,8"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Pages To Print:" Margin="0,0,0,2"/>
-                            <TextBox   Grid.Row="5" Grid.Column="1" Name="TplPagesBox"    Watermark="e.g. 1  or  1,3-5" Margin="0,0,0,8"/>
+                            <!-- Row 3–4: Description | Door Material -->
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Description:"   Margin="0,0,8,2"/>
+                            <ComboBox  Grid.Row="4" Grid.Column="0" Name="TplDescCombo"   HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Door Material:" Margin="0,0,0,2"/>
+                            <ComboBox  Grid.Row="4" Grid.Column="1" Name="TplMaterialCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
 
-                            <!-- Row 6–7: Pages To Rotate | Rotation Direction -->
-                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Pages To Rotate:" Margin="0,0,8,2"/>
-                            <TextBox   Grid.Row="7" Grid.Column="0" Name="TplPagesToRotateBox" Watermark="optional, e.g. 2,4" Margin="0,0,8,8"/>
-                            <TextBlock Grid.Row="6" Grid.Column="1" Text="Rotation Direction (°):" Margin="0,0,0,2"/>
-                            <TextBox   Grid.Row="7" Grid.Column="1" Name="TplRotationDirectionBox" Watermark="e.g. 90 or -90" Margin="0,0,0,8"/>
+                            <!-- Row 5–6: Num Pages | Pages To Print -->
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Num Pages:"     Margin="0,0,8,2"/>
+                            <TextBox   Grid.Row="6" Grid.Column="0" Name="TplNumPagesBox" Text="1" Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="5" Grid.Column="1" Text="Pages To Print:" Margin="0,0,0,2"/>
+                            <TextBox   Grid.Row="6" Grid.Column="1" Name="TplPagesBox"    Watermark="e.g. 1  or  1,3-5" Margin="0,0,0,8"/>
 
-                            <!-- Row 8: Online Link (full width) -->
-                            <TextBlock Grid.Row="8" Grid.Column="0" Text="Online Link (optional):" Margin="0,0,8,2"/>
-                            <TextBox   Grid.Row="9" Grid.Column="0" Name="TplOnlineLinkBox" Watermark="https://..." Margin="0,0,8,0"/>
-                            <TextBlock Grid.Row="8" Grid.Column="1" Text="Local File (optional):" Margin="0,0,0,2"/>
-                            <Grid      Grid.Row="9" Grid.Column="1" ColumnDefinitions="*,Auto">
+                            <!-- Row 7–8: Pages To Rotate | Rotation Direction -->
+                            <TextBlock Grid.Row="7" Grid.Column="0" Text="Pages To Rotate:" Margin="0,0,8,2"/>
+                            <TextBox   Grid.Row="8" Grid.Column="0" Name="TplPagesToRotateBox" Watermark="optional, e.g. 2,4" Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="7" Grid.Column="1" Text="Rotation Direction (°):" Margin="0,0,0,2"/>
+                            <TextBox   Grid.Row="8" Grid.Column="1" Name="TplRotationDirectionBox" Watermark="e.g. 90 or -90" Margin="0,0,0,8"/>
+
+                            <!-- Row 9–10: Online Link | Local File -->
+                            <TextBlock Grid.Row="9"  Grid.Column="0" Text="Online Link (optional):" Margin="0,0,8,2"/>
+                            <TextBox   Grid.Row="10" Grid.Column="0" Name="TplOnlineLinkBox" Watermark="https://..." Margin="0,0,8,0"/>
+                            <TextBlock Grid.Row="9"  Grid.Column="1" Text="Local File (optional):" Margin="0,0,0,2"/>
+                            <Grid      Grid.Row="10" Grid.Column="1" ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0" Name="TplLocalLinkBox" Watermark="Path to PDF..."/>
                                 <Button  Grid.Column="1" Name="TplBrowseButton" Content="..." Width="32" Margin="4,0,0,0"/>
                             </Grid>

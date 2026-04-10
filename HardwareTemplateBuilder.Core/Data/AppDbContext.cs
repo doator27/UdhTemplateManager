@@ -154,6 +154,20 @@ public class AppDbContext : DbContext
             .HasForeignKey(hit => hit.IndividualTemplateId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // HardwareItemTemplate → Job (optional; set null on job delete)
+        modelBuilder.Entity<HardwareItemTemplate>()
+            .HasOne(hit => hit.Job)
+            .WithMany()
+            .HasForeignKey(hit => hit.JobId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // IndividualTemplate → Job (optional OriginJob; set null on job delete)
+        modelBuilder.Entity<IndividualTemplate>()
+            .HasOne(t => t.OriginJob)
+            .WithMany()
+            .HasForeignKey(t => t.OriginJobId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Job → Customer
         modelBuilder.Entity<Job>()
             .HasOne(j => j.Customer)

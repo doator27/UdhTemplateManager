@@ -6,7 +6,6 @@
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <Button DockPanel.Dock="Left" Name="MainMenuButton"     Content="← Main Menu"     Margin="0,0,8,0"/>
             <Button DockPanel.Dock="Left" Name="BackButton"         Content="← Back to Jobs"  Margin="0,0,8,0"/>
-            <Button DockPanel.Dock="Left" Name="BulkAddButton"      Content="Bulk Add Hardware" Margin="0,0,12,0"/>
             <Button DockPanel.Dock="Left" Name="MarkCompleteButton" Content="✓ Mark Complete"  Margin="0,0,6,0"/>
             <Button DockPanel.Dock="Left" Name="ReactivateButton"   Content="↺ Reactivate"    IsVisible="False" Margin="0,0,6,0"/>
             <TextBlock Name="JobStatusLabel" DockPanel.Dock="Left"  VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#606060" FontStyle="Italic"/>
@@ -40,6 +39,9 @@
                         </StackPanel>
                     </StackPanel>
                 </Border>
+
+                <Button Name="BulkAddButton" Content="Add Hardware"
+                        HorizontalAlignment="Left" Margin="0,0,0,8"/>
 
                 <!-- Linked Hardware Items sub-panel -->
                 <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
@@ -105,106 +107,8 @@
                             </Border>
 
                             <ListBox Name="LinkedHardwareList" Height="120" Margin="0,0,0,8"/>
-                            <Button Name="RemoveHardwareButton" Content="Remove from Job" HorizontalAlignment="Left" Margin="0,0,0,12"/>
-
-                            <TextBlock Text="Search Hardware Items to Add:" FontWeight="Bold" Margin="0,0,0,4"/>
-                            <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,4">
-                                <ComboBox Grid.Column="0" Name="SearchMfrCombo"  HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
-                                <ComboBox Grid.Column="1" Name="SearchDescCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
-                                <TextBox  Grid.Column="2" Name="SearchModelBox"  Watermark="Model #"/>
-                            </Grid>
-                            <ListBox Name="HardwareSearchList" Height="120" Margin="0,0,0,8"/>
-                            <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,8">
-                                <TextBlock Grid.Column="0" Text="Custom label (optional):" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBox   Grid.Column="1" Name="CustomDescBox" Watermark="Leave blank to use model number"/>
-                            </Grid>
-                            <Button Name="AddHardwareButton" Content="Add to Job" HorizontalAlignment="Left"/>
-                            <TextBlock Name="LinkStatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Quick Create sub-panel -->
-                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
-                    <StackPanel>
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Name="ToggleQuickCreateButton"
-                                    Content="▼" Width="28" Padding="2,0" Height="22"/>
-                            <TextBlock Text="Quick Create" FontWeight="Bold" VerticalAlignment="Center"/>
-                        </DockPanel>
-
-                        <StackPanel Name="QuickCreateBody" IsVisible="False" Margin="0,6,0,0">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Button Name="ToggleNewHardwareButton"    Content="+ Hardware Item"/>
-                                <Button Name="ToggleNewDescriptionButton" Content="+ Description"/>
-                                <Button Name="ToggleNewTemplateButton"    Content="+ Template"/>
-                            </StackPanel>
-
-                            <!-- New Hardware Item form -->
-                            <Border Name="NewHardwarePanel" IsVisible="False" BorderBrush="#B0B0B0"
-                                    BorderThickness="1" Padding="8" Margin="0,8,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="New Hardware Item" FontWeight="Bold" Margin="0,0,0,6"/>
-                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,0,0,6">
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <ComboBox  Grid.Row="0" Grid.Column="1" Name="NewHwMfrCombo" HorizontalAlignment="Stretch" Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <ComboBox  Grid.Row="1" Grid.Column="1" Name="NewHwDescCombo" HorizontalAlignment="Stretch" Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Model #:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <TextBox   Grid.Row="2" Grid.Column="1" Name="NewHwModelBox" Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Notes:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBox   Grid.Row="3" Grid.Column="1" Name="NewHwNotesBox" Watermark="Optional"/>
-                                    </Grid>
-                                    <CheckBox Name="NewHwAddToJobCheck" Content="Add to job after creating" IsChecked="True" Margin="0,0,0,6"/>
-                                    <Button Name="CreateHardwareButton" Content="Create Hardware Item" HorizontalAlignment="Left"/>
-                                    <TextBlock Name="NewHwStatusLabel" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="#800000"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- New Description form -->
-                            <Border Name="NewDescriptionPanel" IsVisible="False" BorderBrush="#B0B0B0"
-                                    BorderThickness="1" Padding="8" Margin="0,8,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="New Description" FontWeight="Bold" Margin="0,0,0,6"/>
-                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,6">
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Parent:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <ComboBox  Grid.Row="0" Grid.Column="1" Name="NewDescParentCombo" HorizontalAlignment="Stretch" Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Name:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBox   Grid.Row="1" Grid.Column="1" Name="NewDescNameBox"/>
-                                    </Grid>
-                                    <Button Name="CreateDescriptionButton" Content="Create Description" HorizontalAlignment="Left"/>
-                                    <TextBlock Name="NewDescStatusLabel" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="#800000"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- New Template form -->
-                            <Border Name="NewTemplatePanel" IsVisible="False" BorderBrush="#B0B0B0"
-                                    BorderThickness="1" Padding="8" Margin="0,8,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="New Template" FontWeight="Bold" Margin="0,0,0,6"/>
-                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Link to item:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <ComboBox  Grid.Row="0" Grid.Column="1" Name="NewTplHardwareCombo" HorizontalAlignment="Stretch" Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Template #:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <TextBox   Grid.Row="1" Grid.Column="1" Name="NewTplNumberBox" Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <ComboBox  Grid.Row="2" Grid.Column="1" Name="NewTplDescCombo" HorizontalAlignment="Stretch" Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Pages to print:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <TextBox   Grid.Row="3" Grid.Column="1" Name="NewTplPagesBox" Watermark="e.g. 1  or  1-3  or  1,3,5" Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Door material:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <ComboBox  Grid.Row="4" Grid.Column="1" Name="NewTplMaterialCombo" HorizontalAlignment="Stretch" Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Online link:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <TextBox   Grid.Row="5" Grid.Column="1" Name="NewTplOnlineLinkBox" Watermark="https://..." Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Local file:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <Grid      Grid.Row="6" Grid.Column="1" ColumnDefinitions="*,Auto">
-                                            <TextBox  Grid.Column="0" Name="NewTplLocalLinkBox" Watermark="Path to PDF..."/>
-                                            <Button   Grid.Column="1" Name="NewTplBrowseButton" Content="..." Width="32" Margin="4,0,0,0"/>
-                                        </Grid>
-                                    </Grid>
-                                    <Button Name="CreateTemplateButton" Content="Create &amp; Link Template" HorizontalAlignment="Left"/>
-                                    <TextBlock Name="NewTplStatusLabel" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="#800000"/>
-                                </StackPanel>
-                            </Border>
+                            <Button Name="RemoveHardwareButton" Content="Remove from Job" HorizontalAlignment="Left" Margin="0,0,0,6"/>
+                            <TextBlock Name="LinkStatusLabel" Foreground="#800000"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>

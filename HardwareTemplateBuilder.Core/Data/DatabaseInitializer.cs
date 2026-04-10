@@ -142,6 +142,22 @@ public static class DatabaseInitializer
             cmd.ExecuteNonQuery();
         }
 
+        // Patch: OriginJobId on IndividualTemplates (Phase 35 — job-scoped templates)
+        if (!ColumnExists(conn, "IndividualTemplates", "OriginJobId"))
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "ALTER TABLE \"IndividualTemplates\" ADD COLUMN \"OriginJobId\" INTEGER REFERENCES \"Jobs\"(\"Id\") ON DELETE SET NULL";
+            cmd.ExecuteNonQuery();
+        }
+
+        // Patch: JobId on HardwareItemTemplates (Phase 35 — job-scoped template links)
+        if (!ColumnExists(conn, "HardwareItemTemplates", "JobId"))
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "ALTER TABLE \"HardwareItemTemplates\" ADD COLUMN \"JobId\" INTEGER REFERENCES \"Jobs\"(\"Id\") ON DELETE SET NULL";
+            cmd.ExecuteNonQuery();
+        }
+
         // Patch: SMTP / alert email settings (Phase 24).
         // Uses INSERT OR IGNORE so the operation is safe on both new and existing databases.
         var smtpDefaults = new (string Key, string Value)[]

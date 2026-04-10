@@ -45,7 +45,6 @@ public partial class JobDetailView : UserControl
 
     private bool _isDragging;
     private Point _dragStartPoint;
-    private bool _updatingSearchDescCombo;
 
     /// <summary>Currently selected release ID; null means the base hardware list.</summary>
     private int? _currentReleaseId;
@@ -78,21 +77,8 @@ public partial class JobDetailView : UserControl
         _isComplete = job?.IsComplete ?? false;
         UpdateCompleteButtons();
 
-        // Search combos
-        var anyMfr = new List<Manufacturer> { new Manufacturer { Id = 0, ManufacturerName = "(Any)" } };
-        anyMfr.AddRange(_manufacturers);
-        SearchMfrCombo.ItemsSource = anyMfr;
-        SearchMfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
-        SearchMfrCombo.SelectedIndex = 0;
-
-        var anyDesc = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
-        anyDesc.AddRange(_descComboItems);
-        SearchDescCombo.ItemsSource = anyDesc;
-        SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-        SearchDescCombo.SelectedIndex = 0;
-
         LinkedHardwareList.ItemsSource = _linkedHardware;
-        LinkedHardwareList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayLabel");
+        LinkedHardwareList.DisplayMemberBinding = new Avalonia.Data.Binding("FullDisplayLabel");
 
         LoadLinkedHardware();
 
@@ -115,8 +101,6 @@ public partial class JobDetailView : UserControl
         // Collapsible section toggles
         WireToggle(ToggleAttachmentsButton,     AttachmentsBody);
         WireToggle(ToggleLinkedHardwareButton,  LinkedHardwareBody);
-        WireToggle(ToggleQuickCreateButton,     QuickCreateBody);
-
 
         // Phase 22: Sort + Edit
         SortByMfrButton.Click  += (_, _) => SortLinkedHardware("mfr");
@@ -145,23 +129,9 @@ public partial class JobDetailView : UserControl
         CancelReleaseButton.Click += (_, _) => { NewReleasePanel.IsVisible = false; ReleaseStatusLabel.Text = string.Empty; };
         SaveReleaseButton.Click   += (_, _) => CreateRelease();
 
-        SearchMfrCombo.SelectionChanged += (_, _) => OnSearchMfrChanged();
-        SearchDescCombo.SelectionChanged += (_, _) => { if (!_updatingSearchDescCombo) SearchHardware(); };
-        SearchModelBox.TextChanged += (_, _) => SearchHardware();
-        AddHardwareButton.Click += (_, _) => AddHardwareToJob();
         RemoveHardwareButton.Click += (_, _) => RemoveHardwareFromJob();
         GeneratePackageButton.Click    += async (_, _) => await OnGeneratePackageAsync();
         BrowseOldVersionsButton.Click  += (_, _) => BrowseOldVersions();
-
-        // Quick Create toggles
-        ToggleNewHardwareButton.Click    += (_, _) => TogglePanel(NewHardwarePanel,    InitNewHardwarePanel);
-        ToggleNewDescriptionButton.Click += (_, _) => TogglePanel(NewDescriptionPanel, InitNewDescriptionPanel);
-        ToggleNewTemplateButton.Click    += (_, _) => TogglePanel(NewTemplatePanel,    InitNewTemplatePanel);
-
-        CreateHardwareButton.Click    += (_, _) => CreateHardwareItem();
-        CreateDescriptionButton.Click += (_, _) => CreateDescription();
-        CreateTemplateButton.Click    += async (_, _) => await CreateTemplateAsync();
-        NewTplBrowseButton.Click      += async (_, _) => await BrowseLocalFileAsync();
 
         // Drag-and-drop reorder on linked hardware list
         LinkedHardwareList.AddHandler(PointerPressedEvent, OnLinkedListPointerPressed, RoutingStrategies.Tunnel);
@@ -216,49 +186,6 @@ public partial class JobDetailView : UserControl
         return _linkedHardware[index];
     }
 
-    // --- Search ---
-
-    /// <summary>
-    /// Repopulates the Description search combo to show only descriptions that have at least
-    /// one hardware item made by the selected manufacturer, then re-runs the search.
-    /// </summary>
-    private void OnSearchMfrChanged()
-    {
-        var mfr = SearchMfrCombo.SelectedItem as Manufacturer;
-        var mfrId = mfr?.Id ?? 0;
-
-        var filtered = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
-
-        if (mfrId == 0)
-        {
-            filtered.AddRange(_descComboItems);
-        }
-        else
-        {
-            using var ctx = DatabaseInitializer.CreateContext();
-            var descIds = ctx.HardwareItems
-                .Where(h => h.ManufacturerId == mfrId)
-                .Select(h => h.DescriptionId)
-                .Distinct()
-                .ToHashSet();
-            filtered.AddRange(_descComboItems.Where(d => descIds.Contains(d.Id)));
-        }
-
-        _updatingSearchDescCombo = true;
-        try
-        {
-            SearchDescCombo.ItemsSource = filtered;
-            SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-            SearchDescCombo.SelectedIndex = 0;
-        }
-        finally
-        {
-            _updatingSearchDescCombo = false;
-        }
-
-        SearchHardware();
-    }
-
     // --- Hardware management ---
 
     private void LoadLinkedHardware()
@@ -279,62 +206,6 @@ public partial class JobDetailView : UserControl
 
         foreach (var row in query.ToList())
             _linkedHardware.Add(row);
-    }
-
-    private void SearchHardware()
-    {
-        var mfr      = SearchMfrCombo.SelectedItem as Manufacturer;
-        var descItem = SearchDescCombo.SelectedItem as DescriptionComboItem;
-        var model    = SearchModelBox.Text?.Trim();
-
-        var mfrName = (mfr      == null || mfr.Id      == 0) ? null : mfr.ManufacturerName;
-        var descId  = (descItem == null || descItem.Id == 0) ? (int?)null : descItem.Id;
-
-        using var context = DatabaseInitializer.CreateContext();
-        var repo = new HardwareItemRepository(context);
-        var results = repo.Search(mfrName, descId, model).ToList();
-
-        HardwareSearchList.ItemsSource = results;
-        HardwareSearchList.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
-    }
-
-    private void AddHardwareToJob()
-    {
-        if (HardwareSearchList.SelectedItem is not HardwareItem h) { LinkStatusLabel.Text = "Select a hardware item to add."; return; }
-
-        var customDesc  = CustomDescBox.Text?.Trim();
-        var customLabel = string.IsNullOrWhiteSpace(customDesc) ? null : customDesc;
-
-        using var context = DatabaseInitializer.CreateContext();
-
-        // Duplicate check: same item + same custom label (including both null) is a duplicate.
-        bool isDuplicate = context.JobHardware.Any(jh =>
-            jh.JobId             == _jobId &&
-            jh.HardwareItemId    == h.Id   &&
-            jh.CustomDescription == customLabel);
-
-        if (isDuplicate)
-        {
-            LinkStatusLabel.Text = $"Already in job: {h.ModelNumber}"
-                + (customLabel != null ? $" ({customLabel})" : string.Empty);
-            return;
-        }
-
-        var freqService = new FrequencyService(context);
-        var hardwareItem = context.HardwareItems.Find(h.Id);
-        if (hardwareItem != null) freqService.IncrementFrequency(hardwareItem);
-
-        _jobHardwareRepo!.Add(new JobHardware
-        {
-            JobId             = _jobId,
-            HardwareItemId    = h.Id,
-            CustomDescription = customLabel,
-            ReleaseId         = _currentReleaseId
-        });
-
-        CustomDescBox.Text   = "";
-        LinkStatusLabel.Text = $"Added: {h.ModelNumber}";
-        LoadLinkedHardware();
     }
 
     private void RemoveHardwareFromJob()
@@ -528,7 +399,8 @@ public partial class JobDetailView : UserControl
             var templates = context.HardwareItemTemplates
                 .Include(hit => hit.IndividualTemplate)
                     .ThenInclude(t => t.Manufacturer)
-                .Where(hit => hit.HardwareItemId == hwId)
+                .Where(hit => hit.HardwareItemId == hwId &&
+                              (hit.JobId == null || hit.JobId == _jobId))
                 .Select(hit => hit.IndividualTemplate)
                 .ToList();
 
@@ -614,7 +486,8 @@ public partial class JobDetailView : UserControl
                                 .ThenInclude(t => t.Manufacturer)
                             .Include(hit => hit.IndividualTemplate)
                                 .ThenInclude(t => t.Description)
-                            .Where(hit => hit.HardwareItemId == x.HardwareItemId)
+                            .Where(hit => hit.HardwareItemId == x.HardwareItemId &&
+                                          (hit.JobId == null || hit.JobId == _jobId))
                             .Select(hit => hit.IndividualTemplate)
                             .ToList()
                             .AsReadOnly();
@@ -981,242 +854,6 @@ public partial class JobDetailView : UserControl
     }
 
     // --- Quick Create ---
-
-    private bool _newHardwarePanelReady;
-    private bool _newDescriptionPanelReady;
-    private bool _newTemplatePanelReady;
-
-    private void TogglePanel(Border panel, Action init)
-    {
-        if (!panel.IsVisible)
-        {
-            init();
-            panel.IsVisible = true;
-        }
-        else
-        {
-            panel.IsVisible = false;
-        }
-    }
-
-    private void InitNewHardwarePanel()
-    {
-        if (_newHardwarePanelReady) return;
-        _newHardwarePanelReady = true;
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        var mfrs  = new ManufacturerRepository(ctx).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        var descs = DescriptionHelper.BuildComboItems(new DescriptionRepository(ctx).GetAll());
-
-        NewHwMfrCombo.ItemsSource = mfrs;
-        NewHwMfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
-
-        NewHwDescCombo.ItemsSource = descs;
-        NewHwDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-    }
-
-    private void InitNewDescriptionPanel()
-    {
-        if (_newDescriptionPanelReady) return;
-        _newDescriptionPanelReady = true;
-        RefreshNewDescParentCombo();
-    }
-
-    private void RefreshNewDescParentCombo()
-    {
-        using var ctx = DatabaseInitializer.CreateContext();
-        var items = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(None — top level)" } };
-        items.AddRange(DescriptionHelper.BuildComboItems(new DescriptionRepository(ctx).GetAll()));
-        NewDescParentCombo.ItemsSource = items;
-        NewDescParentCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-        NewDescParentCombo.SelectedIndex = 0;
-    }
-
-    private void InitNewTemplatePanel()
-    {
-        if (_newTemplatePanelReady) return;
-        _newTemplatePanelReady = true;
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        var descs      = DescriptionHelper.BuildComboItems(new DescriptionRepository(ctx).GetAll());
-        var materials  = ctx.DoorMaterials.OrderBy(m => m.Material).ToList();
-
-        NewTplDescCombo.ItemsSource = descs;
-        NewTplDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-
-        NewTplMaterialCombo.ItemsSource = materials;
-        NewTplMaterialCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
-        if (materials.Count > 0) NewTplMaterialCombo.SelectedIndex = 0;
-
-        RefreshNewTemplateHardwareCombo();
-    }
-
-    private void RefreshNewTemplateHardwareCombo()
-    {
-        using var ctx = DatabaseInitializer.CreateContext();
-        var items = ctx.JobHardware
-            .Include(jh => jh.HardwareItem).ThenInclude(h => h.Manufacturer)
-            .Where(jh => jh.JobId == _jobId)
-            .ToList();
-        NewTplHardwareCombo.ItemsSource = items;
-        NewTplHardwareCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayLabel");
-        if (items.Count > 0) NewTplHardwareCombo.SelectedIndex = 0;
-    }
-
-    private void CreateHardwareItem()
-    {
-        NewHwStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
-        NewHwStatusLabel.Text = string.Empty;
-
-        var mfr  = NewHwMfrCombo.SelectedItem  as Manufacturer;
-        var desc = NewHwDescCombo.SelectedItem as DescriptionComboItem;
-        var model = NewHwModelBox.Text?.Trim();
-
-        if (mfr == null)   { NewHwStatusLabel.Text = "Select a manufacturer."; return; }
-        if (desc == null)  { NewHwStatusLabel.Text = "Select a description."; return; }
-        if (string.IsNullOrEmpty(model)) { NewHwStatusLabel.Text = "Enter a model number."; return; }
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        var repo = new HardwareItemRepository(ctx);
-        var item = repo.Add(new HardwareItem
-        {
-            ManufacturerId = mfr.Id,
-            DescriptionId  = desc.Id,
-            ModelNumber    = model,
-            Remarks        = string.IsNullOrWhiteSpace(NewHwNotesBox.Text) ? null : NewHwNotesBox.Text.Trim()
-        });
-
-        if (NewHwAddToJobCheck.IsChecked == true)
-        {
-            new JobHardwareRepository(ctx).Add(new JobHardware
-            {
-                JobId          = _jobId,
-                HardwareItemId = item.Id
-            });
-            LoadLinkedHardware();
-            RefreshNewTemplateHardwareCombo();
-        }
-
-        NewHwStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
-        NewHwStatusLabel.Text = $"Created: {model}" + (NewHwAddToJobCheck.IsChecked == true ? " (added to job)" : string.Empty);
-        NewHwModelBox.Text  = string.Empty;
-        NewHwNotesBox.Text  = string.Empty;
-    }
-
-    private void CreateDescription()
-    {
-        NewDescStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
-        NewDescStatusLabel.Text = string.Empty;
-
-        var name = NewDescNameBox.Text?.Trim();
-        if (string.IsNullOrEmpty(name)) { NewDescStatusLabel.Text = "Enter a description name."; return; }
-
-        var parent = NewDescParentCombo.SelectedItem as DescriptionComboItem;
-        int? parentId = (parent == null || parent.Id == 0) ? null : parent.Id;
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        new DescriptionRepository(ctx).Add(new Description
-        {
-            DescriptionText = name,
-            ParentId        = parentId
-        });
-
-        // Refresh all description combos so the new entry is immediately available.
-        _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(ctx).GetAll());
-
-        var anyDesc = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
-        anyDesc.AddRange(_descComboItems);
-        SearchDescCombo.ItemsSource = anyDesc;
-        SearchDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-
-        if (_newHardwarePanelReady)
-        {
-            NewHwDescCombo.ItemsSource = _descComboItems;
-            NewHwDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-        }
-        if (_newTemplatePanelReady)
-        {
-            NewTplDescCombo.ItemsSource = _descComboItems;
-            NewTplDescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-        }
-
-        RefreshNewDescParentCombo();
-
-        NewDescStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
-        NewDescStatusLabel.Text = $"Created: {name}";
-        NewDescNameBox.Text = string.Empty;
-    }
-
-    private async Task CreateTemplateAsync()
-    {
-        NewTplStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
-        NewTplStatusLabel.Text = string.Empty;
-
-        var jobHw   = NewTplHardwareCombo.SelectedItem as JobHardware;
-        var desc    = NewTplDescCombo.SelectedItem     as DescriptionComboItem;
-        var material = NewTplMaterialCombo.SelectedItem as DoorMaterial;
-        var number  = NewTplNumberBox.Text?.Trim();
-        var pages   = NewTplPagesBox.Text?.Trim();
-        var online  = NewTplOnlineLinkBox.Text?.Trim();
-        var local   = NewTplLocalLinkBox.Text?.Trim();
-
-        if (jobHw == null)  { NewTplStatusLabel.Text = "Select a hardware item to link to."; return; }
-        if (desc == null)   { NewTplStatusLabel.Text = "Select a description."; return; }
-        if (material == null) { NewTplStatusLabel.Text = "Select a door material."; return; }
-        if (string.IsNullOrEmpty(number)) { NewTplStatusLabel.Text = "Enter a template number."; return; }
-        if (string.IsNullOrEmpty(pages))  { NewTplStatusLabel.Text = "Enter pages to print."; return; }
-        if (string.IsNullOrEmpty(online) && string.IsNullOrEmpty(local))
-        { NewTplStatusLabel.Text = "Provide at least an online link or a local file path."; return; }
-
-        using var ctx = DatabaseInitializer.CreateContext();
-
-        var hw = ctx.HardwareItems.Find(jobHw.HardwareItemId);
-        if (hw == null) { NewTplStatusLabel.Text = "Hardware item not found."; return; }
-
-        var template = new IndividualTemplate
-        {
-            ManufacturerId   = hw.ManufacturerId,
-            DescriptionId    = desc.Id,
-            TemplateNumber   = number,
-            PagesToPrint     = pages,
-            DoorMaterialId   = material.Id,
-            OnlineLink       = string.IsNullOrEmpty(online) ? null : online,
-            LocalLink        = string.IsNullOrEmpty(local)  ? null : local
-        };
-
-        ctx.IndividualTemplates.Add(template);
-        ctx.SaveChanges();
-
-        ctx.HardwareItemTemplates.Add(new HardwareItemTemplate
-        {
-            HardwareItemId       = hw.Id,
-            IndividualTemplateId = template.Id
-        });
-        ctx.SaveChanges();
-
-        NewTplStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
-        NewTplStatusLabel.Text = $"Created and linked: {number}";
-        NewTplNumberBox.Text = string.Empty;
-        NewTplPagesBox.Text  = string.Empty;
-        NewTplOnlineLinkBox.Text = string.Empty;
-        NewTplLocalLinkBox.Text  = string.Empty;
-    }
-
-    private async Task BrowseLocalFileAsync()
-    {
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
-
-        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title         = "Select Template PDF",
-            AllowMultiple = false,
-            FileTypeFilter = new[] { new FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } } }
-        });
-
-        if (files.Count > 0)
-            NewTplLocalLinkBox.Text = files[0].Path.LocalPath;
-    }
 
     // --- History ---
 
