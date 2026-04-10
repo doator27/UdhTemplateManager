@@ -17,7 +17,6 @@ namespace HardwareTemplateBuilder.App.Views;
 /// <summary>CRUD view for managing <see cref="IndividualTemplate"/> records.</summary>
 public partial class IndividualTemplatesView : UserControl
 {
-    private IndividualTemplateRepository? _repo;
     private List<Manufacturer> _manufacturers = new();
     private List<DescriptionComboItem> _descComboItems = new();
     private List<DoorMaterial> _doorMaterials = new();
@@ -36,11 +35,12 @@ public partial class IndividualTemplatesView : UserControl
 
     private void Initialize()
     {
-        var context = DatabaseInitializer.CreateContext();
-        _repo = new IndividualTemplateRepository(context);
-        _manufacturers = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
-        _doorMaterials = new DoorMaterialRepository(context).GetAll().ToList();
+        using (var context = DatabaseInitializer.CreateContext())
+        {
+            _manufacturers = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
+            _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
+            _doorMaterials = new DoorMaterialRepository(context).GetAll().ToList();
+        }
 
         ManufacturerCombo.ItemsSource = _manufacturers;
         ManufacturerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
@@ -92,7 +92,8 @@ public partial class IndividualTemplatesView : UserControl
         var matFilter = DoorMaterialFilterCombo.SelectedItem as DoorMaterial;
         var matId = matFilter?.Id ?? 0;
 
-        var items = _repo!.GetAll()
+        using var ctx = DatabaseInitializer.CreateContext();
+        var items = ctx.IndividualTemplates
             .Where(t => string.IsNullOrEmpty(filter) || t.TemplateNumber.ToLower().Contains(filter))
             .Where(t => matId == 0 || t.DoorMaterialId == matId)
             .OrderBy(t => t.TemplateNumber)
@@ -164,26 +165,29 @@ public partial class IndividualTemplatesView : UserControl
         int savedId;
         if (_selectedId == 0)
         {
-            var saved = _repo!.Add(entity);
+            using var ctx = DatabaseInitializer.CreateContext();
+            var saved = new IndividualTemplateRepository(ctx).Add(entity);
             savedId = saved.Id;
+            _selectedId = savedId;
         }
         else
         {
             savedId = _selectedId;
-            var existing = _repo!.GetById(_selectedId);
+            using var ctx = DatabaseInitializer.CreateContext();
+            var existing = ctx.IndividualTemplates.Find(_selectedId);
             if (existing != null)
             {
-                existing.ManufacturerId = entity.ManufacturerId;
-                existing.DescriptionId = entity.DescriptionId;
-                existing.TemplateNumber = entity.TemplateNumber;
-                existing.NumPages = entity.NumPages;
-                existing.PagesToPrint = entity.PagesToPrint;
-                existing.PagesToRotate = entity.PagesToRotate;
+                existing.ManufacturerId    = entity.ManufacturerId;
+                existing.DescriptionId     = entity.DescriptionId;
+                existing.TemplateNumber    = entity.TemplateNumber;
+                existing.NumPages          = entity.NumPages;
+                existing.PagesToPrint      = entity.PagesToPrint;
+                existing.PagesToRotate     = entity.PagesToRotate;
                 existing.RotationDirection = entity.RotationDirection;
-                existing.DoorMaterialId = entity.DoorMaterialId;
-                existing.OnlineLink = entity.OnlineLink;
-                existing.LocalLink = entity.LocalLink;
-                _repo.Update(existing);
+                existing.DoorMaterialId    = entity.DoorMaterialId;
+                existing.OnlineLink        = entity.OnlineLink;
+                existing.LocalLink         = entity.LocalLink;
+                ctx.SaveChanges();
             }
         }
 
@@ -236,7 +240,8 @@ public partial class IndividualTemplatesView : UserControl
     private void DeleteSelected()
     {
         if (_selectedId == 0) return;
-        _repo!.Delete(_selectedId);
+        using var ctx = DatabaseInitializer.CreateContext();
+        new IndividualTemplateRepository(ctx).Delete(_selectedId);
         ClearForm();
         LoadList();
     }
