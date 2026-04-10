@@ -914,3 +914,168 @@ Phase 26 (Jobs Home Page) — baseline for this group
 > Phase 30 should precede Phase 34 — creator tracking is most useful once multiple users share the same database.
 > Phase 32 has no schema changes and does not affect any other phase.
 > Phase 23 is the most complex of the group — plan a dedicated session for schema migration + UI work.
+
+---
+
+## Phase 35 — Job-Specific Templates and Quick-Create Removal
+
+**Goal:** The template-staging step in the bulk add wizard gains a "Job-specific" checkbox. When checked, the template is hidden from every other job's template search and is linked only to the current job's PDF assembly. Simultaneously, the unused Quick Create panel (inline hardware/description/template creation in `JobDetailView`) is removed to reduce UI surface area.
+
+---
+
+### Background and design rationale
+
+Currently every `IndividualTemplate` and every `HardwareItemTemplate` link is global — a template staged for one job becomes visible and linked to that hardware item for all future jobs. The new behaviour introduces two scoping controls:
+
+| Column | Table | Meaning |
+|---|---|---|
+| `OriginJobId INT? FK→Jobs` | `IndividualTemplate` | Which job originally created this template. `NULL` = globally visible. Non-null = hidden from all other jobs' searches. |
+| `JobId INT? FK→Jobs` | `HardwareItemTemplate` | Which job this hardware-template link belongs to. `NULL` = applies to all jobs. Non-null = included in PDF assembly for that job only. |
+
+**Deduplication behaviour:** `IndividualTemplateRepository.FindDuplicate` already matches on (TemplateNumber, ManufacturerId, DescriptionId, DoorMaterialId). If an existing record is found — whether global or job-specific for a different job — it is reused as-is. Only the `HardwareItemTemplate` link that is created in `OnFinish()` is scoped to the current job (via `JobId`). The `OriginJobId` on the returned duplicate template is never mutated.
+
+**Carrying the job-specific intent through staging:** Because `FindDuplicate` may return a template whose `OriginJobId` belongs to a different job, the "is this template job-specific?" intent must live on the pending row, not solely on the template record. `BulkHardwareRow.PendingTemplates` changes from `List<IndividualTemplate>` to `List<BulkPendingTemplate>` (a new lightweight wrapper defined in `BulkAddSession.cs`).
+
+---
+
+### Schema changes
+
+**`IndividualTemplate` — add column `OriginJobId`:**
+- Nullable `int` FK referencing `Jobs.Id`, `ON DELETE SET NULL`.
+- `NULL` = globally available template; non-null = job-scoped.
+
+**`HardwareItemTemplate` — add column `JobId`:**
+- Nullable `int` FK referencing `Jobs.Id`, `ON DELETE SET NULL`.
+- `NULL` = global hardware-template link; non-null = applies to one job only.
+
+Apply both changes as a single EF Core migration (`AddJobScopedTemplates`). Add idempotent `EnsureSchemaPatches()` blocks for both columns so existing databases are patched on first launch.
+
+---
+
+### Model and session changes
+
+**`BulkPendingTemplate` (new, `BulkAddSession.cs`):**
+```csharp
+public class BulkPendingTemplate
+{
+    public IndividualTemplate Template { get; set; } = null!;
+    /// <summary>When true, the HardwareItemTemplate link is scoped to the current job.</summary>
+    public bool IsJobSpecific { get; set; }
+}
+```
+
+**`BulkHardwareRow`:**
+- Change `PendingTemplates` from `List<IndividualTemplate>` to `List<BulkPendingTemplate>`.
+- Update all callers (`AddPendingTemplate`, `RemovePendingTemplate`, `RefreshPendingList`, `StageSearchResult`, `OnFinish`) to use the wrapper.
+
+**`IndividualTemplate.cs`:**
+- Add `public int? OriginJobId { get; set; }` and navigation property `public Job? OriginJob { get; set; }`.
+
+**`HardwareItemTemplate.cs`:**
+- Add `public int? JobId { get; set; }` and navigation property `public Job? Job { get; set; }`.
+
+**`AppDbContext.cs`:**
+- Configure both new FKs with `OnDelete(DeleteBehavior.SetNull)`.
+
+---
+
+### Repository changes
+
+**`HardwareItemTemplateRepository`:**
+- Add `GetByHardwareItem(int hardwareItemId, int? jobId)` overload: returns templates where `JobId IS NULL OR JobId = jobId`.
+- The existing parameterless `GetByHardwareItemId` (used by non-job contexts) is unchanged.
+
+**`IndividualTemplateRepository`:**
+- `FindDuplicate`: no change — key match already ignores `OriginJobId`.
+- Add `GetVisibleForJob(int jobId)`: returns templates where `OriginJobId IS NULL OR OriginJobId = jobId`. Used by the wizard's search panel.
+
+---
+
+### Wizard changes (`TemplateResolutionWizardView.axaml/.cs`)
+
+**AXAML:**
+- Add a `CheckBox` labelled "Job-specific (hide from other jobs)" to the add-template form, placed below the template number field. Name it `JobSpecificCheck`.
+
+**`AddPendingTemplate()`:**
+- After `templateRepo.Add(candidate)`, construct a `BulkPendingTemplate { Template = saved, IsJobSpecific = JobSpecificCheck.IsChecked == true }`.
+- If `IsJobSpecific` and `saved.OriginJobId == null` (i.e. the template was newly created, not a dedup hit against an existing global template): set `saved.OriginJobId = _jobId` and call `ctx.SaveChanges()` to persist the origin marker.
+- Append the `BulkPendingTemplate` to `row.PendingTemplates`.
+
+**`RefreshPendingList(BulkHardwareRow row)`:**
+- Bind `row.PendingTemplates` as before; update `DisplayMemberBinding` to show `Template.TemplateNumber` (via `BulkPendingTemplate.Template`).
+- Optionally suffix job-specific entries with `" [job]"` in the display.
+
+**`RemovePendingTemplate()`:**
+- Unwrap `PendingTemplatesList.SelectedItem as BulkPendingTemplate` instead of `IndividualTemplate`.
+
+**`StageSearchResult()` / `RunTemplateSearch()`:**
+- Filter the template search query: `WHERE OriginJobId IS NULL OR OriginJobId = _jobId`.
+- Use `IndividualTemplateRepository.GetVisibleForJob(_jobId)` as the source.
+
+**`OnFinish()` — Case B template linking:**
+- For each `BulkPendingTemplate pending` in `row.PendingTemplates`:
+  ```csharp
+  hitRepo.Add(new HardwareItemTemplate
+  {
+      HardwareItemId       = hwItemId,
+      IndividualTemplateId = pending.Template.Id,
+      JobId                = pending.IsJobSpecific ? _jobId : (int?)null
+  });
+  ```
+
+---
+
+### PDF assembly changes (`JobDetailView.axaml.cs`)
+
+When building the `AssemblyRequest.Hardware` list, replace the current `ctx.HardwareItemTemplates.Where(hit => hit.HardwareItemId == item.Id)` query with a job-aware query:
+```csharp
+.Where(hit => hit.HardwareItemId == item.Id
+           && (hit.JobId == null || hit.JobId == _jobId))
+```
+This ensures job-specific templates from other jobs are excluded while global and current-job-specific templates are both included.
+
+---
+
+### Quick Create removal (`JobDetailView.axaml/.cs`)
+
+**`JobDetailView.axaml` — remove entirely:**
+- The `ToggleQuickCreateButton` / `QuickCreateBody` collapsible section header
+- `NewHardwarePanel` (manufacturer + description + model + notes form)
+- `NewDescriptionPanel` (parent description + name form)
+- `NewTemplatePanel` (hardware link + number + description + material + links form)
+
+**`JobDetailView.axaml.cs` — remove entirely:**
+- `WireToggle(ToggleQuickCreateButton, QuickCreateBody)` call in `Initialize()`
+- `ToggleNewHardwareButton.Click`, `ToggleNewDescriptionButton.Click`, `ToggleNewTemplateButton.Click` handlers
+- `CreateHardwareButton.Click`, `CreateDescriptionButton.Click`, `CreateTemplateButton.Click` handlers
+- `InitNewHardwarePanel()`, `InitNewDescriptionPanel()`, `InitNewTemplatePanel()`, `RefreshNewTemplateHardwareCombo()` methods
+- `CreateHardwareItem()`, `CreateDescription()`, `CreateTemplateAsync()` methods
+
+The "Linked Hardware Items" search-and-add section (searching existing items by manufacturer/description/model and adding them to the job) is **not** removed — it is separate from Quick Create and remains in use.
+
+---
+
+### Deliverable
+
+- The bulk add wizard shows a "Job-specific" checkbox when staging a new template. Checked templates are stored with `OriginJobId` set and linked with a scoped `HardwareItemTemplate.JobId`; unchecked templates behave exactly as before.
+- PDF assembly for a job includes both global templates and job-specific templates for that job, and excludes job-specific templates belonging to other jobs.
+- Template search in the wizard hides templates originating from other jobs.
+- The Quick Create panel is gone from `JobDetailView`, eliminating dead UI surface.
+
+---
+
+## Dependency Map (Phases 30–35)
+
+```
+Phase 26 (Jobs Home Page) — baseline for this group
+  ├── Phase 30 (Multi-User DB Access)    ← foundational; recommended before Phase 34
+  ├── Phase 31 (Description Combobox)   ← UI-only within BulkHardwareEntryView; independent
+  ├── Phase 32 (Page Numbering Fix)      ← service-only; independent
+  ├── Phase 33 (Copy Job on Creation)   ← extends JobCreationView; independent
+  ├── Phase 34 (Job Creator Tracking)   ← Phase 30 recommended first (shared DB gives it value)
+  └── Phase 35 (Job-Specific Templates) ← extends Phases 25–26 bulk flow; independent of 30–34
+```
+
+> Phase 35 touches the bulk add wizard (Phase 25), the PDF assembly pipeline (Phase 8/10), and JobDetailView.
+> The Quick Create removal in Phase 35 is purely subtractive — no risk of regression to the linked-hardware search section.
+> Phase 35 has no dependency on Phases 30–34 and can be developed independently.

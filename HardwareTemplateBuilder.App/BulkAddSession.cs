@@ -17,6 +17,28 @@ public class BulkHardwareLabel
 }
 
 /// <summary>
+/// Wraps a staged <see cref="IndividualTemplate"/> together with the job-scoping flag
+/// set by the user in the template resolution wizard.
+/// </summary>
+public class BulkPendingTemplate
+{
+    /// <summary>Gets or sets the staged template (may be a deduped existing record).</summary>
+    public IndividualTemplate Template { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets whether this template link should be scoped to the current job only.
+    /// When true, <c>HardwareItemTemplate.JobId</c> is set to the current job on Finish.
+    /// </summary>
+    public bool IsJobSpecific { get; set; }
+
+    /// <summary>
+    /// Gets a display string for list binding: template number with an optional "[job]" suffix.
+    /// </summary>
+    public string DisplayText =>
+        IsJobSpecific ? $"{Template.TemplateNumber} [job]" : Template.TemplateNumber;
+}
+
+/// <summary>
 /// Represents one row entered in the bulk hardware entry view.
 /// Carries the user's input plus resolved state for the wizard.
 /// </summary>
@@ -48,9 +70,9 @@ public class BulkHardwareRow
 
     /// <summary>
     /// Gets or sets the templates staged for a new (Case B) hardware item.
-    /// Populated during the wizard before the item is persisted.
+    /// Each entry carries the template and a job-scoping flag set by the user.
     /// </summary>
-    public List<IndividualTemplate> PendingTemplates { get; set; } = new();
+    public List<BulkPendingTemplate> PendingTemplates { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the hardware item record created during the wizard for Case B rows.

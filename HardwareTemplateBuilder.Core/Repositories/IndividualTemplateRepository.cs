@@ -16,4 +16,14 @@ public class IndividualTemplateRepository : RepositoryBase<IndividualTemplate>
             t.ManufacturerId == entity.ManufacturerId &&
             t.TemplateNumber == entity.TemplateNumber &&
             t.DoorMaterialId == entity.DoorMaterialId);
+
+    /// <summary>
+    /// Returns all templates visible for the given job: globally-visible templates
+    /// (<c>OriginJobId IS NULL</c>) plus templates originally created for
+    /// <paramref name="jobId"/>.
+    /// </summary>
+    /// <param name="jobId">The job to include job-specific templates for.</param>
+    public IQueryable<IndividualTemplate> GetVisibleForJob(int jobId) =>
+        _context.IndividualTemplates
+            .Where(t => t.OriginJobId == null || t.OriginJobId == jobId);
 }
