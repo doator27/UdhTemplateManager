@@ -38,10 +38,10 @@
                 <!-- Linked Hardware Items sub-panel -->
                 <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                     <StackPanel>
-                        <DockPanel Margin="0,0,0,6">
-                            <Button DockPanel.Dock="Right" Name="BulkAddButton" Content="Add Hardware" Margin="4,0,0,0"/>
-                            <TextBlock Text="Linked Hardware Items" FontWeight="Bold" VerticalAlignment="Center"/>
-                        </DockPanel>
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="Linked Hardware Items" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,0,6"/>
+							<Button DockPanel.Dock="Left" Name="BulkAddButton" Content="Add Hardware" Margin="0,0,0,0"/>
+                        </StackPanel>
 
                         <StackPanel Name="LinkedHardwareBody">
 
