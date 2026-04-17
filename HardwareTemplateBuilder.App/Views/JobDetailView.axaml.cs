@@ -741,66 +741,96 @@ public partial class JobDetailView : UserControl
 
     private async Task AddAttachmentAsync(string fileType)
     {
-        AttachmentStatusLabel.Text = "";
-        var topLevel = TopLevel.GetTopLevel(this) as Window;
-        if (topLevel == null) return;
-
-        var filters = fileType == "Email"
-            ? new[] { new FilePickerFileType("Email / PDF") { Patterns = new[] { "*.eml", "*.msg", "*.pdf" } } }
-            : new[] { new FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } } };
-
-        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        try
         {
-            Title         = $"Select {fileType} file",
-            AllowMultiple = true,
-            FileTypeFilter = filters
-        });
-
-        if (files.Count == 0) return;
-
-        var folder = GetAttachmentsFolder();
-        if (folder == null) { AttachmentStatusLabel.Text = "Could not resolve job folder."; return; }
-
-        var notes = AttachmentNoteBox.Text?.Trim();
-        int added = 0;
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        var repo = new JobAttachmentRepository(ctx);
-
-        foreach (var file in files)
-        {
-            var sourcePath = file.Path.LocalPath;
-            var fileName   = Path.GetFileName(sourcePath);
-            var destPath   = Path.Combine(folder, fileName);
-
-            // If a file with that name already exists, append a counter.
-            if (File.Exists(destPath))
+            AttachmentStatusLabel.Text = "";
+            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            
+            var topLevel = TopLevel.GetTopLevel(this) as Window;
+            if (topLevel == null)
             {
-                var stem = Path.GetFileNameWithoutExtension(fileName);
-                var ext  = Path.GetExtension(fileName);
-                int n = 1;
-                while (File.Exists(destPath))
-                    destPath = Path.Combine(folder, $"{stem} ({n++}){ext}");
+                AttachmentStatusLabel.Text = "Could not determine parent window.";
+                return;
             }
 
-            File.Copy(sourcePath, destPath);
+            var filters = fileType == "Email"
+                ? new[] { new FilePickerFileType("Email / PDF") { Patterns = new[] { "*.eml", "*.msg", "*.pdf" } } }
+                : new[] { new FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } } };
 
-            repo.Add(new JobAttachment
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                JobId      = _jobId,
-                FileName   = Path.GetFileName(destPath),
-                StoredPath = destPath,
-                FileType   = fileType,
-                Notes      = string.IsNullOrWhiteSpace(notes) ? null : notes,
-                DateAdded  = DateTime.UtcNow
+                Title         = $"Select {fileType} file",
+                AllowMultiple = true,
+                FileTypeFilter = filters
             });
-            added++;
-        }
 
-        AttachmentNoteBox.Text = "";
-        AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
-        AttachmentStatusLabel.Text = $"Added {added} file{(added == 1 ? "" : "s")}.";
-        LoadAttachments();
+            if (files.Count == 0) return;
+
+            var folder = GetAttachmentsFolder();
+            if (folder == null)
+            {
+                AttachmentStatusLabel.Text = "Could not resolve job folder.";
+                return;
+            }
+
+            var notes = AttachmentNoteBox.Text?.Trim();
+            int added = 0;
+
+            using var ctx = DatabaseInitializer.CreateContext();
+            var repo = new JobAttachmentRepository(ctx);
+
+            foreach (var file in files)
+            {
+                if (file?.Path == null)
+                {
+                    AttachmentStatusLabel.Text = "Invalid file selection.";
+                    continue;
+                }
+
+                var sourcePath = file.Path.LocalPath;
+                if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+                {
+                    AttachmentStatusLabel.Text = $"File not found: {sourcePath}";
+                    continue;
+                }
+
+                var fileName   = Path.GetFileName(sourcePath);
+                var destPath   = Path.Combine(folder, fileName);
+
+                // If a file with that name already exists, append a counter.
+                if (File.Exists(destPath))
+                {
+                    var stem = Path.GetFileNameWithoutExtension(fileName);
+                    var ext  = Path.GetExtension(fileName);
+                    int n = 1;
+                    while (File.Exists(destPath))
+                        destPath = Path.Combine(folder, $"{stem} ({n++}){ext}");
+                }
+
+                File.Copy(sourcePath, destPath);
+
+                repo.Add(new JobAttachment
+                {
+                    JobId      = _jobId,
+                    FileName   = Path.GetFileName(destPath),
+                    StoredPath = destPath,
+                    FileType   = fileType,
+                    Notes      = string.IsNullOrWhiteSpace(notes) ? null : notes,
+                    DateAdded  = DateTime.UtcNow
+                });
+                added++;
+            }
+
+            AttachmentNoteBox.Text = "";
+            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+            AttachmentStatusLabel.Text = $"Added {added} file{(added == 1 ? "" : "s")}.";
+            LoadAttachments();
+        }
+        catch (Exception ex)
+        {
+            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Text = $"Error adding attachment: {ex.Message}";
+        }
     }
 
     private void OpenAttachment()
