@@ -4,7 +4,6 @@
     <DockPanel Margin="8">
         <!-- Top: navigation + action buttons + job title -->
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Left" Name="MainMenuButton"     Content="← Main Menu"     Margin="0,0,8,0"/>
             <Button DockPanel.Dock="Left" Name="BackButton"         Content="← Back to Jobs"  Margin="0,0,8,0"/>
             <Button DockPanel.Dock="Left" Name="MarkCompleteButton" Content="✓ Mark Complete"  Margin="0,0,6,0"/>
             <Button DockPanel.Dock="Left" Name="ReactivateButton"   Content="↺ Reactivate"    IsVisible="False" Margin="0,0,6,0"/>
@@ -18,12 +17,8 @@
                 <!-- Job Attachments sub-panel -->
                 <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                     <StackPanel>
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Name="ToggleAttachmentsButton"
-                                    Content="▼" Width="28" Padding="2,0" Height="22"/>
-                            <TextBlock Text="Job Attachments" FontWeight="Bold" VerticalAlignment="Center"/>
-                        </DockPanel>
-                        <StackPanel Name="AttachmentsBody" IsVisible="False" Margin="0,6,0,0">
+                        <TextBlock Text="Job Attachments" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <StackPanel Name="AttachmentsBody">
                             <ListBox Name="AttachmentList" Height="110" Margin="0,0,0,8"/>
                             <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
                                 <TextBlock Grid.Column="0" Text="Note (optional):" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -40,73 +35,17 @@
                     </StackPanel>
                 </Border>
 
-                <Button Name="BulkAddButton" Content="Add Hardware"
-                        HorizontalAlignment="Left" Margin="0,0,0,8"/>
-
                 <!-- Linked Hardware Items sub-panel -->
                 <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                     <StackPanel>
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Name="ToggleLinkedHardwareButton"
-                                    Content="▼" Width="28" Padding="2,0" Height="22"/>
+                        <DockPanel Margin="0,0,0,6">
+                            <Button DockPanel.Dock="Right" Name="BulkAddButton" Content="Add Hardware" Margin="4,0,0,0"/>
                             <TextBlock Text="Linked Hardware Items" FontWeight="Bold" VerticalAlignment="Center"/>
                         </DockPanel>
 
-                        <StackPanel Name="LinkedHardwareBody" IsVisible="False" Margin="0,6,0,0">
+                        <StackPanel Name="LinkedHardwareBody">
 
-                            <!-- Release selector -->
-                            <DockPanel Margin="0,0,0,6">
-                                <TextBlock DockPanel.Dock="Left" Text="Release:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <Button DockPanel.Dock="Right" Name="NewReleaseButton" Content="+ New Release" Margin="8,0,0,0"/>
-                                <ComboBox Name="ReleaseCombo" HorizontalAlignment="Left" MinWidth="200"/>
-                            </DockPanel>
-
-                            <!-- New Release form -->
-                            <Border Name="NewReleasePanel" IsVisible="False" BorderBrush="#B0B0B0"
-                                    BorderThickness="1" Padding="8" Margin="0,0,0,6">
-                                <StackPanel>
-                                    <TextBlock Text="New Release" FontWeight="Bold" Margin="0,0,0,4"/>
-                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,6">
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Label:" VerticalAlignment="Center" Margin="0,0,8,4"/>
-                                        <TextBox   Grid.Row="0" Grid.Column="1" Name="ReleaseLabelBox" Watermark="e.g. Addendum 1" Margin="0,0,0,4"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Notes:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBox   Grid.Row="1" Grid.Column="1" Name="ReleaseNotesBox" Watermark="Optional"/>
-                                    </Grid>
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <Button Name="SaveReleaseButton"   Content="Add Release"/>
-                                        <Button Name="CancelReleaseButton" Content="Cancel"/>
-                                    </StackPanel>
-                                    <TextBlock Name="ReleaseStatusLabel" Margin="0,6,0,0" Foreground="#800000"/>
-                                </StackPanel>
-                            </Border>
-
-                            <TextBlock Text="(Drag items to reorder)" Foreground="#606060" FontSize="11" Margin="0,0,0,4"/>
-
-                            <!-- Sort + Edit toolbar -->
-                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,4">
-                                <Button Name="SortByMfrButton"    Content="Sort by Mfr"/>
-                                <Button Name="SortByDescButton"   Content="Sort by Desc"/>
-                                <Button Name="EditHardwareButton" Content="Edit Selected"/>
-                            </StackPanel>
-
-                            <!-- Inline edit form -->
-                            <Border Name="EditHardwarePanel" IsVisible="False" BorderBrush="#B0B0B0"
-                                    BorderThickness="1" Padding="8" Margin="0,0,0,6">
-                                <StackPanel>
-                                    <TextBlock Text="Edit Hardware Link" FontWeight="Bold" Margin="0,0,0,4"/>
-                                    <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
-                                        <TextBlock Grid.Column="0" Text="Custom label:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBox   Grid.Column="1" Name="EditCustomDescBox" Watermark="Leave blank to use model number"/>
-                                    </Grid>
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <Button Name="SaveHardwareEditButton"   Content="Save"/>
-                                        <Button Name="CancelHardwareEditButton" Content="Cancel"/>
-                                    </StackPanel>
-                                    <TextBlock Name="EditHardwareStatusLabel" Margin="0,6,0,0" Foreground="#800000"/>
-                                </StackPanel>
-                            </Border>
-
-                            <ListBox Name="LinkedHardwareList" Height="120" Margin="0,0,0,8"/>
+                            <ListBox Name="LinkedHardwareList" Height="180" Margin="0,0,0,8"/>
                             <Button Name="RemoveHardwareButton" Content="Remove from Job" HorizontalAlignment="Left" Margin="0,0,0,6"/>
                             <TextBlock Name="LinkStatusLabel" Foreground="#800000"/>
                         </StackPanel>
@@ -119,8 +58,9 @@
                         <TextBlock Text="PDF Package Generation" FontWeight="Bold" Margin="0,0,0,6"/>
 
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <Button Name="GeneratePackageButton"   Content="Generate Package"  Margin="0,0,8,0"/>
-                            <Button Name="BrowseOldVersionsButton" Content="Browse Old Versions"/>
+                            <Button Name="GeneratePackageButton"    Content="Generate Package"    Margin="0,0,8,0"/>
+                            <Button Name="OpenCurrentPackageButton" Content="Open Current Package" Margin="0,0,8,0"/>
+                            <Button Name="BrowseOldVersionsButton"  Content="Browse Old Versions"/>
                         </StackPanel>
                         <ProgressBar Name="PackageProgress"
                                      IsIndeterminate="True" IsVisible="False"

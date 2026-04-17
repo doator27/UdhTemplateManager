@@ -27,7 +27,6 @@ public partial class CustomersView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _repo = new CustomerRepository(context);
-        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();

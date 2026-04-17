@@ -42,7 +42,6 @@ public partial class AppSettingsView : UserControl
         AlertEmailToBox.Text   = _repo.GetValue("AlertEmailTo");
         AlertEmailFromBox.Text = _repo.GetValue("AlertEmailFrom");
 
-        MainMenuButton.Click        += (_, _) => NavigationRequested?.Invoke("Dashboard");
         SaveButton.Click            += (_, _) => Save();
         BrowseButton.Click          += async (_, _) => await BrowseStorageFolderAsync();
         DbConnectBrowseButton.Click += async (_, _) => await BrowseConnectFileAsync();

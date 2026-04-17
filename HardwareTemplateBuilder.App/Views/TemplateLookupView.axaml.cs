@@ -64,8 +64,6 @@ public partial class TemplateLookupView : UserControl
         DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
         DescCombo.SelectedIndex = 0;
 
-        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
-
         // Wire search controls — manufacturer drives description cascade.
         MfrCombo.SelectionChanged  += (_, _) => OnSearchMfrChanged();
         DescCombo.SelectionChanged += (_, _) => { if (!_updatingDescCombo) SearchHardware(); };

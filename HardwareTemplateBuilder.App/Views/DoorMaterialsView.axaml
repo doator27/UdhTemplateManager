@@ -3,7 +3,6 @@
              x:Class="HardwareTemplateBuilder.App.Views.DoorMaterialsView">
     <DockPanel Margin="8">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,12,0"/>
             <TextBlock Text="Door Materials" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
         <TextBlock DockPanel.Dock="Top" Text="Door materials are fixed: Hollow Metal and Wood. These records are seeded automatically."

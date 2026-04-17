@@ -27,7 +27,6 @@ public partial class UserProfilesView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _repo = new UserProfileRepository(context);
-        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();

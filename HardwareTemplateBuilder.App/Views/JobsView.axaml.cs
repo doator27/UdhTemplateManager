@@ -38,7 +38,6 @@ public partial class JobsView : UserControl
         public JobRow(Job job, string creatorName) { Job = job; CreatorName = creatorName; }
     }
 
-    private JobRepository? _repo;
     private List<Customer> _customers = new();
     private List<ProjectManager> _projectManagers = new();
     private List<UserProfile> _userProfiles = new();
@@ -60,9 +59,6 @@ public partial class JobsView : UserControl
 
     private void Initialize()
     {
-        var context = DatabaseInitializer.CreateContext();
-        _repo = new JobRepository(context);
-
         LoadCustomers();
         LoadProjectManagers();
         LoadUserProfiles();
@@ -82,7 +78,6 @@ public partial class JobsView : UserControl
             return tb;
         }, supportsRecycling: false);
 
-        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         FilterBox.TextChanged += (_, _) => LoadJobList();
         ShowCompletedCheck.IsCheckedChanged += (_, _) => LoadJobList();
         CreatorFilterCombo.SelectionChanged += (_, _) => LoadJobList();
@@ -147,8 +142,6 @@ public partial class JobsView : UserControl
     private void RefreshIfStale()
     {
         if ((DateTime.UtcNow - _lastRefreshed).TotalSeconds < 30) return;
-        var ctx = DatabaseInitializer.CreateContext();
-        _repo = new JobRepository(ctx);
         LoadJobList();
     }
 
@@ -161,7 +154,14 @@ public partial class JobsView : UserControl
         var items = new List<UserProfile?> { null }.Concat(_userProfiles.Cast<UserProfile?>()).ToList();
         CreatorFilterCombo.ItemsSource = items;
         CreatorFilterCombo.DisplayMemberBinding = new Avalonia.Data.Binding("UserName");
-        CreatorFilterCombo.SelectedIndex = 0; // (Any)
+        var activeId = SessionService.ActiveUserProfile?.Id;
+        int selectIndex = 0;
+        if (activeId.HasValue)
+        {
+            var idx = items.FindIndex(p => p?.Id == activeId.Value);
+            if (idx >= 0) selectIndex = idx;
+        }
+        CreatorFilterCombo.SelectedIndex = selectIndex;
     }
 
     private void LoadCustomers(Customer? selectAfter = null)
@@ -224,7 +224,8 @@ public partial class JobsView : UserControl
         var showComplete     = ShowCompletedCheck.IsChecked == true;
         var creatorFilter    = CreatorFilterCombo.SelectedItem as UserProfile;
 
-        var jobs = _repo!.GetAll()
+        using var ctx = DatabaseInitializer.CreateContext();
+        var jobs = new JobRepository(ctx).GetAll()
             .Where(j => showComplete || !j.IsComplete)
             .Where(j => string.IsNullOrEmpty(filter) ||
                         j.JobNumber.ToLower().Contains(filter) ||
@@ -300,7 +301,8 @@ public partial class JobsView : UserControl
 
         if (_selectedJobId == 0)
         {
-            var newJob = _repo!.Add(new Job
+            using var ctx = DatabaseInitializer.CreateContext();
+            var newJob = new JobRepository(ctx).Add(new Job
             {
                 JobNumber        = jobNumber,
                 JobName          = jobName,
@@ -314,14 +316,16 @@ public partial class JobsView : UserControl
         }
         else
         {
-            var existing = _repo!.GetById(_selectedJobId);
+            using var ctx = DatabaseInitializer.CreateContext();
+            var repo = new JobRepository(ctx);
+            var existing = repo.GetById(_selectedJobId);
             if (existing != null)
             {
                 existing.JobNumber        = jobNumber;
                 existing.JobName          = jobName;
                 existing.CustomerId       = customer.Id;
                 existing.ProjectManagerId = pm.Id;
-                _repo.Update(existing);
+                repo.Update(existing);
             }
         }
         StatusLabel.Text = "Saved.";
@@ -359,7 +363,8 @@ public partial class JobsView : UserControl
     private void DeleteSelected()
     {
         if (_selectedJobId == 0) return;
-        _repo!.Delete(_selectedJobId);
+        using var ctx = DatabaseInitializer.CreateContext();
+        new JobRepository(ctx).Delete(_selectedJobId);
         ClearForm();
         LoadJobList();
     }

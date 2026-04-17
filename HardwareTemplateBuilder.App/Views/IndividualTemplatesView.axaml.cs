@@ -56,7 +56,6 @@ public partial class IndividualTemplatesView : UserControl
         DoorMaterialFilterCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
         DoorMaterialFilterCombo.SelectedIndex = 0;
 
-        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         DoorMaterialFilterCombo.SelectionChanged += (_, _) => LoadList();

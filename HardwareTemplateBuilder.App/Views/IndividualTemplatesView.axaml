@@ -3,7 +3,6 @@
              x:Class="HardwareTemplateBuilder.App.Views.IndividualTemplatesView">
     <DockPanel Margin="8">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Left" Name="MainMenuButton" Content="← Main Menu" Margin="0,0,12,0"/>
             <TextBlock Text="Individual Templates" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
         <Grid ColumnDefinitions="260,*">

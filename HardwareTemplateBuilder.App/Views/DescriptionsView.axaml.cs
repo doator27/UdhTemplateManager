@@ -53,7 +53,6 @@ public partial class DescriptionsView : UserControl
 
         DescTree.ItemsSource = _roots;
 
-        MainMenuButton.Click      += (_, _) => NavigationRequested?.Invoke("Dashboard");
         DescTree.SelectionChanged += (_, _) => OnTreeSelectionChanged();
         SaveButton.Click          += (_, _) => Save();
         AddRootButton.Click       += (_, _) => AddNode(parentId: null);

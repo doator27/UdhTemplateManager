@@ -19,7 +19,6 @@ public partial class DoorMaterialsView : UserControl
         InitializeComponent();
         Loaded += (_, _) =>
         {
-            MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
             LoadList();
         };
     }

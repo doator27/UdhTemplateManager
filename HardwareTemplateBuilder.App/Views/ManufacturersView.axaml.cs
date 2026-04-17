@@ -27,7 +27,6 @@ public partial class ManufacturersView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _repo = new ManufacturerRepository(context);
-        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();

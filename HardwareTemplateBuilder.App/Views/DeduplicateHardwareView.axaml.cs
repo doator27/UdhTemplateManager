@@ -86,7 +86,6 @@ public partial class DeduplicateHardwareView : UserControl
         InitializeComponent();
         Loaded += (_, _) =>
         {
-            MainMenuButton.Click          += (_, _) => NavigationRequested?.Invoke("Dashboard");
             ScanButton.Click              += (_, _) => RunHardwareScan();
             MergeAllButton.Click          += async (_, _) => await MergeAllHardwareAsync();
             ScanTemplatesButton.Click     += (_, _) => RunTemplateScan();

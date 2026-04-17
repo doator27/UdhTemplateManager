@@ -46,9 +46,6 @@ public partial class JobDetailView : UserControl
     private bool _isDragging;
     private Point _dragStartPoint;
 
-    /// <summary>Currently selected release ID; null means the base hardware list.</summary>
-    private int? _currentReleaseId;
-
     /// <summary>Tracks whether the job is currently marked complete.</summary>
     private bool _isComplete;
 
@@ -90,7 +87,6 @@ public partial class JobDetailView : UserControl
         OpenAttachmentButton.Click    += (_, _) => OpenAttachment();
         RemoveAttachmentButton.Click  += (_, _) => RemoveAttachment();
 
-        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
         BulkAddButton.Click += (_, _) => NavigationRequested?.Invoke($"BulkManufacturerSelection:{_jobId}");
 
@@ -98,40 +94,10 @@ public partial class JobDetailView : UserControl
         MarkCompleteButton.Click  += async (_, _) => await MarkCompleteAsync();
         ReactivateButton.Click    += (_, _) => Reactivate();
 
-        // Collapsible section toggles
-        WireToggle(ToggleAttachmentsButton,     AttachmentsBody);
-        WireToggle(ToggleLinkedHardwareButton,  LinkedHardwareBody);
-
-        // Phase 22: Sort + Edit
-        SortByMfrButton.Click  += (_, _) => SortLinkedHardware("mfr");
-        SortByDescButton.Click += (_, _) => SortLinkedHardware("desc");
-        EditHardwareButton.Click += (_, _) =>
-        {
-            if (LinkedHardwareList.SelectedItem is not JobHardware jh)
-            {
-                LinkStatusLabel.Text = "Select a hardware item to edit.";
-                return;
-            }
-            EditCustomDescBox.Text = jh.CustomDescription ?? string.Empty;
-            EditHardwarePanel.IsVisible = true;
-        };
-        SaveHardwareEditButton.Click += (_, _) => SaveHardwareEdit();
-        CancelHardwareEditButton.Click += (_, _) =>
-        {
-            EditHardwarePanel.IsVisible = false;
-            EditHardwareStatusLabel.Text = string.Empty;
-        };
-
-        // Phase 23: Releases
-        LoadReleaseCombo();
-        ReleaseCombo.SelectionChanged += (_, _) => OnReleaseChanged();
-        NewReleaseButton.Click    += (_, _) => { NewReleasePanel.IsVisible = true; ReleaseLabelBox.Focus(); };
-        CancelReleaseButton.Click += (_, _) => { NewReleasePanel.IsVisible = false; ReleaseStatusLabel.Text = string.Empty; };
-        SaveReleaseButton.Click   += (_, _) => CreateRelease();
-
-        RemoveHardwareButton.Click += (_, _) => RemoveHardwareFromJob();
-        GeneratePackageButton.Click    += async (_, _) => await OnGeneratePackageAsync();
-        BrowseOldVersionsButton.Click  += (_, _) => BrowseOldVersions();
+        RemoveHardwareButton.Click         += (_, _) => RemoveHardwareFromJob();
+        GeneratePackageButton.Click        += async (_, _) => await OnGeneratePackageAsync();
+        OpenCurrentPackageButton.Click     += (_, _) => OpenCurrentPackage();
+        BrowseOldVersionsButton.Click      += (_, _) => BrowseOldVersions();
 
         // Drag-and-drop reorder on linked hardware list
         LinkedHardwareList.AddHandler(PointerPressedEvent, OnLinkedListPointerPressed, RoutingStrategies.Tunnel);
@@ -192,19 +158,18 @@ public partial class JobDetailView : UserControl
     {
         _linkedHardware.Clear();
         using var context = DatabaseInitializer.CreateContext();
-        var query = context.JobHardware
+        var rows = context.JobHardware
             .Include(jh => jh.HardwareItem)
                 .ThenInclude(h => h.Manufacturer)
             .Include(jh => jh.HardwareItem)
                 .ThenInclude(h => h.Description)
-            .Where(jh => jh.JobId == _jobId);
+            .Where(jh => jh.JobId == _jobId && jh.ReleaseId == null)
+            .OrderBy(jh => jh.HardwareItem!.Manufacturer!.ManufacturerName)
+            .ThenBy(jh => jh.HardwareItem!.Description!.DescriptionText)
+            .ThenBy(jh => jh.HardwareItem!.ModelNumber)
+            .ToList();
 
-        if (_currentReleaseId == null)
-            query = query.Where(jh => jh.ReleaseId == null);
-        else
-            query = query.Where(jh => jh.ReleaseId == _currentReleaseId);
-
-        foreach (var row in query.ToList())
+        foreach (var row in rows)
             _linkedHardware.Add(row);
     }
 
@@ -265,116 +230,6 @@ public partial class JobDetailView : UserControl
         UpdateCompleteButtons();
     }
 
-    // --- Phase 21 is wired in Initialize via ToggleLinkedHardwareButton ---
-
-    // --- Phase 22: Sort + Edit hardware ---
-
-    /// <summary>Sorts the linked hardware list in-place by manufacturer or description name.</summary>
-    private void SortLinkedHardware(string by)
-    {
-        var sorted = by == "mfr"
-            ? _linkedHardware.OrderBy(jh => jh.HardwareItem?.Manufacturer?.ManufacturerName ?? string.Empty)
-                             .ThenBy(jh => jh.HardwareItem?.ModelNumber ?? string.Empty)
-                             .ToList()
-            : _linkedHardware.OrderBy(jh => jh.HardwareItem?.Description?.DescriptionText ?? string.Empty)
-                             .ThenBy(jh => jh.HardwareItem?.ModelNumber ?? string.Empty)
-                             .ToList();
-
-        _linkedHardware.Clear();
-        foreach (var item in sorted)
-            _linkedHardware.Add(item);
-    }
-
-    /// <summary>Saves the edited custom label for the currently selected hardware link.</summary>
-    private void SaveHardwareEdit()
-    {
-        if (LinkedHardwareList.SelectedItem is not JobHardware jh)
-        {
-            EditHardwareStatusLabel.Text = "No item selected.";
-            return;
-        }
-
-        var newLabel = EditCustomDescBox.Text?.Trim();
-        newLabel = string.IsNullOrEmpty(newLabel) ? null : newLabel;
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        var link = ctx.JobHardware.Find(jh.Id);
-        if (link == null) { EditHardwareStatusLabel.Text = "Record not found."; return; }
-
-        link.CustomDescription = newLabel;
-        ctx.SaveChanges();
-
-        EditHardwareStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
-        EditHardwareStatusLabel.Text = "Saved.";
-        EditHardwarePanel.IsVisible = false;
-        LoadLinkedHardware();
-    }
-
-    // --- Phase 23: Job releases ---
-
-    /// <summary>
-    /// Populates the ReleaseCombo with "(Base list)" + all named releases for this job.
-    /// </summary>
-    private void LoadReleaseCombo()
-    {
-        using var ctx = DatabaseInitializer.CreateContext();
-        var releases = ctx.JobReleases
-            .Where(r => r.JobId == _jobId)
-            .OrderBy(r => r.ReleaseNumber)
-            .ToList();
-
-        var items = new System.Collections.Generic.List<object>
-        {
-            new { Label = "(Base list)", ReleaseId = (int?)null }
-        };
-        foreach (var r in releases)
-            items.Add(new { Label = r.DisplayLabel, ReleaseId = (int?)r.Id });
-
-        ReleaseCombo.ItemsSource = items;
-        ReleaseCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Label");
-        ReleaseCombo.SelectedIndex = 0;
-    }
-
-    private void OnReleaseChanged()
-    {
-        if (ReleaseCombo.SelectedItem == null) return;
-        // Use reflection-style dynamic to avoid introducing a named type.
-        var item = ReleaseCombo.SelectedItem;
-        var prop = item.GetType().GetProperty("ReleaseId");
-        _currentReleaseId = prop?.GetValue(item) as int?;
-        LoadLinkedHardware();
-    }
-
-    private void CreateRelease()
-    {
-        var label = ReleaseLabelBox.Text?.Trim();
-        if (string.IsNullOrEmpty(label))
-        {
-            ReleaseStatusLabel.Text = "Enter a release label.";
-            return;
-        }
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        var repo   = new JobReleaseRepository(ctx);
-        var number = repo.NextReleaseNumber(_jobId);
-        var release = repo.Add(new HardwareTemplateBuilder.Core.Models.JobRelease
-        {
-            JobId         = _jobId,
-            ReleaseNumber = number,
-            ReleaseLabel  = label,
-            Notes         = string.IsNullOrWhiteSpace(ReleaseNotesBox.Text) ? null : ReleaseNotesBox.Text.Trim()
-        });
-
-        ReleaseLabelBox.Text  = string.Empty;
-        ReleaseNotesBox.Text  = string.Empty;
-        NewReleasePanel.IsVisible = false;
-        ReleaseStatusLabel.Text   = string.Empty;
-
-        // Refresh combo and select the new release.
-        LoadReleaseCombo();
-        // Select the last item (the new release).
-        ReleaseCombo.SelectedIndex = ReleaseCombo.ItemCount - 1;
-    }
 
     // --- Generate Package ---
 
@@ -681,6 +536,50 @@ public partial class JobDetailView : UserControl
     }
 
     /// <summary>
+    /// Opens the most recently modified PDF in the job's output folder (excluding the
+    /// "Old versions" and "Attachments" subdirectories).
+    /// </summary>
+    private void OpenCurrentPackage()
+    {
+        string saveDir;
+        string jobNumber;
+        using (var ctx = DatabaseInitializer.CreateContext())
+        {
+            var job   = ctx.Jobs.Find(_jobId);
+            jobNumber = job?.JobNumber ?? string.Empty;
+            saveDir   = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
+            if (string.IsNullOrWhiteSpace(saveDir))
+                saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        }
+
+        var jobDir = Path.Combine(saveDir, jobNumber);
+        if (!Directory.Exists(jobDir))
+        {
+            PackageStatusLabel.Text = "No output folder found for this job.";
+            return;
+        }
+
+        var pdf = Directory.GetFiles(jobDir, "*.pdf")
+            .OrderByDescending(File.GetLastWriteTime)
+            .FirstOrDefault();
+
+        if (pdf == null)
+        {
+            PackageStatusLabel.Text = "No package found for this job.";
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(pdf) { UseShellExecute = true });
+        }
+        catch
+        {
+            PackageStatusLabel.Text = $"Could not open: {Path.GetFileName(pdf)}";
+        }
+    }
+
+    /// <summary>
     /// Opens the "Old versions" folder for this job in the OS file explorer, if it exists.
     /// </summary>
     private void BrowseOldVersions()
@@ -934,16 +833,6 @@ public partial class JobDetailView : UserControl
         {
             // History write failure is non-fatal.
         }
-    }
-
-    /// <summary>Wires a toggle button to show/hide a panel and update the ▼/▲ arrow.</summary>
-    private static void WireToggle(Button button, Avalonia.Controls.Control body)
-    {
-        button.Click += (_, _) =>
-        {
-            body.IsVisible     = !body.IsVisible;
-            button.Content     = body.IsVisible ? "▲" : "▼";
-        };
     }
 
     /// <summary>Creates a fully wired <see cref="PdfAssemblyService"/> using the supplied HTTP client.</summary>

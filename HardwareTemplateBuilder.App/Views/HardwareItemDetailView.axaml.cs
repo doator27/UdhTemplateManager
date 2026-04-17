@@ -4,6 +4,7 @@ using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
+using HardwareTemplateBuilder.Core.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
@@ -79,7 +80,6 @@ public partial class HardwareItemDetailView : UserControl
         LoadLinkedTemplates();
         SearchTemplates();
 
-        MainMenuButton.Click       += (_, _) => NavigationRequested?.Invoke("Dashboard");
         BackButton.Click           += (_, _) => NavigationRequested?.Invoke("HardwareItems");
         RemoveTemplateButton.Click += (_, _) => RemoveTemplate();
         AddTemplateButton.Click    += (_, _) => AddLinkTemplate();
@@ -139,6 +139,19 @@ public partial class HardwareItemDetailView : UserControl
         var pagesToPrint = AddPagesToPrintBox.Text?.Trim();
         if (string.IsNullOrEmpty(pagesToPrint)) pagesToPrint = "1";
 
+        if (!int.TryParse(AddNumPagesBox.Text?.Trim(), out var numPages) || numPages < 1)
+        { AddStatusLabel.Text = "Num Pages must be a positive integer."; return; }
+
+        var pagesToRotate = AddPagesToRotateBox.Text?.Trim();
+        if (!string.IsNullOrEmpty(pagesToRotate))
+        {
+            try { new PageRangeParser().Parse(pagesToRotate); }
+            catch { AddStatusLabel.Text = "Pages To Rotate format invalid. Use e.g. 1,3-5,8."; return; }
+        }
+
+        if (!int.TryParse(AddRotationDirectionBox.Text?.Trim() ?? "0", out var rotationDirection))
+        { AddStatusLabel.Text = "Rotation Direction must be an integer (e.g. 90 or -90)."; return; }
+
         var onlineLink = AddOnlineLinkBox.Text?.Trim();
         var localLink  = AddLocalLinkBox.Text?.Trim();
 
@@ -154,14 +167,16 @@ public partial class HardwareItemDetailView : UserControl
 
         var candidate = new IndividualTemplate
         {
-            ManufacturerId = _itemManufacturerId,
-            DescriptionId  = desc.Id,
-            DoorMaterialId = mat.Id,
-            TemplateNumber = templateNum,
-            PagesToPrint   = pagesToPrint,
-            NumPages       = 1,
-            OnlineLink     = string.IsNullOrEmpty(onlineLink) ? null : onlineLink,
-            LocalLink      = string.IsNullOrEmpty(localLink)  ? null : localLink,
+            ManufacturerId    = _itemManufacturerId,
+            DescriptionId     = desc.Id,
+            DoorMaterialId    = mat.Id,
+            TemplateNumber    = templateNum,
+            PagesToPrint      = pagesToPrint,
+            NumPages          = numPages,
+            PagesToRotate     = string.IsNullOrEmpty(pagesToRotate) ? null : pagesToRotate,
+            RotationDirection = rotationDirection,
+            OnlineLink        = string.IsNullOrEmpty(onlineLink) ? null : onlineLink,
+            LocalLink         = string.IsNullOrEmpty(localLink)  ? null : localLink,
         };
 
         // Add() returns existing record if (Manufacturer, TemplateNumber, DoorMaterial) match.
@@ -181,10 +196,13 @@ public partial class HardwareItemDetailView : UserControl
             AddStatusLabel.Text = $"Created and linked: {saved.TemplateNumber}";
 
         // Clear fields for next entry.
-        AddTemplateNumBox.Text  = "";
-        AddPagesToPrintBox.Text = "1";
-        AddOnlineLinkBox.Text   = "";
-        AddLocalLinkBox.Text    = "";
+        AddTemplateNumBox.Text        = "";
+        AddPagesToPrintBox.Text       = "1";
+        AddNumPagesBox.Text           = "1";
+        AddPagesToRotateBox.Text      = "";
+        AddRotationDirectionBox.Text  = "0";
+        AddOnlineLinkBox.Text         = "";
+        AddLocalLinkBox.Text          = "";
 
         LoadLinkedTemplates();
     }

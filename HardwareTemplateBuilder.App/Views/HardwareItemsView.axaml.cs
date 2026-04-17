@@ -42,7 +42,6 @@ public partial class HardwareItemsView : UserControl
         ManufacturerCombo.ItemsSource = _manufacturers;
         ManufacturerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
 
-        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();

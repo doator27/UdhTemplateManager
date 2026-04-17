@@ -31,7 +31,6 @@ public partial class RefreshTemplatesView : UserControl
 
     private void Initialize()
     {
-        MainMenuButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         StartButton.Click  += async (_, _) => await OnStartRefreshAsync();
         CancelButton.Click += (_, _) => _cts?.Cancel();
     }
