@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="HardwareTemplateBuilder.App.Views.ImportJobPickerDialog"
+        Title="Import Hardware from Job"
+        Width="420" Height="320"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right"
+                    Spacing="8" Margin="0,10,0,0">
+            <Button Name="ImportButton" Content="Import" IsDefault="True"/>
+            <Button Name="CancelButton" Content="Cancel" IsCancel="True"/>
+        </StackPanel>
+
+        <StackPanel>
+            <TextBlock Text="Select a job to import hardware from:" Margin="0,0,0,6"/>
+            <TextBox Name="FilterBox" Watermark="Search by job number or name…" Margin="0,0,0,6"/>
+            <ListBox Name="JobList" Height="200"/>
+            <TextBlock Name="StatusLabel" Foreground="#800000" Margin="0,6,0,0"/>
+        </StackPanel>
+    </DockPanel>
+</Window>
