@@ -40,7 +40,10 @@
                     <StackPanel>
                         <StackPanel Margin="0,0,0,6">
                             <TextBlock Text="Linked Hardware Items" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,0,6"/>
-							<Button DockPanel.Dock="Left" Name="BulkAddButton" Content="Add Hardware" Margin="0,0,0,0"/>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Button Name="BulkAddButton"      Content="Add Hardware"/>
+                                <Button Name="ImportHardwareButton" Content="Import Hardware"/>
+                            </StackPanel>
                         </StackPanel>
 
                         <StackPanel Name="LinkedHardwareBody">

@@ -56,9 +56,10 @@ public partial class TemplateResolutionWizardView : UserControl
         NextButton.Click   += (_, _) => Navigate(+1);
         FinishButton.Click += (_, _) => OnFinish();
 
-        AddTemplateButton.Click          += (_, _) => AddPendingTemplate();
-        RemovePendingTemplateButton.Click += (_, _) => RemovePendingTemplate();
-        TplBrowseButton.Click            += async (_, _) => await BrowseLocalFileAsync();
+        AddTemplateButton.Click             += (_, _) => AddPendingTemplate();
+        RemovePendingTemplateButton.Click   += (_, _) => RemovePendingTemplate();
+        RemoveImportedTemplateButton.Click  += (_, _) => RemoveImportedTemplate();
+        TplBrowseButton.Click               += async (_, _) => await BrowseLocalFileAsync();
 
         ToggleSearchButton.Click      += (_, _) => ToggleSearchPanel();
         StageSearchResultButton.Click += (_, _) => StageSearchResult();
@@ -124,9 +125,9 @@ public partial class TemplateResolutionWizardView : UserControl
 
     private void ShowMatchedCase(BulkHardwareRow row)
     {
-        MatchedPanel.IsVisible  = true;
-        NewItemPanel.IsVisible  = false;
-        ItemStatusLabel.Text    = "Matched existing item. Templates below will be linked to this job.";
+        MatchedPanel.IsVisible = true;
+        NewItemPanel.IsVisible = false;
+        ItemStatusLabel.Text   = "Matched existing item. Templates below will be linked to this job.";
 
         using var ctx = DatabaseInitializer.CreateContext();
         var linked = ctx.HardwareItemTemplates
@@ -138,6 +139,24 @@ public partial class TemplateResolutionWizardView : UserControl
             .ToList();
         LinkedTemplatesList.ItemsSource = linked;
         LinkedTemplatesList.DisplayMemberBinding = new Avalonia.Data.Binding("TemplateNumber");
+
+        // Imported job-specific templates — only shown when coming from ImportHardwareAsync.
+        ImportedTemplatesSection.IsVisible = row.PendingTemplates.Count > 0;
+        ImportedTemplatesList.ItemsSource  = null;
+        ImportedTemplatesList.ItemsSource  = row.PendingTemplates;
+        ImportedTemplatesList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+    }
+
+    private void RemoveImportedTemplate()
+    {
+        var row = _rows[_currentIndex];
+        if (ImportedTemplatesList.SelectedItem is BulkPendingTemplate p)
+        {
+            row.PendingTemplates.Remove(p);
+            ImportedTemplatesSection.IsVisible = row.PendingTemplates.Count > 0;
+            ImportedTemplatesList.ItemsSource  = null;
+            ImportedTemplatesList.ItemsSource  = row.PendingTemplates;
+        }
     }
 
     private void ShowNewCase(BulkHardwareRow row)
@@ -303,6 +322,64 @@ public partial class TemplateResolutionWizardView : UserControl
                         existing.Remarks = row.HardwareItemRemarks;
                         ctx.SaveChanges();
                     }
+                }
+
+                // Link any job-specific templates carried over from an import.
+                foreach (var pending in row.PendingTemplates)
+                {
+                    int templateId;
+
+                    // If the template was scoped to a different job, clone it for this job.
+                    if (pending.Template.OriginJobId.HasValue && pending.Template.OriginJobId != _jobId)
+                    {
+                        var existingClone = ctx.IndividualTemplates.FirstOrDefault(t =>
+                            t.ManufacturerId == pending.Template.ManufacturerId &&
+                            t.TemplateNumber == pending.Template.TemplateNumber &&
+                            t.DoorMaterialId == pending.Template.DoorMaterialId &&
+                            t.OriginJobId    == _jobId);
+
+                        if (existingClone != null)
+                        {
+                            templateId = existingClone.Id;
+                        }
+                        else
+                        {
+                            var clone = new IndividualTemplate
+                            {
+                                ManufacturerId    = pending.Template.ManufacturerId,
+                                DescriptionId     = pending.Template.DescriptionId,
+                                DoorMaterialId    = pending.Template.DoorMaterialId,
+                                TemplateNumber    = pending.Template.TemplateNumber,
+                                NumPages          = pending.Template.NumPages,
+                                PagesToPrint      = pending.Template.PagesToPrint,
+                                PagesToRotate     = pending.Template.PagesToRotate,
+                                RotationDirection = pending.Template.RotationDirection,
+                                OnlineLink        = pending.Template.OnlineLink,
+                                LocalLink         = pending.Template.LocalLink,
+                                OriginJobId       = _jobId
+                            };
+                            ctx.IndividualTemplates.Add(clone);
+                            ctx.SaveChanges();
+                            templateId = clone.Id;
+                        }
+                    }
+                    else
+                    {
+                        templateId = pending.Template.Id;
+                    }
+
+                    bool linkExists = ctx.HardwareItemTemplates.Any(hit =>
+                        hit.HardwareItemId       == hwItemId &&
+                        hit.IndividualTemplateId == templateId &&
+                        hit.JobId                == _jobId);
+
+                    if (!linkExists)
+                        hitRepo.Add(new HardwareItemTemplate
+                        {
+                            HardwareItemId       = hwItemId,
+                            IndividualTemplateId = templateId,
+                            JobId                = _jobId
+                        });
                 }
             }
             else

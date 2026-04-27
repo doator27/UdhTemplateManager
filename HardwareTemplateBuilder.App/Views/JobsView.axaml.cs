@@ -123,11 +123,6 @@ public partial class JobsView : UserControl
         CancelProjectManagerButton.Click   += (_, _) => HidePanel(NewProjectManagerPanel, NewProjectManagerBox);
         SaveProjectManagerButton.Click     += (_, _) => AddProjectManager();
 
-        CopyHardwareCheck.IsCheckedChanged += (_, _) =>
-        {
-            CopySourceCombo.IsVisible = CopyHardwareCheck.IsChecked == true;
-        };
-
         // Auto-refresh when the window regains focus so changes made by other users on the
         // shared database are visible without a manual reload. Only reloads if the view has
         // been inactive for at least 30 seconds to avoid redundant queries during normal use.
@@ -270,8 +265,6 @@ public partial class JobsView : UserControl
             ? Avalonia.Media.Brushes.DarkRed
             : Avalonia.Media.Brushes.Gray;
 
-        // Hide copy section when editing an existing job.
-        CopyHardwareSection.IsVisible = false;
     }
 
     private void ToggleJobComplete()
@@ -311,8 +304,6 @@ public partial class JobsView : UserControl
                 UserProfileId    = userProfileId
             });
 
-            if (CopyHardwareCheck.IsChecked == true && CopySourceCombo.SelectedItem is Job sourceJob)
-                CopyHardwareFromJob(sourceJob.Id, newJob.Id);
         }
         else
         {
@@ -330,34 +321,6 @@ public partial class JobsView : UserControl
         }
         StatusLabel.Text = "Saved.";
         LoadJobList();
-    }
-
-    /// <summary>
-    /// Copies all base-release <see cref="JobHardware"/> rows from <paramref name="sourceJobId"/>
-    /// into <paramref name="targetJobId"/>. Only rows with <c>ReleaseId IS NULL</c> are copied.
-    /// </summary>
-    private static void CopyHardwareFromJob(int sourceJobId, int targetJobId)
-    {
-        using var ctx = DatabaseInitializer.CreateContext();
-        var sourceRows = ctx.JobHardware
-            .Where(jh => jh.JobId == sourceJobId && jh.ReleaseId == null)
-            .AsNoTracking()
-            .ToList();
-
-        foreach (var row in sourceRows)
-        {
-            ctx.JobHardware.Add(new JobHardware
-            {
-                JobId              = targetJobId,
-                HardwareItemId     = row.HardwareItemId,
-                CustomDescription  = row.CustomDescription,
-                Remarks            = row.Remarks,
-                CalloutRemarks     = row.CalloutRemarks,
-                ReleaseId          = null
-            });
-        }
-
-        ctx.SaveChanges();
     }
 
     private void DeleteSelected()
@@ -420,24 +383,5 @@ public partial class JobsView : UserControl
         NotesStatusLabel.Text = "";
         JobList.SelectedItem  = null;
 
-        // Show the copy-hardware section when starting a new job.
-        LoadAllJobsForCopy();
-        CopyHardwareSection.IsVisible  = true;
-        CopyHardwareCheck.IsChecked    = false;
-        CopySourceCombo.IsVisible      = false;
-        CopySourceCombo.SelectedItem   = null;
-    }
-
-    /// <summary>
-    /// Populates <see cref="CopySourceCombo"/> with all existing jobs, ordered by number.
-    /// </summary>
-    private void LoadAllJobsForCopy()
-    {
-        using var ctx = DatabaseInitializer.CreateContext();
-        var jobs = new JobRepository(ctx).GetAll()
-            .OrderBy(j => j.JobNumber)
-            .ToList();
-        CopySourceCombo.ItemsSource = jobs;
-        CopySourceCombo.DisplayMemberBinding = new Avalonia.Data.Binding("JobNumber");
     }
 }

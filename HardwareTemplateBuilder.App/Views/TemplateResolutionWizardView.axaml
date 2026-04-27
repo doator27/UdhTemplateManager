@@ -37,7 +37,15 @@
                         BorderBrush="#B0B0B0" BorderThickness="1" Padding="8">
                     <StackPanel>
                         <TextBlock Text="Templates already linked to this item:" FontWeight="Bold" Margin="0,0,0,4"/>
-                        <ListBox Name="LinkedTemplatesList" Height="100"/>
+                        <ListBox Name="LinkedTemplatesList" Height="80"/>
+
+                        <!-- Only visible when importing job-specific templates from another job -->
+                        <StackPanel Name="ImportedTemplatesSection" IsVisible="False" Margin="0,10,0,0">
+                            <TextBlock Text="Job-specific templates to import:" FontWeight="Bold" Margin="0,0,0,4"/>
+                            <ListBox Name="ImportedTemplatesList" Height="80"/>
+                            <Button Name="RemoveImportedTemplateButton" Content="Remove Selected"
+                                    HorizontalAlignment="Left" Margin="0,4,0,0"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

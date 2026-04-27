@@ -89,6 +89,7 @@ public partial class JobDetailView : UserControl
 
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
         BulkAddButton.Click += (_, _) => NavigationRequested?.Invoke($"BulkManufacturerSelection:{_jobId}");
+        ImportHardwareButton.Click += async (_, _) => await ImportHardwareAsync();
 
         // Phase 20: Mark complete / Reactivate
         MarkCompleteButton.Click  += async (_, _) => await MarkCompleteAsync();
@@ -186,6 +187,86 @@ public partial class JobDetailView : UserControl
             LinkStatusLabel.Text = $"Removed: {jh.DisplayLabel}";
             LoadLinkedHardware();
         }
+    }
+
+    // --- Import hardware ---
+
+    /// <summary>
+    /// Shows the import picker dialog and, if a source job is chosen, loads its hardware
+    /// into the template resolution wizard for review.
+    /// </summary>
+    private async Task ImportHardwareAsync()
+    {
+        var window = TopLevel.GetTopLevel(this) as Window;
+        if (window == null) return;
+
+        var dialog = new ImportJobPickerDialog(_jobId);
+        var sourceJob = await dialog.ShowDialog<Job?>(window);
+        if (sourceJob == null) return;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+
+        var sourceRows = ctx.JobHardware
+            .Include(jh => jh.HardwareItem).ThenInclude(h => h.Manufacturer)
+            .Include(jh => jh.HardwareItem).ThenInclude(h => h.Description)
+            .Where(jh => jh.JobId == sourceJob.Id && jh.ReleaseId == null)
+            .OrderBy(jh => jh.Id)
+            .AsNoTracking()
+            .ToList();
+
+        if (sourceRows.Count == 0)
+        {
+            await DialogHelper.ShowInfoAsync(window, "The selected job has no hardware to import.", "Nothing to Import");
+            return;
+        }
+
+        // Group labels by hardware item, preserving the first-appearance order.
+        var orderedIds = new List<int>();
+        var groups     = new Dictionary<int, List<JobHardware>>();
+        foreach (var row in sourceRows)
+        {
+            if (!groups.ContainsKey(row.HardwareItemId))
+            {
+                orderedIds.Add(row.HardwareItemId);
+                groups[row.HardwareItemId] = new List<JobHardware>();
+            }
+            groups[row.HardwareItemId].Add(row);
+        }
+
+        var pendingRows = new List<BulkHardwareRow>();
+        foreach (var hwId in orderedIds)
+        {
+            var labelRows = groups[hwId];
+            var hw        = labelRows[0].HardwareItem;
+
+            var jobScopedTemplates = ctx.HardwareItemTemplates
+                .Include(hit => hit.IndividualTemplate)
+                .Where(hit => hit.HardwareItemId == hwId && hit.JobId == sourceJob.Id)
+                .AsNoTracking()
+                .ToList();
+
+            pendingRows.Add(new BulkHardwareRow
+            {
+                MatchedItem          = hw,
+                SelectedManufacturer = hw.Manufacturer,
+                ModelNumber          = hw.ModelNumber,
+                HardwareItemRemarks  = hw.Remarks,
+                Labels               = labelRows.Select(r => new BulkHardwareLabel
+                {
+                    CustomLabel = r.CustomDescription ?? "",
+                    Remarks     = r.Remarks
+                }).ToList(),
+                PendingTemplates = jobScopedTemplates.Select(hit => new BulkPendingTemplate
+                {
+                    Template      = hit.IndividualTemplate,
+                    IsJobSpecific = true
+                }).ToList()
+            });
+        }
+
+        BulkAddSession.PendingRows = pendingRows;
+        BulkAddSession.JobId       = _jobId;
+        NavigationRequested?.Invoke($"TemplateResolutionWizard:{_jobId}");
     }
 
     // --- Phase 20: Job complete status ---

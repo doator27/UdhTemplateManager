@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Database:** SQLite via Entity Framework Core 8.0
 - **PDF manipulation:** PdfSharp 6.1 (merging, page extraction, rotation)
 - **PDF generation:** QuestPDF 2024 (cover sheet)
-- **Tests:** xUnit with EF Core InMemory/SQLite providers
+- **Tests:** xUnit with in-memory SQLite (`UseSqlite("Data Source=:memory:")` + `EnsureCreated()`)
 - **Target platforms:** Linux (dev) and Windows (production)
 
 ## Solution Structure
@@ -42,11 +42,14 @@ dotnet ef database update --project HardwareTemplateBuilder.Core        # Apply 
 - **DatabaseInitializer.CreateContext()** is the standard way to obtain a db context — contexts are created per-operation, not shared
 - **DatabaseLocationService** manages the configurable database file path (default: `%AppData%/HardwareTemplateBuilder/hardware_templates.db`)
 - **MachineIdentityService** generates a stable machine UUID stored in `UserProfile.MachineId`, enabling auto-selection of the matching profile on login
+- **SqlitePragmaInterceptor** (EF Core `DbConnectionInterceptor`) applies `PRAGMA busy_timeout=5000` on every connection open; WAL mode is set once at startup via `DatabaseInitializer` and persists in the DB file
+- **RetryHelper** provides `ExecuteWithRetry()` for write operations that may hit `SQLITE_BUSY`/`SQLITE_LOCKED` — exponential back-off, 3 retries by default
 - **Generic `IRepository<T>`** with `GetById`, `GetAll`, `Add`, `Update`, `Delete`; `IHardwareItemRepository` adds `Search(manufacturer, description, modelNumber)` returning results sorted by `Frequency` descending
 - All `Add()` methods include duplicate detection — return existing record if already present
 - `JobTemplateSnapshot` records are written once at PDF generation and **never modified**
 - `JobRelease` records model addenda/revisions to a job; `JobHardware` rows can reference a `JobRelease` via nullable FK (SetNull on release delete)
 - **App configuration is stored in the `AppSetting` table** (key-value), not in appsettings.json. Keys include `TemplateStorageLocation`, `LastRefreshTimestamp`, and SMTP settings seeded by `DatabaseInitializer`
+- **Job-scoped templates:** `IndividualTemplate.OriginJobId` (null = globally visible; non-null = hidden from other jobs' searches). `HardwareItemTemplate.JobId` (null = global link included in all packages; non-null = link only active for that specific job's PDF generation). Use `IndividualTemplateRepository.GetVisibleForJob(jobId)` when searching within a job context.
 
 ### Key Services (Core/Services/)
 
@@ -56,6 +59,7 @@ dotnet ef database update --project HardwareTemplateBuilder.Core        # Apply 
 | `PageRangeParser` | Parses page specs like `"1,3-5,8"` into page number lists |
 | `DescriptionPathService` | Builds hierarchical display paths for `Description` tree nodes |
 | `TemplateRefreshService` | Re-downloads or re-copies template files on demand |
+| `MissingTemplateAlertService` | Checks for hardware items missing template files at startup (best-effort, background) |
 
 ### PDF Assembly Pipeline (Core/Services/Pdf/)
 
@@ -72,8 +76,9 @@ Orchestrated by `PdfAssemblyService`, which accepts an `AssemblyRequest` and exe
 
 - **Architecture is code-behind, not MVVM** — views directly instantiate repositories and call services; there are no ViewModels or data-binding commands
 - `MainWindow` hosts a persistent menu bar (File, Jobs, Maintenance, Admin) and a content area
-- `ViewRouter` swaps child `UserControl` views for navigation — 17 views total
+- `ViewRouter` swaps child `UserControl` views for navigation — 25 views total; **a new instance is created on every navigate** (no view caching)
 - `SessionService` (static) holds the active `UserProfile` for the session lifetime; `BulkAddSession` (static) holds transient bulk-entry state across the multi-step bulk-add flow
+- **Bulk-add flow** is a multi-step wizard entirely within the content area: `BulkManufacturerSelectionView` → `BulkJobHubView` → `BulkManufacturerSessionView` → `BulkHardwareEntryView` → `TemplateResolutionWizardView` (persists `JobHardware` on Finish). State is shared via `BulkAddSession` and `BulkSessionDraft` static classes.
 - On first launch with no `UserProfile` records, `ProfilePickerDialog` prompts creation before proceeding; `DatabaseSetupDialog` handles unreachable DB paths at startup
 - Visual style: `#C0C0C0` background, beveled buttons, Tahoma/Arial fonts (Windows 98 aesthetic) via Avalonia `ControlTheme`/`Style`
 - Standard search pattern throughout: Manufacturer/Description/ModelNumber comboboxes → listbox sorted by `Frequency` desc

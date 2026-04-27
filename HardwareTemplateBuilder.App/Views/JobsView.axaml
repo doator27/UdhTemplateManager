@@ -59,13 +59,6 @@
                             <Button Name="ToggleCompleteButton" Content="Mark Complete" Margin="0,0,0,0"/>
                         </StackPanel>
 
-                        <!-- Copy hardware — only visible when creating a new job -->
-                        <StackPanel Name="CopyHardwareSection" Margin="0,8,0,0" IsVisible="False">
-                            <CheckBox Name="CopyHardwareCheck" Content="Copy hardware from existing job" Margin="0,0,0,4"/>
-                            <ComboBox Name="CopySourceCombo" HorizontalAlignment="Stretch"
-                                      PlaceholderText="Select source job..." IsVisible="False"/>
-                        </StackPanel>
-
                         <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
 
                         <!-- Notes -->
