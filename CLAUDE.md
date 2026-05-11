@@ -50,6 +50,7 @@ dotnet ef database update --project HardwareTemplateBuilder.Core        # Apply 
 - `JobRelease` records model addenda/revisions to a job; `JobHardware` rows can reference a `JobRelease` via nullable FK (SetNull on release delete)
 - **App configuration is stored in the `AppSetting` table** (key-value), not in appsettings.json. Keys include `TemplateStorageLocation`, `LastRefreshTimestamp`, and SMTP settings seeded by `DatabaseInitializer`
 - **Job-scoped templates:** `IndividualTemplate.OriginJobId` (null = globally visible; non-null = hidden from other jobs' searches). `HardwareItemTemplate.JobId` (null = global link included in all packages; non-null = link only active for that specific job's PDF generation). Use `IndividualTemplateRepository.GetVisibleForJob(jobId)` when searching within a job context.
+- **Cloning job-scoped templates:** `IndividualTemplateRepository.Add()` deduplicates on `ManufacturerId + TemplateNumber + DoorMaterialId` and ignores `OriginJobId`, so calling it to clone a job-scoped template returns the original unchanged. Instead, query for an existing clone (`OriginJobId == targetJobId`, same mfr+number+material) directly via `ctx.IndividualTemplates.FirstOrDefault(...)`, and if absent insert via `ctx.IndividualTemplates.Add()` bypassing the repository.
 
 ### Key Services (Core/Services/)
 
@@ -72,6 +73,14 @@ Orchestrated by `PdfAssemblyService`, which accepts an `AssemblyRequest` and exe
 5. Prepend cover sheet + `PageNumberer` stamps sequential numbers offset past cover pages
 6. Write `JobTemplateSnapshot` records
 
+#### QuestPDF constraints (CoverSheetBuilder)
+
+`page.Header()` in QuestPDF is rendered as a **completely fresh, independent context on every page** — no state carries across page renders. This means `ShowOnce()`, `SkipOnce()`, and `IDynamicComponent` (including reading `context.PageNumber`) all behave as if every page is page 1 when placed inside `page.Header()`. The only reliable way to show something once on the first page is to put it in `page.Content()` wrapped in `ShowOnce()`, which works because content is a single continuous flow across pages.
+
+- `DynamicContext` is in `QuestPDF.Elements` (not `QuestPDF.Infrastructure`/`QuestPDF.Fluent`) — add `using QuestPDF.Elements;` if implementing `IDynamicComponent`
+- `IDynamicComponent` (non-generic) is in `QuestPDF.Infrastructure`; `IDynamicComponent<TState>` extends it with a `State` property
+- Cover sheet row ordering is by **minimum body page number** (not description path), so the Page # column always ascends in document order
+
 ### UI (App/)
 
 - **Architecture is code-behind, not MVVM** — views directly instantiate repositories and call services; there are no ViewModels or data-binding commands
@@ -79,6 +88,7 @@ Orchestrated by `PdfAssemblyService`, which accepts an `AssemblyRequest` and exe
 - `ViewRouter` swaps child `UserControl` views for navigation — 25 views total; **a new instance is created on every navigate** (no view caching)
 - `SessionService` (static) holds the active `UserProfile` for the session lifetime; `BulkAddSession` (static) holds transient bulk-entry state across the multi-step bulk-add flow
 - **Bulk-add flow** is a multi-step wizard entirely within the content area: `BulkManufacturerSelectionView` → `BulkJobHubView` → `BulkManufacturerSessionView` → `BulkHardwareEntryView` → `TemplateResolutionWizardView` (persists `JobHardware` on Finish). State is shared via `BulkAddSession` and `BulkSessionDraft` static classes.
+- **Import hardware flow** feeds into the same `TemplateResolutionWizardView`. `JobDetailView` shows an "Import Hardware" button that opens `ImportJobPickerDialog` (searchable job list), then populates `BulkAddSession.PendingRows` from the source job's base `JobHardware` rows (ordered by `Id`) and navigates to `TemplateResolutionWizard:{jobId}`. Job-scoped templates from the source job appear in `row.PendingTemplates` and are cloned at Finish time.
 - On first launch with no `UserProfile` records, `ProfilePickerDialog` prompts creation before proceeding; `DatabaseSetupDialog` handles unreachable DB paths at startup
 - Visual style: `#C0C0C0` background, beveled buttons, Tahoma/Arial fonts (Windows 98 aesthetic) via Avalonia `ControlTheme`/`Style`
 - Standard search pattern throughout: Manufacturer/Description/ModelNumber comboboxes → listbox sorted by `Frequency` desc
@@ -123,6 +133,8 @@ Batch operations (PDF assembly, template refresh) collect all per-item failures 
 ## Releases
 
 See `RELEASING.md`. Releases are produced by the GitHub Actions workflow in `.github/workflows/release.yml` — triggered by a `v*` tag push or manual dispatch. The artifact is a self-contained single-file Windows x64 executable zipped as `HardwareTemplateBuilder-{VERSION}-win-x64.zip`.
+
+`Program.cs` calls `SetCurrentProcessExplicitAppUserModelID` and `CreateStartMenuShortcutIfNeeded()` on Windows startup. The shortcut method creates `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Hardware Template Builder.lnk` via WScript.Shell COM on first run — this is what makes Windows 10 expose "Pin to taskbar" in the right-click menu. It uses `Environment.ProcessPath` (not `Process.MainModule`) to get the original launcher path.
 
 The `HardwareTemplateBuilder.SmokeTest` console project runs full CRUD against all entity types to validate schema and relationships — run it manually against a real database when testing migrations or repository changes.
 

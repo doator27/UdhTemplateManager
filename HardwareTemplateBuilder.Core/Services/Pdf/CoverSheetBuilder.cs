@@ -49,10 +49,11 @@ public class CoverSheetBuilder
                 page.DefaultTextStyle(style => style.FontFamily(fontFamily).FontSize(9));
 
                 // ----- Page header — repeats identically on every page -----
-                // QuestPDF renders page.Header() in a fresh, independent context per page,
-                // so no mechanism (ShowOnce, SkipOnce, IDynamicComponent) can make it
-                // behave differently on page 1 vs later pages. The full metadata is placed
-                // in page.Content() with ShowOnce() instead (see below).
+                // Contains only the compact job identifier. Column headers are NOT placed
+                // here because page.Header() always renders above page.Content(), which
+                // would put the column names above the full metadata block on page 1.
+                // Instead, column headers live in table.Header() inside the content so
+                // they repeat per page while appearing below the metadata.
                 page.Header().Column(header =>
                 {
                     header.Item()
@@ -64,34 +65,14 @@ public class CoverSheetBuilder
                         });
 
                     header.Item().LineHorizontal(1).LineColor("#1a3a5c");
-
-                    header.Item().PaddingTop(4).Row(headerRow =>
-                    {
-                        void HeaderCell(int weight, string text) =>
-                            headerRow.RelativeItem(weight)
-                                .Background(HeaderBackground)
-                                .PaddingVertical(5)
-                                .PaddingHorizontal(4)
-                                .Text(text)
-                                .FontColor(Colors.White)
-                                .Bold();
-
-                        HeaderCell(2, "Manufacturer");
-                        HeaderCell(2, "Hardware Type");
-                        HeaderCell(2, "Hardware Description");
-                        HeaderCell(2, "Template #");
-                        HeaderCell(1, "Page #");
-                        HeaderCell(2, "Remarks");
-                    });
                 });
 
                 // ----- Content -----
                 page.Content().PaddingTop(6).Column(col =>
                 {
                     // Full metadata block — rendered only on the first content page.
-                    // ShowOnce() works correctly in page.Content() because the content
-                    // is a single continuous flow across pages; it collapses to zero
-                    // height on all pages after the first.
+                    // ShowOnce() works in page.Content() because content is a single
+                    // continuous flow; the element collapses to zero height on pages 2+.
                     col.Item().ShowOnce().Column(meta =>
                     {
                         meta.Item()
@@ -130,28 +111,58 @@ public class CoverSheetBuilder
                             tbl.Cell().ColumnSpan(4).Text(string.Empty);
                         });
 
-                        // Separator between metadata block and data rows.
-                        meta.Item().PaddingTop(8).LineHorizontal(1).LineColor("#b0b0b0");
+                        meta.Item().PaddingTop(8).LineHorizontal(1).LineColor("#1a3a5c");
                         meta.Item().Height(6);
                     });
 
-                    // Data rows — each kept whole on a single page via ShowEntire().
-                    int rowIndex = 0;
-                    foreach (var row in data.Rows)
+                    // Hardware table — table.Header() repeats the column name row at the
+                    // top of every page the table overflows onto.
+                    col.Item().Table(table =>
                     {
-                        if (row.IsGroupSeparator)
+                        table.ColumnsDefinition(cols =>
                         {
-                            col.Item().Height(10);
-                            continue;
-                        }
+                            cols.RelativeColumn(2); // Manufacturer
+                            cols.RelativeColumn(2); // Hardware Type
+                            cols.RelativeColumn(2); // Hardware Description
+                            cols.RelativeColumn(2); // Template #
+                            cols.RelativeColumn(1); // Page #
+                            cols.RelativeColumn(2); // Remarks
+                        });
 
-                        var bg = (rowIndex % 2 == 1) ? AltRowBackground : "#ffffff";
-                        rowIndex++;
-
-                        col.Item().ShowEntire().Row(dataRow =>
+                        table.Header(h =>
                         {
-                            void DataCell(int weight, string? text) =>
-                                dataRow.RelativeItem(weight)
+                            void HeaderCell(string text) =>
+                                h.Cell()
+                                    .Background(HeaderBackground)
+                                    .PaddingVertical(5)
+                                    .PaddingHorizontal(4)
+                                    .Text(text)
+                                    .FontColor(Colors.White)
+                                    .Bold();
+
+                            HeaderCell("Manufacturer");
+                            HeaderCell("Hardware Type");
+                            HeaderCell("Hardware Description");
+                            HeaderCell("Template #");
+                            HeaderCell("Page #");
+                            HeaderCell("Remarks");
+                        });
+
+                        int rowIndex = 0;
+                        foreach (var row in data.Rows)
+                        {
+                            if (row.IsGroupSeparator)
+                            {
+                                for (int c = 0; c < 6; c++)
+                                    table.Cell().PaddingVertical(5).Text(string.Empty);
+                                continue;
+                            }
+
+                            var bg = (rowIndex % 2 == 1) ? AltRowBackground : "#ffffff";
+                            rowIndex++;
+
+                            void DataCell(string? text) =>
+                                table.Cell()
                                     .Background(bg)
                                     .BorderBottom(1)
                                     .BorderColor("#d0d8e4")
@@ -159,14 +170,14 @@ public class CoverSheetBuilder
                                     .PaddingHorizontal(4)
                                     .Text(text ?? string.Empty);
 
-                            DataCell(2, row.Manufacturer);
-                            DataCell(2, row.HardwareType);
-                            DataCell(2, row.HardwareDescription);
-                            DataCell(2, row.TemplateNumbers);
-                            DataCell(1, row.PageNumbers);
-                            DataCell(2, row.Remarks);
-                        });
-                    }
+                            DataCell(row.Manufacturer);
+                            DataCell(row.HardwareType);
+                            DataCell(row.HardwareDescription);
+                            DataCell(row.TemplateNumbers);
+                            DataCell(row.PageNumbers);
+                            DataCell(row.Remarks);
+                        }
+                    });
                 });
 
                 // ----- Footer -----
