@@ -1,4 +1,3 @@
-using QuestPDF.Elements;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -10,7 +9,8 @@ namespace HardwareTemplateBuilder.Core.Services.Pdf;
 /// Generates a professionally formatted cover sheet PDF using QuestPDF.
 /// The cover sheet includes a header block (job metadata) and a body table
 /// (one row per hardware item). Multi-page overflow is handled automatically.
-/// Page 1 shows full job metadata; subsequent pages show only the job number.
+/// Page 1 shows full job metadata (in the content area via ShowOnce); subsequent
+/// pages show only the job number (in the repeating page header).
 /// Each hardware item row is kept together on a single page.
 /// </summary>
 public class CoverSheetBuilder
@@ -48,21 +48,99 @@ public class CoverSheetBuilder
                 page.Margin(0.75f, Unit.Inch);
                 page.DefaultTextStyle(style => style.FontFamily(fontFamily).FontSize(9));
 
-                // IDynamicComponent renders the full metadata block on page 1 only
-                // and just the job number on subsequent pages.
-                // ShowOnce/SkipOnce do not work in page.Header() because the header
-                // is a fresh independent render on each page with no cross-page state.
-                page.Header().Dynamic(new PageHeaderComponent(data));
+                // ----- Page header — repeats identically on every page -----
+                // QuestPDF renders page.Header() in a fresh, independent context per page,
+                // so no mechanism (ShowOnce, SkipOnce, IDynamicComponent) can make it
+                // behave differently on page 1 vs later pages. The full metadata is placed
+                // in page.Content() with ShowOnce() instead (see below).
+                page.Header().Column(header =>
+                {
+                    header.Item()
+                        .PaddingBottom(4)
+                        .Text(t =>
+                        {
+                            t.Span("Job: ").Bold().FontSize(11).FontColor("#1a3a5c");
+                            t.Span(data.JobNumber).Bold().FontSize(11).FontColor("#1a3a5c");
+                        });
 
-                // ----- Body: one Column item per row, each kept whole on a single page -----
+                    header.Item().LineHorizontal(1).LineColor("#1a3a5c");
+
+                    header.Item().PaddingTop(4).Row(headerRow =>
+                    {
+                        void HeaderCell(int weight, string text) =>
+                            headerRow.RelativeItem(weight)
+                                .Background(HeaderBackground)
+                                .PaddingVertical(5)
+                                .PaddingHorizontal(4)
+                                .Text(text)
+                                .FontColor(Colors.White)
+                                .Bold();
+
+                        HeaderCell(2, "Manufacturer");
+                        HeaderCell(2, "Hardware Type");
+                        HeaderCell(2, "Hardware Description");
+                        HeaderCell(2, "Template #");
+                        HeaderCell(1, "Page #");
+                        HeaderCell(2, "Remarks");
+                    });
+                });
+
+                // ----- Content -----
                 page.Content().PaddingTop(6).Column(col =>
                 {
+                    // Full metadata block — rendered only on the first content page.
+                    // ShowOnce() works correctly in page.Content() because the content
+                    // is a single continuous flow across pages; it collapses to zero
+                    // height on all pages after the first.
+                    col.Item().ShowOnce().Column(meta =>
+                    {
+                        meta.Item()
+                            .AlignCenter()
+                            .Text("Unified Door and Hardware Templates")
+                            .FontSize(16)
+                            .Bold()
+                            .FontColor("#1a3a5c");
+
+                        meta.Item().PaddingTop(10).Table(tbl =>
+                        {
+                            tbl.ColumnsDefinition(cols =>
+                            {
+                                cols.RelativeColumn(1); // label
+                                cols.RelativeColumn(3); // value
+                                cols.RelativeColumn(1); // label (right column)
+                                cols.RelativeColumn(3); // value
+                            });
+
+                            void MetaCell(string text, bool bold = false)
+                            {
+                                var cell = tbl.Cell().PaddingVertical(2).PaddingHorizontal(4);
+                                if (bold) cell.Text(text).Bold();
+                                else cell.Text(text);
+                            }
+
+                            MetaCell("Job Number:", bold: true); MetaCell(data.JobNumber);
+                            MetaCell("Job Name:", bold: true);   MetaCell(data.JobName);
+                            MetaCell("Customer:", bold: true);        MetaCell(data.CustomerName);
+                            MetaCell("Project Manager:", bold: true); MetaCell(data.ProjectManagerName);
+                            MetaCell("Date Created:", bold: true);
+                            MetaCell(data.DateCreated.ToString("MMMM d, yyyy"));
+                            MetaCell("Templates by:", bold: true);
+                            MetaCell(data.PreparedBy);
+                            tbl.Cell().ColumnSpan(2).Text(string.Empty);
+                            tbl.Cell().ColumnSpan(4).Text(string.Empty);
+                        });
+
+                        // Separator between metadata block and data rows.
+                        meta.Item().PaddingTop(8).LineHorizontal(1).LineColor("#b0b0b0");
+                        meta.Item().Height(6);
+                    });
+
+                    // Data rows — each kept whole on a single page via ShowEntire().
                     int rowIndex = 0;
                     foreach (var row in data.Rows)
                     {
                         if (row.IsGroupSeparator)
                         {
-                            // Blank spacer between manufacturer groups.
                             col.Item().Height(10);
                             continue;
                         }
@@ -70,8 +148,6 @@ public class CoverSheetBuilder
                         var bg = (rowIndex % 2 == 1) ? AltRowBackground : "#ffffff";
                         rowIndex++;
 
-                        // ShowEntire() moves the entire row to the next page if it won't fit,
-                        // preventing a single row's content from splitting across pages.
                         col.Item().ShowEntire().Row(dataRow =>
                         {
                             void DataCell(int weight, string? text) =>
@@ -127,105 +203,5 @@ public class CoverSheetBuilder
         var dir = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
-    }
-
-    /// <summary>
-    /// Renders the page header differently for page 1 (full job metadata) versus all
-    /// subsequent pages (job number only). Uses <see cref="DynamicContext.PageNumber"/>
-    /// so no state tracking is required.
-    /// </summary>
-    private sealed class PageHeaderComponent : IDynamicComponent
-    {
-        private readonly CoverSheetData _data;
-
-        /// <summary>Initialises the component with the cover sheet data to render.</summary>
-        public PageHeaderComponent(CoverSheetData data) => _data = data;
-
-        /// <inheritdoc/>
-        public DynamicComponentComposeResult Compose(DynamicContext context)
-        {
-            bool isFirstPage = context.PageNumber == 1;
-
-            var content = context.CreateElement(container =>
-                container.Column(col =>
-                {
-                    if (isFirstPage)
-                    {
-                        col.Item()
-                            .AlignCenter()
-                            .Text("Unified Door and Hardware Templates")
-                            .FontSize(16)
-                            .Bold()
-                            .FontColor("#1a3a5c");
-
-                        col.Item().PaddingTop(10).Table(meta =>
-                        {
-                            meta.ColumnsDefinition(cd =>
-                            {
-                                cd.RelativeColumn(1); // label
-                                cd.RelativeColumn(3); // value
-                                cd.RelativeColumn(1); // label (right column)
-                                cd.RelativeColumn(3); // value
-                            });
-
-                            void MetaCell(string text, bool bold = false)
-                            {
-                                var cell = meta.Cell().PaddingVertical(2).PaddingHorizontal(4);
-                                if (bold) cell.Text(text).Bold();
-                                else cell.Text(text);
-                            }
-
-                            MetaCell("Job Number:", bold: true); MetaCell(_data.JobNumber);
-                            MetaCell("Job Name:", bold: true);   MetaCell(_data.JobName);
-                            MetaCell("Customer:", bold: true);        MetaCell(_data.CustomerName);
-                            MetaCell("Project Manager:", bold: true); MetaCell(_data.ProjectManagerName);
-                            MetaCell("Date Created:", bold: true);
-                            MetaCell(_data.DateCreated.ToString("MMMM d, yyyy"));
-                            MetaCell("Templates by:", bold: true);
-                            MetaCell(_data.PreparedBy);
-                            meta.Cell().ColumnSpan(2).Text(string.Empty);
-                            meta.Cell().ColumnSpan(4).Text(string.Empty);
-                        });
-
-                        col.Item().PaddingTop(6).LineHorizontal(1).LineColor("#1a3a5c");
-                    }
-                    else
-                    {
-                        col.Item().Text(t =>
-                        {
-                            t.Span("Job: ").Bold().FontSize(11).FontColor("#1a3a5c");
-                            t.Span(_data.JobNumber).Bold().FontSize(11).FontColor("#1a3a5c");
-                        });
-                        col.Item().PaddingTop(4).LineHorizontal(1).LineColor("#1a3a5c");
-                    }
-
-                    // Column header row — every page
-                    col.Item().PaddingTop(4).Row(headerRow =>
-                    {
-                        void HeaderCell(int weight, string text) =>
-                            headerRow.RelativeItem(weight)
-                                .Background(HeaderBackground)
-                                .PaddingVertical(5)
-                                .PaddingHorizontal(4)
-                                .Text(text)
-                                .FontColor(Colors.White)
-                                .Bold();
-
-                        HeaderCell(2, "Manufacturer");
-                        HeaderCell(2, "Hardware Type");
-                        HeaderCell(2, "Hardware Description");
-                        HeaderCell(2, "Template #");
-                        HeaderCell(1, "Page #");
-                        HeaderCell(2, "Remarks");
-                    });
-                })
-            );
-
-            return new DynamicComponentComposeResult
-            {
-                Content = (IElement)content,
-                HasMoreContent = false
-            };
-        }
     }
 }
