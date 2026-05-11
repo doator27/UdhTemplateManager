@@ -9,6 +9,8 @@ namespace HardwareTemplateBuilder.Core.Services.Pdf;
 /// Generates a professionally formatted cover sheet PDF using QuestPDF.
 /// The cover sheet includes a header block (job metadata) and a body table
 /// (one row per hardware item). Multi-page overflow is handled automatically.
+/// Page 1 shows full job metadata; subsequent pages show only the job number.
+/// Each hardware item row is kept together on a single page.
 /// </summary>
 public class CoverSheetBuilder
 {
@@ -49,67 +51,70 @@ public class CoverSheetBuilder
                 page.Margin(0.75f, Unit.Inch);
                 page.DefaultTextStyle(style => style.FontFamily(fontFamily).FontSize(9));
 
-                // ----- Header block -----
+                // ----- Header block (repeats on every page) -----
                 page.Header().Column(header =>
                 {
-                    header.Item()
-                        .AlignCenter()
-                        .Text("Unified Door and Hardware Templates")
-                        .FontSize(16)
-                        .Bold()
-                        .FontColor("#1a3a5c");
-
-                    header.Item().PaddingTop(10).Table(meta =>
+                    // Full metadata — page 1 only
+                    header.Item().ShowOnce().Column(full =>
                     {
-                        meta.ColumnsDefinition(cols =>
+                        full.Item()
+                            .AlignCenter()
+                            .Text("Unified Door and Hardware Templates")
+                            .FontSize(16)
+                            .Bold()
+                            .FontColor("#1a3a5c");
+
+                        full.Item().PaddingTop(10).Table(meta =>
                         {
-                            cols.RelativeColumn(1); // label
-                            cols.RelativeColumn(3); // value
-                            cols.RelativeColumn(1); // label (right column)
-                            cols.RelativeColumn(3); // value
+                            meta.ColumnsDefinition(cols =>
+                            {
+                                cols.RelativeColumn(1); // label
+                                cols.RelativeColumn(3); // value
+                                cols.RelativeColumn(1); // label (right column)
+                                cols.RelativeColumn(3); // value
+                            });
+
+                            void MetaCell(string text, bool bold = false)
+                            {
+                                var cell = meta.Cell().PaddingVertical(2).PaddingHorizontal(4);
+                                if (bold)
+                                    cell.Text(text).Bold();
+                                else
+                                    cell.Text(text);
+                            }
+
+                            MetaCell("Job Number:", bold: true); MetaCell(data.JobNumber);
+                            MetaCell("Job Name:", bold: true);   MetaCell(data.JobName);
+                            MetaCell("Customer:", bold: true);        MetaCell(data.CustomerName);
+                            MetaCell("Project Manager:", bold: true); MetaCell(data.ProjectManagerName);
+                            MetaCell("Date Created:", bold: true);
+                            MetaCell(data.DateCreated.ToString("MMMM d, yyyy"));
+                            MetaCell("Templates by:", bold: true);
+                            MetaCell(data.PreparedBy);
+                            meta.Cell().ColumnSpan(2).Text(string.Empty);
+                            meta.Cell().ColumnSpan(4).Text(string.Empty);
                         });
 
-                        void MetaCell(string text, bool bold = false)
-                        {
-                            var cell = meta.Cell().PaddingVertical(2).PaddingHorizontal(4);
-                            if (bold)
-                                cell.Text(text).Bold();
-                            else
-                                cell.Text(text);
-                        }
-
-                        MetaCell("Job Number:", bold: true); MetaCell(data.JobNumber);
-                        MetaCell("Job Name:", bold: true);   MetaCell(data.JobName);
-                        MetaCell("Customer:", bold: true);        MetaCell(data.CustomerName);
-                        MetaCell("Project Manager:", bold: true); MetaCell(data.ProjectManagerName);
-                        MetaCell("Date Created:", bold: true);
-                        MetaCell(data.DateCreated.ToString("MMMM d, yyyy"));
-                        MetaCell("Templates by:", bold: true);
-                        MetaCell(data.PreparedBy);
-                        meta.Cell().ColumnSpan(2).Text(string.Empty); // right side of same row (empty)
-                        meta.Cell().ColumnSpan(4).Text(string.Empty); // spacer row
+                        full.Item().PaddingTop(6).LineHorizontal(1).LineColor("#1a3a5c");
                     });
 
-                    header.Item().PaddingTop(6).LineHorizontal(1).LineColor("#1a3a5c");
-                });
-
-                // ----- Body table -----
-                page.Content().PaddingTop(8).Table(table =>
-                {
-                    table.ColumnsDefinition(cols =>
+                    // Job number only — pages 2+
+                    header.Item().SkipOnce().Column(simple =>
                     {
-                        cols.RelativeColumn(2);  // Manufacturer
-                        cols.RelativeColumn(2);  // Hardware Type
-                        cols.RelativeColumn(2);  // Hardware Description
-                        cols.RelativeColumn(2);  // Template #
-                        cols.RelativeColumn(1);  // Page #
-                        cols.RelativeColumn(2);  // Remarks
+                        simple.Item()
+                            .Text(t =>
+                            {
+                                t.Span("Job: ").Bold().FontSize(11).FontColor("#1a3a5c");
+                                t.Span(data.JobNumber).Bold().FontSize(11).FontColor("#1a3a5c");
+                            });
+                        simple.Item().PaddingTop(4).LineHorizontal(1).LineColor("#1a3a5c");
                     });
 
-                    table.Header(header =>
+                    // Column headers row — every page
+                    header.Item().PaddingTop(4).Row(headerRow =>
                     {
-                        void HeaderCell(string text) =>
-                            header.Cell()
+                        void HeaderCell(int weight, string text) =>
+                            headerRow.RelativeItem(weight)
                                 .Background(HeaderBackground)
                                 .PaddingVertical(5)
                                 .PaddingHorizontal(4)
@@ -117,44 +122,51 @@ public class CoverSheetBuilder
                                 .FontColor(Colors.White)
                                 .Bold();
 
-                        HeaderCell("Manufacturer");
-                        HeaderCell("Hardware Type");
-                        HeaderCell("Hardware Description");
-                        HeaderCell("Template #");
-                        HeaderCell("Page #");
-                        HeaderCell("Remarks");
+                        HeaderCell(2, "Manufacturer");
+                        HeaderCell(2, "Hardware Type");
+                        HeaderCell(2, "Hardware Description");
+                        HeaderCell(2, "Template #");
+                        HeaderCell(1, "Page #");
+                        HeaderCell(2, "Remarks");
                     });
+                });
 
+                // ----- Body: one Column item per row, each kept whole on a single page -----
+                page.Content().PaddingTop(6).Column(col =>
+                {
                     int rowIndex = 0;
                     foreach (var row in data.Rows)
                     {
                         if (row.IsGroupSeparator)
                         {
-                            // Blank spacer row — 6 empty cells with vertical padding to
-                            // visually separate manufacturer groups.
-                            for (int c = 0; c < 6; c++)
-                                table.Cell().PaddingVertical(5).Text(string.Empty);
+                            // Blank spacer between manufacturer groups — no need to keep together.
+                            col.Item().Height(10);
                             continue;
                         }
 
                         var bg = (rowIndex % 2 == 1) ? AltRowBackground : "#ffffff";
                         rowIndex++;
 
-                        void DataCell(string? text) =>
-                            table.Cell()
-                                .Background(bg)
-                                .BorderBottom(1)
-                                .BorderColor("#d0d8e4")
-                                .PaddingVertical(4)
-                                .PaddingHorizontal(4)
-                                .Text(text ?? string.Empty);
+                        // ShowEntire() moves the entire row to the next page if it won't fit,
+                        // preventing a single row's content from splitting across pages.
+                        col.Item().ShowEntire().Row(dataRow =>
+                        {
+                            void DataCell(int weight, string? text) =>
+                                dataRow.RelativeItem(weight)
+                                    .Background(bg)
+                                    .BorderBottom(1)
+                                    .BorderColor("#d0d8e4")
+                                    .PaddingVertical(4)
+                                    .PaddingHorizontal(4)
+                                    .Text(text ?? string.Empty);
 
-                        DataCell(row.Manufacturer);
-                        DataCell(row.HardwareType);
-                        DataCell(row.HardwareDescription);
-                        DataCell(row.TemplateNumbers);
-                        DataCell(row.PageNumbers);
-                        DataCell(row.Remarks);
+                            DataCell(2, row.Manufacturer);
+                            DataCell(2, row.HardwareType);
+                            DataCell(2, row.HardwareDescription);
+                            DataCell(2, row.TemplateNumbers);
+                            DataCell(1, row.PageNumbers);
+                            DataCell(2, row.Remarks);
+                        });
                     }
                 });
 

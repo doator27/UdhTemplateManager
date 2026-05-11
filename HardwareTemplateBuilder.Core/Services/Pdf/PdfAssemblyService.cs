@@ -247,43 +247,50 @@ public class PdfAssemblyService
     /// <summary>
     /// Builds a <see cref="CoverSheetData"/> from the assembly request and the
     /// computed per-item body page lists.
-    /// Hardware items are grouped by manufacturer. Within each group they are sorted by
-    /// description hierarchy path then by model/custom description — mirroring the PDF body
-    /// order. Manufacturer groups are ordered by the minimum (highest-priority) path found
-    /// in the group, with alphabetical name as a tiebreaker. A blank separator row is
+    /// Hardware items are grouped by manufacturer. Both groups and items within groups are
+    /// ordered by the first body-page number their templates occupy, so the Page # column
+    /// in the cover sheet always ascends in document order. A blank separator row is
     /// inserted between each manufacturer group for readability.
     /// </summary>
     private static CoverSheetData BuildCoverSheetData(
         AssemblyRequest request,
         Dictionary<int, List<int>> itemBodyPages)
     {
+        // Sort groups and items by their first body page number so the Page # column
+        // in the cover sheet always ascends, matching the document order.
         var manufacturerGroups = request.Hardware
             .GroupBy(hwt => hwt.Item.ManufacturerId)
             .Select(g =>
             {
                 var sortedItems = g
-                    .OrderBy(hwt => WeightTemplateSortStrategy.GetSortPath(
-                                hwt.Item.DescriptionId, request.AllDescriptions),
-                             PathComparer.Instance)
+                    .OrderBy(hwt =>
+                    {
+                        var pages = itemBodyPages.TryGetValue(hwt.Item.Id, out var p) ? p : new List<int>();
+                        return pages.Count > 0 ? pages.Min() : int.MaxValue;
+                    })
                     .ThenBy(hwt => !string.IsNullOrWhiteSpace(hwt.CustomDescription)
                                 ? hwt.CustomDescription
                                 : hwt.Item.ModelNumber,
                              StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-                var minPath = sortedItems
-                    .Select(hwt => WeightTemplateSortStrategy.GetSortPath(
-                                hwt.Item.DescriptionId, request.AllDescriptions))
-                    .Min(PathComparer.Instance)!;
+                int groupMinPage = sortedItems
+                    .Select(hwt =>
+                    {
+                        var pages = itemBodyPages.TryGetValue(hwt.Item.Id, out var p) ? p : new List<int>();
+                        return pages.Count > 0 ? pages.Min() : int.MaxValue;
+                    })
+                    .DefaultIfEmpty(int.MaxValue)
+                    .Min();
 
                 return new
                 {
                     ManufacturerName = g.First().Item.Manufacturer?.ManufacturerName ?? string.Empty,
                     Items            = sortedItems,
-                    MinPath          = minPath
+                    GroupMinPage     = groupMinPage
                 };
             })
-            .OrderBy(g => g.MinPath, PathComparer.Instance)
+            .OrderBy(g => g.GroupMinPage)
             .ThenBy(g => g.ManufacturerName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
