@@ -248,16 +248,17 @@ public class PdfAssemblyService
     /// Builds a <see cref="CoverSheetData"/> from the assembly request and the
     /// computed per-item body page lists.
     /// Hardware items are grouped by manufacturer. Both groups and items within groups are
-    /// ordered by the first body-page number their templates occupy, so the Page # column
-    /// in the cover sheet always ascends in document order. A blank separator row is
+    /// ordered by the lowest body-page number their templates occupy (supporting both
+    /// sequential and non-sequential page ranges), so the cover sheet rows appear in
+    /// the same order as the templates in the PDF body. A blank separator row is
     /// inserted between each manufacturer group for readability.
     /// </summary>
     private static CoverSheetData BuildCoverSheetData(
         AssemblyRequest request,
         Dictionary<int, List<int>> itemBodyPages)
     {
-        // Sort groups and items by their first body page number so the Page # column
-        // in the cover sheet always ascends, matching the document order.
+        // Sort groups and items by their lowest body page number so the cover sheet
+        // rows ascend in the same order as the PDF body pages.
         var manufacturerGroups = request.Hardware
             .GroupBy(hwt => hwt.Item.ManufacturerId)
             .Select(g =>
@@ -274,6 +275,7 @@ public class PdfAssemblyService
                              StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
+                // Find the minimum page number for this manufacturer group.
                 int groupMinPage = sortedItems
                     .Select(hwt =>
                     {
