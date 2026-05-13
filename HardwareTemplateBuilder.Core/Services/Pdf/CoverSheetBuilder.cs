@@ -57,14 +57,35 @@ public class CoverSheetBuilder
                 page.Header().Column(header =>
                 {
                     header.Item()
-                        .PaddingBottom(4)
-                        .Text(t =>
-                        {
-                            t.Span("Job: ").Bold().FontSize(11).FontColor("#1a3a5c");
-                            t.Span(data.JobNumber).Bold().FontSize(11).FontColor("#1a3a5c");
-                        });
-
+                            .Row(row =>
+                            {
+                                row.RelativeItem()
+                                    .AlignLeft()
+                                    .Text("Unified Door and Hardware")
+                                    .FontSize(16)
+                                    .Bold()
+                                    .FontColor("#1a3a5c");
+                                
+                                row.RelativeItem()
+                                    .AlignRight()
+                                    .Text(t =>
+                                    {
+                                        t.Span("Job: ").Bold().FontSize(16).FontColor("#1a3a5c");
+                                        t.Span(data.JobNumber).Bold().FontSize(16).FontColor("#1a3a5c");
+                                    });
+                            });
+                            
+                    
                     header.Item().LineHorizontal(1).LineColor("#1a3a5c");
+                   
+                    //header.Item()
+                    //    .PaddingBottom(2)
+                    //    .Text(t =>
+                    //    {
+                    //        t.Span("Job: ").Bold().FontSize(11).FontColor("#1a3a5c");
+                    //        t.Span(data.JobNumber).Bold().FontSize(11).FontColor("#1a3a5c");
+                    //    });
+                                   
                 });
 
                 // ----- Content -----
@@ -75,13 +96,6 @@ public class CoverSheetBuilder
                     // continuous flow; the element collapses to zero height on pages 2+.
                     col.Item().ShowOnce().Column(meta =>
                     {
-                        meta.Item()
-                            .AlignCenter()
-                            .Text("Unified Door and Hardware Templates")
-                            .FontSize(16)
-                            .Bold()
-                            .FontColor("#1a3a5c");
-
                         meta.Item().PaddingTop(10).Table(tbl =>
                         {
                             tbl.ColumnsDefinition(cols =>
@@ -99,19 +113,23 @@ public class CoverSheetBuilder
                                 else cell.Text(text);
                             }
 
-                            MetaCell("Job Number:", bold: true); MetaCell(data.JobNumber);
-                            MetaCell("Job Name:", bold: true);   MetaCell(data.JobName);
-                            MetaCell("Customer:", bold: true);        MetaCell(data.CustomerName);
-                            MetaCell("Project Manager:", bold: true); MetaCell(data.ProjectManagerName);
-                            MetaCell("Date Created:", bold: true);
+                            //MetaCell("Job #:", bold: true); MetaCell(data.JobNumber);
+                            MetaCell("Job Name:", bold: true); MetaCell(data.JobName);
+                            //tbl.Cell().ColumnSpan(4).PaddingVertical(1).Text(string.Empty); // Blank row
+
+                            MetaCell("Customer:", bold: true); MetaCell(data.CustomerName);
+                            MetaCell("PM:", bold: true); MetaCell(data.ProjectManagerName);
+                            //tbl.Cell().ColumnSpan(4).PaddingVertical(1).Text(string.Empty); // Blank row
+
+                            MetaCell("Date:", bold: true);
                             MetaCell(data.DateCreated.ToString("MMMM d, yyyy"));
-                            MetaCell("Templates by:", bold: true);
+                            MetaCell("Prep By:", bold: true);
                             MetaCell(data.PreparedBy);
                             tbl.Cell().ColumnSpan(2).Text(string.Empty);
                             tbl.Cell().ColumnSpan(4).Text(string.Empty);
                         });
 
-                        meta.Item().PaddingTop(8).LineHorizontal(1).LineColor("#1a3a5c");
+                        meta.Item().PaddingTop(4).LineHorizontal(1).LineColor("#1a3a5c");
                         meta.Item().Height(6);
                     });
 
@@ -163,6 +181,7 @@ public class CoverSheetBuilder
 
                             void DataCell(string? text) =>
                                 table.Cell()
+                                    .ShowEntire()
                                     .Background(bg)
                                     .BorderBottom(1)
                                     .BorderColor("#d0d8e4")
