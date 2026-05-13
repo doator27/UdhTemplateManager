@@ -47,10 +47,10 @@ public class WeightTemplateSortStrategy : ITemplateSortStrategy
     /// <summary>
     /// Walks the ancestor chain of <paramref name="descriptionId"/> and returns the ordered
     /// list of <c>SortOrder</c> values from the root down to the node.
-    /// Exposed as <c>internal static</c> so other services (e.g. cover sheet sorting) can
+    /// Exposed as <c>public static</c> so other services (e.g. cover sheet sorting, debug views) can
     /// reuse the same path-building logic without duplicating code.
     /// </summary>
-    internal static IReadOnlyList<int> GetSortPath(
+    public static IReadOnlyList<int> GetSortPath(
         int descriptionId,
         IReadOnlyDictionary<int, Description> allDescriptions)
     {
@@ -71,7 +71,7 @@ public class WeightTemplateSortStrategy : ITemplateSortStrategy
 /// Lexicographic comparer for sort-path lists. Shorter paths that are a prefix of a longer
 /// path sort before the longer path (parent before children).
 /// </summary>
-internal sealed class PathComparer : IComparer<IReadOnlyList<int>>
+public sealed class PathComparer : IComparer<IReadOnlyList<int>>
 {
     /// <summary>Shared singleton instance.</summary>
     public static readonly PathComparer Instance = new();
