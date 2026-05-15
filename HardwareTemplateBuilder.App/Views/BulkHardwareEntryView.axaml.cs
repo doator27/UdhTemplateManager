@@ -352,7 +352,7 @@ public partial class BulkHardwareEntryView : UserControl
 
             using var ctx = DatabaseInitializer.CreateContext();
             var q = ctx.HardwareItems.AsQueryable()
-                .Where(h => h.ManufacturerId == _manufacturerId);
+                .Where(h => h.ManufacturerId == _manufacturerId && h.IsActive);
 
             if (entry.Description != null)
             {
@@ -383,7 +383,8 @@ public partial class BulkHardwareEntryView : UserControl
                     entry.MatchedItem = ctx.HardwareItems.FirstOrDefault(i =>
                         i.ManufacturerId == _manufacturerId &&
                         i.DescriptionId == entry.Description.Id &&
-                        i.ModelNumber == text);
+                        i.ModelNumber == text &&
+                        i.IsActive);
                 }
             }
 
@@ -693,7 +694,7 @@ public partial class BulkHardwareEntryView : UserControl
     {
         using var ctx = DatabaseInitializer.CreateContext();
         var usedDescIds = ctx.HardwareItems
-            .Where(h => h.ManufacturerId == manufacturerId)
+            .Where(h => h.ManufacturerId == manufacturerId && h.IsActive)
             .Select(h => h.DescriptionId)
             .Distinct()
             .ToHashSet();

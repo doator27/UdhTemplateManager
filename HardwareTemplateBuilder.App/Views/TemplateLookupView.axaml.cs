@@ -97,7 +97,7 @@ public partial class TemplateLookupView : UserControl
         {
             using var ctx = DatabaseInitializer.CreateContext();
             var descIds = ctx.HardwareItems
-                .Where(h => h.ManufacturerId == mfrId)
+                .Where(h => h.ManufacturerId == mfrId && h.IsActive)
                 .Select(h => h.DescriptionId)
                 .Distinct()
                 .ToHashSet();

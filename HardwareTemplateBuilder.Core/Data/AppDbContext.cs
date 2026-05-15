@@ -89,10 +89,14 @@ public class AppDbContext : DbContext
             new DoorMaterial { Id = 3, Material = "Both" }
         );
 
-        // HardwareItem: default Frequency to 0
+        // HardwareItem: default Frequency to 0 and IsActive to true
         modelBuilder.Entity<HardwareItem>()
             .Property(h => h.Frequency)
             .HasDefaultValue(0);
+
+        modelBuilder.Entity<HardwareItem>()
+            .Property(h => h.IsActive)
+            .HasDefaultValue(true);
 
         // JobTemplateSnapshot: default SnapshotDate to current UTC time
         modelBuilder.Entity<JobTemplateSnapshot>()

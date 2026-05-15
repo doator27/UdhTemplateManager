@@ -32,6 +32,13 @@ public class HardwareItem
     public string? Remarks { get; set; }
 
     /// <summary>
+    /// Gets or sets whether this hardware item is active.
+    /// Inactive items are hidden from bulk-add searches and template lookups but remain
+    /// fully searchable in the Hardware Items management screen.
+    /// </summary>
+    public bool IsActive { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets the usage frequency counter.
     /// Incremented each time this item is retrieved via lookup or included in a job.
     /// Used to weight search results (higher = shown first).
@@ -43,4 +50,9 @@ public class HardwareItem
 
     /// <summary>Gets or sets the junction records linking this item to jobs.</summary>
     public ICollection<JobHardware> JobHardwareLinks { get; set; } = new List<JobHardware>();
+
+    /// <summary>
+    /// Gets the display text for this hardware item, prefixed with "[INACTIVE]" if not active.
+    /// </summary>
+    public string DisplayModelNumber => IsActive ? ModelNumber : $"[INACTIVE] {ModelNumber}";
 }

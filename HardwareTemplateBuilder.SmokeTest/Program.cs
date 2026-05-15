@@ -50,7 +50,8 @@ var hardwareItem = new HardwareItem
     DescriptionId = description.Id,
     ModelNumber = "TEST-001",
     Remarks = "Smoke test item",
-    Frequency = 0
+    Frequency = 0,
+    IsActive = true
 };
 context.HardwareItems.Add(hardwareItem);
 

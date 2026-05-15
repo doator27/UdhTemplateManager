@@ -158,6 +158,20 @@ public static class DatabaseInitializer
             cmd.ExecuteNonQuery();
         }
 
+        // Patch: IsActive on HardwareItems — ensures all existing items are marked active.
+        if (!ColumnExists(conn, "HardwareItems", "IsActive"))
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "ALTER TABLE \"HardwareItems\" ADD COLUMN \"IsActive\" INTEGER NOT NULL DEFAULT 1";
+            cmd.ExecuteNonQuery();
+        }
+        // Belt-and-suspenders: ensure all existing records are explicitly set to active.
+        using (var updateCmd = conn.CreateCommand())
+        {
+            updateCmd.CommandText = "UPDATE \"HardwareItems\" SET \"IsActive\" = 1 WHERE \"IsActive\" IS NULL OR \"IsActive\" = 0";
+            updateCmd.ExecuteNonQuery();
+        }
+
         // Patch: SMTP / alert email settings (Phase 24).
         // Uses INSERT OR IGNORE so the operation is safe on both new and existing databases.
         var smtpDefaults = new (string Key, string Value)[]

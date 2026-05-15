@@ -24,10 +24,19 @@ public class HardwareItemRepository : RepositoryBase<HardwareItem>, IHardwareIte
     /// <inheritdoc/>
     public IEnumerable<HardwareItem> Search(string? manufacturerName, int? descriptionId, string? modelNumber)
     {
+        return Search(manufacturerName, descriptionId, modelNumber, activeOnly: true);
+    }
+
+    /// <inheritdoc/>
+    public IEnumerable<HardwareItem> Search(string? manufacturerName, int? descriptionId, string? modelNumber, bool activeOnly)
+    {
         var query = _context.HardwareItems
             .Include(h => h.Manufacturer)
             .Include(h => h.Description)
             .AsQueryable();
+
+        if (activeOnly)
+            query = query.Where(h => h.IsActive);
 
         if (!string.IsNullOrWhiteSpace(manufacturerName))
             query = query.Where(h => h.Manufacturer.ManufacturerName.Contains(manufacturerName));

@@ -14,6 +14,7 @@ namespace HardwareTemplateBuilder.App.Views;
 /// </summary>
 public partial class HardwareItemsView : UserControl
 {
+    private AppDbContext? _context;
     private HardwareItemRepository? _repo;
     private List<Manufacturer> _manufacturers = new();
     private List<DescriptionComboItem> _descComboItems = new();
@@ -29,14 +30,15 @@ public partial class HardwareItemsView : UserControl
     {
         InitializeComponent();
         Loaded += (_, _) => Initialize();
+        Unloaded += (_, _) => Cleanup();
     }
 
     private void Initialize()
     {
-        var context = DatabaseInitializer.CreateContext();
-        _repo = new HardwareItemRepository(context);
-        _manufacturers = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _allRawDescs   = new DescriptionRepository(context).GetAll().ToList();
+        _context = DatabaseInitializer.CreateContext();
+        _repo = new HardwareItemRepository(_context);
+        _manufacturers = new ManufacturerRepository(_context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
+        _allRawDescs   = new DescriptionRepository(_context).GetAll().ToList();
         _descComboItems = DescriptionHelper.BuildComboItems(_allRawDescs);
 
         ManufacturerCombo.ItemsSource = _manufacturers;
@@ -44,6 +46,7 @@ public partial class HardwareItemsView : UserControl
 
         LoadList();
         FilterBox.TextChanged += (_, _) => LoadList();
+        ShowInactiveCheck.IsCheckedChanged += (_, _) => LoadList();
         RecordList.SelectionChanged += (_, _) => OnSelectionChanged();
         SaveButton.Click += (_, _) => Save();
         NewButton.Click += (_, _) => ClearForm();
@@ -70,12 +73,15 @@ public partial class HardwareItemsView : UserControl
     private void LoadList()
     {
         var filter = FilterBox.Text?.ToLower() ?? "";
+        var showInactive = ShowInactiveCheck.IsChecked == true;
+        
         var items = _repo!.GetAll()
+            .Where(h => showInactive || h.IsActive)
             .Where(h => string.IsNullOrEmpty(filter) || h.ModelNumber.ToLower().Contains(filter))
             .OrderBy(h => h.ModelNumber)
             .ToList();
         RecordList.ItemsSource = items;
-        RecordList.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
+        RecordList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayModelNumber");
     }
 
     private void OnSelectionChanged()
@@ -89,6 +95,7 @@ public partial class HardwareItemsView : UserControl
             ModelNumberBox.Text = h.ModelNumber;
             RemarksBox.Text = h.Remarks ?? "";
             FrequencyBox.Text = h.Frequency.ToString();
+            IsActiveCheck.IsChecked = h.IsActive;
             StatusLabel.Text = "";
         }
     }
@@ -114,7 +121,8 @@ public partial class HardwareItemsView : UserControl
                 ManufacturerId = mfr.Id,
                 DescriptionId  = desc.Id,
                 ModelNumber    = modelNumber,
-                Remarks        = string.IsNullOrEmpty(RemarksBox.Text?.Trim()) ? null : RemarksBox.Text.Trim()
+                Remarks        = string.IsNullOrEmpty(RemarksBox.Text?.Trim()) ? null : RemarksBox.Text.Trim(),
+                IsActive       = IsActiveCheck.IsChecked == true
             });
         }
         else
@@ -126,6 +134,7 @@ public partial class HardwareItemsView : UserControl
                 existing.DescriptionId  = desc.Id;
                 existing.ModelNumber    = modelNumber;
                 existing.Remarks        = string.IsNullOrEmpty(RemarksBox.Text?.Trim()) ? null : RemarksBox.Text.Trim();
+                existing.IsActive       = IsActiveCheck.IsChecked == true;
                 _repo.Update(existing);
             }
         }
@@ -150,7 +159,14 @@ public partial class HardwareItemsView : UserControl
         ModelNumberBox.Text = "";
         RemarksBox.Text = "";
         FrequencyBox.Text = "";
+        IsActiveCheck.IsChecked = true;
         StatusLabel.Text = "";
         RecordList.SelectedItem = null;
+    }
+
+    private void Cleanup()
+    {
+        _context?.Dispose();
+        _context = null;
     }
 }
