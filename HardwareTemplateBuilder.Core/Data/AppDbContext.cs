@@ -60,6 +60,9 @@ public class AppDbContext : DbContext
     /// <summary>Gets or sets the bulk-add draft persistence table.</summary>
     public DbSet<BulkAddDraft> BulkAddDrafts => Set<BulkAddDraft>();
 
+    /// <summary>Gets or sets the ignored template duplicates table.</summary>
+    public DbSet<IgnoredTemplateDuplicate> IgnoredTemplateDuplicates => Set<IgnoredTemplateDuplicate>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -250,6 +253,11 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<BulkAddDraft>()
             .HasIndex(d => d.JobId)
+            .IsUnique();
+
+        // IgnoredTemplateDuplicate: unique index on SharedLink + LinkType
+        modelBuilder.Entity<IgnoredTemplateDuplicate>()
+            .HasIndex(i => new { i.SharedLink, i.LinkType })
             .IsUnique();
     }
 }

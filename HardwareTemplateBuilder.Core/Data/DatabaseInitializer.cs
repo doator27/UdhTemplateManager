@@ -189,6 +189,26 @@ public static class DatabaseInitializer
             cmd.CommandText = $"INSERT OR IGNORE INTO \"AppSettings\" (\"Key\", \"Value\") VALUES ('{key}', '{value}')";
             cmd.ExecuteNonQuery();
         }
+
+        // Patch: IgnoredTemplateDuplicates table (migration 20260420120000)
+        if (!TableExists(conn, "IgnoredTemplateDuplicates"))
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                CREATE TABLE ""IgnoredTemplateDuplicates"" (
+                    ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_IgnoredTemplateDuplicates"" PRIMARY KEY AUTOINCREMENT,
+                    ""SharedLink"" TEXT NOT NULL,
+                    ""LinkType"" TEXT NOT NULL,
+                    ""IgnoredAt"" TEXT NOT NULL
+                )";
+            cmd.ExecuteNonQuery();
+
+            using var idxCmd = conn.CreateCommand();
+            idxCmd.CommandText = @"
+                CREATE UNIQUE INDEX ""IX_IgnoredTemplateDuplicates_SharedLink_LinkType""
+                ON ""IgnoredTemplateDuplicates"" (""SharedLink"", ""LinkType"")";
+            idxCmd.ExecuteNonQuery();
+        }
     }
 
     private static bool ColumnExists(System.Data.Common.DbConnection conn, string table, string column)
@@ -202,5 +222,17 @@ public static class DatabaseInitializer
                 return true;
         }
         return false;
+    }
+
+    private static bool TableExists(System.Data.Common.DbConnection conn, string table)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name=@tableName";
+        var param = cmd.CreateParameter();
+        param.ParameterName = "@tableName";
+        param.Value = table;
+        cmd.Parameters.Add(param);
+        using var reader = cmd.ExecuteReader();
+        return reader.Read();
     }
 }

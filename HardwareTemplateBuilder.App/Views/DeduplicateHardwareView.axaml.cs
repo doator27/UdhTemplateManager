@@ -351,6 +351,11 @@ public partial class DeduplicateHardwareView : UserControl
 
         using var ctx = DatabaseInitializer.CreateContext();
 
+        // Load all ignored duplicates to filter them out.
+        var ignoredDuplicates = ctx.IgnoredTemplateDuplicates
+            .Select(i => new { i.SharedLink, i.LinkType })
+            .ToHashSet();
+
         var allTemplates = ctx.IndividualTemplates
             .Include(t => t.Manufacturer)
             .Include(t => t.Description)
@@ -375,13 +380,15 @@ public partial class DeduplicateHardwareView : UserControl
         var byOnline = allTemplates
             .Where(t => !string.IsNullOrWhiteSpace(t.OnlineLink))
             .GroupBy(t => t.OnlineLink!.Trim(), StringComparer.OrdinalIgnoreCase)
-            .Where(g => g.Count() > 1);
+            .Where(g => g.Count() > 1)
+            .Where(g => !ignoredDuplicates.Contains(new { SharedLink = g.Key, LinkType = "Online" }));
 
         // Group by non-empty LocalLink.
         var byLocal = allTemplates
             .Where(t => !string.IsNullOrWhiteSpace(t.LocalLink))
             .GroupBy(t => t.LocalLink!.Trim(), StringComparer.OrdinalIgnoreCase)
-            .Where(g => g.Count() > 1);
+            .Where(g => g.Count() > 1)
+            .Where(g => !ignoredDuplicates.Contains(new { SharedLink = g.Key, LinkType = "Local" }));
 
         // Track which template IDs have already been placed in a group to avoid showing
         // the same template twice when both its links happen to match other templates.
@@ -490,12 +497,28 @@ public partial class DeduplicateHardwareView : UserControl
             await MergeTemplateGroupAsync(groupRef, keep.Id);
         };
 
+        var keepBothBtn = new Button
+        {
+            Content = "Keep Both (Ignore)",
+            Padding = new Avalonia.Thickness(8, 3),
+            Margin  = new Avalonia.Thickness(8, 0, 0, 0)
+        };
+        keepBothBtn.Click += async (_, _) => await KeepBothTemplatesAsync(groupRef);
+
+        var buttonPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 0
+        };
+        buttonPanel.Children.Add(mergeBtn);
+        buttonPanel.Children.Add(keepBothBtn);
+
         var content = new StackPanel { Margin = new Avalonia.Thickness(8, 6) };
         content.Children.Add(linkLabel);
         content.Children.Add(countLabel);
         content.Children.Add(instruction);
         content.Children.Add(listBox);
-        content.Children.Add(mergeBtn);
+        content.Children.Add(buttonPanel);
 
         return new Border
         {
@@ -627,5 +650,48 @@ public partial class DeduplicateHardwareView : UserControl
         }
         if (_tplGroups.Count == 0)
             MergeAllTemplatesButton.IsEnabled = false;
+    }
+
+    /// <summary>
+    /// Marks a template duplicate group as "ignored" so it won't appear in future scans.
+    /// This allows users to keep templates with the same link but different page ranges.
+    /// </summary>
+    private async System.Threading.Tasks.Task KeepBothTemplatesAsync(TplDupGroup group)
+    {
+        var win = TopLevel.GetTopLevel(this) as Window;
+        if (win == null) return;
+
+        bool confirmed = await Helpers.DialogHelper.ConfirmAsync(win,
+            $"Mark this duplicate as 'ignored'?\n\n"
+            + $"Link: {group.SharedLink}\n"
+            + $"Type: {group.LinkType}\n\n"
+            + "This duplicate group will no longer appear in future scans.\n"
+            + "The templates will remain unchanged.",
+            "Keep Both Templates");
+        if (!confirmed) return;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        
+        // Check if already ignored (shouldn't happen, but defensive coding).
+        var existing = ctx.IgnoredTemplateDuplicates
+            .FirstOrDefault(i => i.SharedLink == group.SharedLink && i.LinkType == group.LinkType);
+        
+        if (existing == null)
+        {
+            ctx.IgnoredTemplateDuplicates.Add(new IgnoredTemplateDuplicate
+            {
+                SharedLink = group.SharedLink,
+                LinkType = group.LinkType,
+                IgnoredAt = DateTime.UtcNow
+            });
+            ctx.SaveChanges();
+        }
+
+        _tplGroups.Remove(group);
+        RebuildTemplatePanel();
+
+        StatusLabel.Foreground            = Brushes.DarkGreen;
+        StatusLabel.Text                  = $"Marked duplicate as ignored. {_tplGroups.Count} group(s) remaining.";
+        MergeAllTemplatesButton.IsEnabled = _tplGroups.Count > 0;
     }
 }

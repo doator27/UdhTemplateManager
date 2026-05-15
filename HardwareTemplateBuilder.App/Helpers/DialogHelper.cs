@@ -21,51 +21,8 @@ public static class DialogHelper
             Title = title,
             Width = 440,
             Height = 220,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Background = Avalonia.Media.Brushes.Silver,
-        };
-
-        var okButton = new Button { Content = "OK", Width = 80, Margin = new Avalonia.Thickness(5) };
-        okButton.Click += (_, _) => dialog.Close();
-
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(16),
-            Children =
-            {
-                new TextBlock
-                {
-                    Text = message,
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    Margin = new Avalonia.Thickness(0, 0, 0, 16)
-                },
-                new StackPanel
-                {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                    Children = { okButton }
-                }
-            }
-        };
-
-        await dialog.ShowDialog(owner);
-    }
-
-    /// <summary>
-    /// Shows an informational dialog with a scrollable message area and an OK button.
-    /// Use this instead of <see cref="ShowInfoAsync"/> when the message may be long.
-    /// </summary>
-    /// <param name="owner">The parent window.</param>
-    /// <param name="message">The message to display (may be multi-line).</param>
-    /// <param name="title">The dialog title.</param>
-    public static async Task ShowScrollableInfoAsync(Window owner, string message, string title = "Information")
-    {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 560,
-            Height = 420,
+            MinWidth = 300,
+            MinHeight = 150,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = true,
             Background = Avalonia.Media.Brushes.Silver,
@@ -89,6 +46,62 @@ public static class DialogHelper
                 },
                 new Avalonia.Controls.ScrollViewer
                 {
+                    HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                    Content = new TextBlock
+                    {
+                        Text = message,
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                        Margin = new Avalonia.Thickness(0, 0, 0, 8)
+                    }
+                }
+            }
+        };
+
+        await dialog.ShowDialog(owner);
+    }
+
+    /// <summary>
+    /// Shows an informational dialog with a scrollable message area and an OK button.
+    /// Use this instead of <see cref="ShowInfoAsync"/> when the message may be long.
+    /// </summary>
+    /// <param name="owner">The parent window.</param>
+    /// <param name="message">The message to display (may be multi-line).</param>
+    /// <param name="title">The dialog title.</param>
+    public static async Task ShowScrollableInfoAsync(Window owner, string message, string title = "Information")
+    {
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 560,
+            Height = 420,
+            MinWidth = 300,
+            MinHeight = 200,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = true,
+            Background = Avalonia.Media.Brushes.Silver,
+        };
+
+        var okButton = new Button { Content = "OK", Width = 80, Margin = new Avalonia.Thickness(5) };
+        okButton.Click += (_, _) => dialog.Close();
+
+        dialog.Content = new Avalonia.Controls.DockPanel
+        {
+            Margin = new Avalonia.Thickness(16),
+            Children =
+            {
+                new StackPanel
+                {
+                    [Avalonia.Controls.DockPanel.DockProperty] = Avalonia.Controls.Dock.Bottom,
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    Margin = new Avalonia.Thickness(0, 8, 0, 0),
+                    Children = { okButton }
+                },
+                new Avalonia.Controls.ScrollViewer
+                {
+                    HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
                     Content = new TextBlock
                     {
                         Text = message,
@@ -116,9 +129,11 @@ public static class DialogHelper
         {
             Title = title,
             Width = 380,
-            Height = 150,
+            Height = 180,
+            MinWidth = 300,
+            MinHeight = 150,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
+            CanResize = true,
             Background = Avalonia.Media.Brushes.Silver,
         };
 
@@ -130,22 +145,29 @@ public static class DialogHelper
         yesButton.Click += (_, _) => { result = true; dialog.Close(); };
         noButton.Click += (_, _) => { result = false; dialog.Close(); };
 
-        dialog.Content = new StackPanel
+        dialog.Content = new Avalonia.Controls.DockPanel
         {
             Margin = new Avalonia.Thickness(16),
             Children =
             {
-                new TextBlock
-                {
-                    Text = message,
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    Margin = new Avalonia.Thickness(0, 0, 0, 16)
-                },
                 new StackPanel
                 {
+                    [Avalonia.Controls.DockPanel.DockProperty] = Avalonia.Controls.Dock.Bottom,
                     Orientation = Avalonia.Layout.Orientation.Horizontal,
                     HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    Margin = new Avalonia.Thickness(0, 8, 0, 0),
                     Children = { yesButton, noButton }
+                },
+                new Avalonia.Controls.ScrollViewer
+                {
+                    HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                    Content = new TextBlock
+                    {
+                        Text = message,
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                        Margin = new Avalonia.Thickness(0, 0, 0, 8)
+                    }
                 }
             }
         };

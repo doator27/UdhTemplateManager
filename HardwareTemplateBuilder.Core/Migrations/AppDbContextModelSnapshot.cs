@@ -177,6 +177,31 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.ToTable("HardwareItems");
                 });
 
+            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.IgnoredTemplateDuplicate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("IgnoredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LinkType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SharedLink")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SharedLink", "LinkType")
+                        .IsUnique();
+
+                    b.ToTable("IgnoredTemplateDuplicates");
+                });
+
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.HardwareItemTemplate", b =>
                 {
                     b.Property<int>("Id")
