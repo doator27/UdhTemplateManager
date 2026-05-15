@@ -5,18 +5,37 @@
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="Hardware Items" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
-        <Grid ColumnDefinitions="260,*">
-            <!-- Left: list -->
+        <Grid ColumnDefinitions="300,*">
+            <!-- Left: search and list -->
             <DockPanel Grid.Column="0" Margin="0,0,8,0">
-                <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2"/>
-                <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4"/>
-                <CheckBox DockPanel.Dock="Top" Name="ShowInactiveCheck" Content="Show Inactive Items" Margin="0,0,0,4"/>
+                <TextBlock DockPanel.Dock="Top" Text="Manufacturer:" Margin="0,0,0,2"/>
+                <ComboBox DockPanel.Dock="Top" Name="MfrCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+                
+                <TextBlock DockPanel.Dock="Top" Text="Description:" Margin="0,0,0,2"/>
+                <ComboBox DockPanel.Dock="Top" Name="DescCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+                
+                <TextBlock DockPanel.Dock="Top" Text="Filter by Model:" Margin="0,0,0,2"/>
+                <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search model..." Margin="0,0,0,8"/>
+                
+                <CheckBox DockPanel.Dock="Top" Name="ShowInactiveCheck" Content="Show Inactive Items" Margin="0,0,0,8"/>
+                
+                <TextBlock DockPanel.Dock="Top" Text="Results:" Margin="0,0,0,2"/>
                 <ListBox Name="RecordList"/>
             </DockPanel>
             <!-- Right: form -->
             <ScrollViewer Grid.Column="1">
                 <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
                     <StackPanel>
+                        <TextBlock Text="Selected Item Details:" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Border BorderBrush="#808080" BorderThickness="1" Padding="8" Margin="0,0,0,12" Background="#F0F0F0">
+                            <StackPanel>
+                                <TextBlock Name="SelectedMfrLabel" Margin="0,0,0,4"/>
+                                <TextBlock Name="SelectedDescLabel" Margin="0,0,0,4"/>
+                                <TextBlock Name="SelectedModelLabel" Margin="0,0,0,4"/>
+                                <TextBlock Name="SelectedFreqLabel"/>
+                            </StackPanel>
+                        </Border>
+                        
                         <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer:" Margin="0,0,8,2"/>
                             <ComboBox Grid.Row="1" Grid.Column="0" Name="ManufacturerCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>

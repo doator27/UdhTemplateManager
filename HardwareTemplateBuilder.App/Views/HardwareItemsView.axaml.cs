@@ -21,6 +21,7 @@ public partial class HardwareItemsView : UserControl
     private List<Description> _allRawDescs = new();
     private DescriptionComboItem? _selectedDescItem;
     private int _selectedId;
+    private bool _updatingDescCombo;
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event System.Action<string>? NavigationRequested;
@@ -41,13 +42,31 @@ public partial class HardwareItemsView : UserControl
         _allRawDescs   = new DescriptionRepository(_context).GetAll().ToList();
         _descComboItems = DescriptionHelper.BuildComboItems(_allRawDescs);
 
+        // Populate Manufacturer combo with "(Any)" sentinel at index 0.
+        var anyMfr = new List<Manufacturer> { new() { Id = 0, ManufacturerName = "(Any)" } };
+        anyMfr.AddRange(_manufacturers);
+        MfrCombo.ItemsSource = anyMfr;
+        MfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
+        MfrCombo.SelectedIndex = 0;
+
+        // Populate Description combo with "(Any)" sentinel at index 0.
+        var anyDesc = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
+        anyDesc.AddRange(_descComboItems);
+        DescCombo.ItemsSource = anyDesc;
+        DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+        DescCombo.SelectedIndex = 0;
+
+        // Wire search controls — manufacturer drives description cascade.
+        MfrCombo.SelectionChanged  += (_, _) => OnSearchMfrChanged();
+        DescCombo.SelectionChanged += (_, _) => { if (!_updatingDescCombo) LoadList(); };
+        FilterBox.TextChanged      += (_, _) => LoadList();
+        ShowInactiveCheck.IsCheckedChanged += (_, _) => LoadList();
+        
+        RecordList.SelectionChanged += (_, _) => OnSelectionChanged();
+        
         ManufacturerCombo.ItemsSource = _manufacturers;
         ManufacturerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
 
-        LoadList();
-        FilterBox.TextChanged += (_, _) => LoadList();
-        ShowInactiveCheck.IsCheckedChanged += (_, _) => LoadList();
-        RecordList.SelectionChanged += (_, _) => OnSelectionChanged();
         SaveButton.Click += (_, _) => Save();
         NewButton.Click += (_, _) => ClearForm();
         OpenItemButton.Click += (_, _) => OpenItem();
@@ -58,6 +77,9 @@ public partial class HardwareItemsView : UserControl
             if (window != null && await DialogHelper.ConfirmAsync(window, "Delete this hardware item?"))
                 DeleteSelected();
         };
+        
+        // Show all items on first load.
+        LoadList();
     }
 
     private async System.Threading.Tasks.Task PickDescriptionAsync()
@@ -70,27 +92,87 @@ public partial class HardwareItemsView : UserControl
         DescriptionLabel.Text = _selectedDescItem?.DisplayText ?? "(none)";
     }
 
+    /// <summary>
+    /// Repopulates the Description combo to show only descriptions that have at least one
+    /// hardware item made by the selected manufacturer, then re-runs the search.
+    /// </summary>
+    private void OnSearchMfrChanged()
+    {
+        var mfr = MfrCombo.SelectedItem as Manufacturer;
+        var mfrId = mfr?.Id ?? 0;
+
+        var filtered = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
+
+        if (mfrId == 0)
+        {
+            filtered.AddRange(_descComboItems);
+        }
+        else
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var descIds = ctx.HardwareItems
+                .Where(h => h.ManufacturerId == mfrId && h.IsActive)
+                .Select(h => h.DescriptionId)
+                .Distinct()
+                .ToHashSet();
+            filtered.AddRange(_descComboItems.Where(d => descIds.Contains(d.Id)));
+        }
+
+        _updatingDescCombo = true;
+        try
+        {
+            DescCombo.ItemsSource = filtered;
+            DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+            DescCombo.SelectedIndex = 0;
+        }
+        finally
+        {
+            _updatingDescCombo = false;
+        }
+
+        LoadList();
+    }
+
     private void LoadList()
     {
-        var filter = FilterBox.Text?.ToLower() ?? "";
+        var mfr      = MfrCombo.SelectedItem as Manufacturer;
+        var descItem = DescCombo.SelectedItem as DescriptionComboItem;
+        var model    = FilterBox.Text?.Trim();
         var showInactive = ShowInactiveCheck.IsChecked == true;
-        
-        var items = _repo!.GetAll()
-            .Where(h => showInactive || h.IsActive)
-            .Where(h => string.IsNullOrEmpty(filter) || h.ModelNumber.ToLower().Contains(filter))
-            .OrderBy(h => h.ModelNumber)
+
+        var mfrName = (mfr      == null || mfr.Id      == 0) ? null : mfr.ManufacturerName;
+        var descId  = (descItem == null || descItem.Id == 0) ? (int?)null : descItem.Id;
+
+        var results = _repo!.Search(mfrName, descId, model, activeOnly: !showInactive)
+            .Select(h => new HardwareItemDisplay(h))
             .ToList();
-        RecordList.ItemsSource = items;
-        RecordList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayModelNumber");
+
+        RecordList.ItemsSource = results;
+        RecordList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+
+        // Default to first item.
+        if (results.Count > 0)
+            RecordList.SelectedIndex = 0;
+        else
+            ClearSelectedInfo();
     }
 
     private void OnSelectionChanged()
     {
-        if (RecordList.SelectedItem is HardwareItem h)
+        if (RecordList.SelectedItem is HardwareItemDisplay d)
         {
-            _selectedId = h.Id;
+            _selectedId = d.Item.Id;
+            var h = d.Item;
+            
+            // Update selected info panel
+            SelectedMfrLabel.Text   = $"Manufacturer: {h.Manufacturer?.ManufacturerName ?? "?"}"; 
+            SelectedDescLabel.Text  = $"Description: {h.Description?.DescriptionText ?? "?"}"; 
+            SelectedModelLabel.Text = $"Model: {h.ModelNumber}";
+            SelectedFreqLabel.Text  = $"Frequency: {h.Frequency}";
+            
+            // Update form fields
             ManufacturerCombo.SelectedItem = _manufacturers.FirstOrDefault(m => m.Id == h.ManufacturerId);
-            _selectedDescItem = _descComboItems.FirstOrDefault(d => d.Id == h.DescriptionId);
+            _selectedDescItem = _descComboItems.FirstOrDefault(desc => desc.Id == h.DescriptionId);
             DescriptionLabel.Text = _selectedDescItem?.DisplayText ?? "(none)";
             ModelNumberBox.Text = h.ModelNumber;
             RemarksBox.Text = h.Remarks ?? "";
@@ -98,6 +180,18 @@ public partial class HardwareItemsView : UserControl
             IsActiveCheck.IsChecked = h.IsActive;
             StatusLabel.Text = "";
         }
+        else
+        {
+            ClearSelectedInfo();
+        }
+    }
+
+    private void ClearSelectedInfo()
+    {
+        SelectedMfrLabel.Text   = string.Empty;
+        SelectedDescLabel.Text  = string.Empty;
+        SelectedModelLabel.Text = string.Empty;
+        SelectedFreqLabel.Text  = string.Empty;
     }
 
     private void OpenItem()
@@ -168,5 +262,29 @@ public partial class HardwareItemsView : UserControl
     {
         _context?.Dispose();
         _context = null;
+    }
+
+    // ---------- Inner display wrapper ----------
+
+    /// <summary>
+    /// Wraps a <see cref="HardwareItem"/> with a formatted display string for the results
+    /// listbox.
+    /// </summary>
+    private sealed class HardwareItemDisplay
+    {
+        /// <summary>Gets the underlying hardware item.</summary>
+        public HardwareItem Item { get; }
+
+        /// <summary>Gets the text shown in the results listbox.</summary>
+        public string DisplayText { get; }
+
+        /// <summary>Initializes a new <see cref="HardwareItemDisplay"/>.</summary>
+        public HardwareItemDisplay(HardwareItem item)
+        {
+            Item = item;
+            var mfr  = item.Manufacturer?.ManufacturerName ?? "?";
+            var desc = item.Description?.DescriptionText    ?? "?";
+            DisplayText = $"{mfr} — {desc} — {item.ModelNumber}";
+        }
     }
 }
