@@ -390,7 +390,12 @@ public partial class JobDetailView : UserControl
         PackageProgress.IsVisible = true;
         PackageStatusLabel.Text = "Loading job data...";
 
-        var orderedJobHardware = _linkedHardware.Select(jh => (jh.HardwareItemId, jh.CustomDescription, jh.CalloutRemarks)).ToList();
+        var orderedJobHardware = _linkedHardware.Select(jh => 
+            (jh.HardwareItemId, 
+             jh.CustomDescription, 
+             // For backwards compatibility: prefer CalloutRemarks, fallback to Remarks
+             CalloutRemarks: !string.IsNullOrWhiteSpace(jh.CalloutRemarks) ? jh.CalloutRemarks : jh.Remarks))
+            .ToList();
 
         string outputPath;
         IReadOnlyList<TemplateSnapshotInfo> snapshots;

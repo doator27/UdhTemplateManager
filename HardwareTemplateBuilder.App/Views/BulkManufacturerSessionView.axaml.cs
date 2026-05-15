@@ -255,9 +255,17 @@ public partial class BulkManufacturerSessionView : UserControl
                     {
                         ManufacturerId = mfr.ManufacturerId,
                         DescriptionId  = group.DescriptionId.Value,
-                        ModelNumber    = group.ModelNumber
+                        ModelNumber    = group.ModelNumber,
+                        Remarks        = group.HardwareItemRemarks
                     };
                     ctx.HardwareItems.Add(item);
+                    ctx.SaveChanges();
+                }
+                else if (!string.IsNullOrWhiteSpace(group.HardwareItemRemarks) && 
+                         item.Remarks != group.HardwareItemRemarks)
+                {
+                    // Update remarks if provided and different from existing
+                    item.Remarks = group.HardwareItemRemarks;
                     ctx.SaveChanges();
                 }
 

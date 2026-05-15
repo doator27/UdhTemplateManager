@@ -451,7 +451,7 @@ public partial class TemplateResolutionWizardView : UserControl
                     JobId             = _jobId,
                     HardwareItemId    = hwItemId,
                     CustomDescription = customLabel,
-                    Remarks           = remarks
+                    CalloutRemarks    = remarks
                 });
             }
         }

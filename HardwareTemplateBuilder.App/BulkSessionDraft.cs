@@ -37,6 +37,12 @@ public sealed class BulkSessionGroup
     /// <summary>Gets or sets the template number linked to this hardware item (optional).</summary>
     public string? TemplateNumber { get; set; }
 
+    /// <summary>
+    /// Gets or sets the item-level remarks for the hardware item itself.
+    /// These are shared across all jobs and stored in <see cref="Core.Models.HardwareItem.Remarks"/>.
+    /// </summary>
+    public string? HardwareItemRemarks { get; set; }
+
     /// <summary>Gets or sets the per-callout rows. At least one entry is expected.</summary>
     public List<BulkSessionCallout> Callouts { get; set; } = new();
 }

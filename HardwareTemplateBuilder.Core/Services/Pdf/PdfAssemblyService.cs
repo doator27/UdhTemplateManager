@@ -308,12 +308,15 @@ public class PdfAssemblyService
                 var pages = itemBodyPages.TryGetValue(item.Id, out var p) ? p : new List<int>();
 
                 // Combine the item's shared remarks with any per-callout remark.
-                string? combinedRemarks = (item.Remarks, hwt.CalloutRemarks) switch
+                // For backwards compatibility, check CalloutRemarks first, then fall back to Remarks.
+                var calloutRemark = hwt.CalloutRemarks;
+                
+                string? combinedRemarks = (item.Remarks, calloutRemark) switch
                 {
                     (null or "", null or "") => null,
                     (var a, null or "")      => a,
                     (null or "", var b)      => b,
-                    (var a, var b)           => $"{a}; {b}"
+                    (var a, var b)           => $"{a} | {b}"
                 };
 
                 rows.Add(new CoverSheetRow
