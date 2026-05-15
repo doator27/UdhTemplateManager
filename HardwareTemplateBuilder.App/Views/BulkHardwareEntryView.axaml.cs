@@ -189,6 +189,18 @@ public partial class BulkHardwareEntryView : UserControl
         };
         modelCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
 
+        var showAllModelsCheckBox = new CheckBox
+        {
+            Content = "Show all models",
+            FontSize = 10,
+            IsChecked = true,
+            Margin = new Avalonia.Thickness(0, 2, 0, 0)
+        };
+
+        var modelStack = new StackPanel { Spacing = 2 };
+        modelStack.Children.Add(modelCombo);
+        modelStack.Children.Add(showAllModelsCheckBox);
+
         var itemRemarksBox = new TextBox
         {
             Watermark = "Item remarks (optional)",
@@ -220,8 +232,8 @@ public partial class BulkHardwareEntryView : UserControl
             Margin = new Avalonia.Thickness(0, 0, 0, 8)
         };
         topRow.Children.Add(descStack);
-        Grid.SetColumn(modelCombo, 1);
-        topRow.Children.Add(modelCombo);
+        Grid.SetColumn(modelStack, 1);
+        topRow.Children.Add(modelStack);
         Grid.SetColumn(itemRemarksBox, 2);
         topRow.Children.Add(itemRemarksBox);
         Grid.SetColumn(matchLabel, 3);
@@ -342,9 +354,12 @@ public partial class BulkHardwareEntryView : UserControl
         // active entry collapses to its summary row.
         SetActiveEntry(entry);
 
+        // Initialize the model combo with all items for this manufacturer
+        RefreshModelItems();
+
         void RefreshModelItems()
         {
-            if (_manufacturer == null && entry.Description == null)
+            if (_manufacturer == null)
             {
                 modelCombo.ItemsSource = null;
                 return;
@@ -354,7 +369,8 @@ public partial class BulkHardwareEntryView : UserControl
             var q = ctx.HardwareItems.AsQueryable()
                 .Where(h => h.ManufacturerId == _manufacturerId && h.IsActive);
 
-            if (entry.Description != null)
+            // Only filter by description if checkbox is unchecked and a description is selected
+            if (showAllModelsCheckBox.IsChecked != true && entry.Description != null)
             {
                 q = q.Where(h => h.DescriptionId == entry.Description.Id);
             }
@@ -373,6 +389,18 @@ public partial class BulkHardwareEntryView : UserControl
             else if (modelCombo.SelectedItem is HardwareItem h && h.ModelNumber == text)
             {
                 entry.MatchedItem = h;
+                
+                // If a full item was selected and we don't have a description yet (or "show all" is checked),
+                // auto-populate the description from the matched item
+                if (entry.Description == null || showAllModelsCheckBox.IsChecked == true)
+                {
+                    var matchedDesc = _allDescriptions.FirstOrDefault(d => d.Id == h.DescriptionId);
+                    if (matchedDesc != null)
+                    {
+                        SelectDescription(matchedDesc);
+                        return; // SelectDescription calls SyncMatch, avoid double processing
+                    }
+                }
             }
             else
             {
@@ -414,6 +442,13 @@ public partial class BulkHardwareEntryView : UserControl
             descCombo.Text = string.Empty;
             descCombo.SelectedItem = null;
             descMatchList.IsVisible = false;
+            
+            // When a description is selected, uncheck "Show all models" to filter the list
+            if (desc != null)
+            {
+                showAllModelsCheckBox.IsChecked = false;
+            }
+            
             suppressDescSync = false;
             RefreshModelItems();
             SyncMatch();
@@ -481,6 +516,8 @@ public partial class BulkHardwareEntryView : UserControl
             }
         };
         modelCombo.SelectionChanged += (_, _) => SyncMatch();
+
+        showAllModelsCheckBox.Click += (_, _) => RefreshModelItems();
 
         itemRemarksBox.TextChanged += (_, _) =>
         {
