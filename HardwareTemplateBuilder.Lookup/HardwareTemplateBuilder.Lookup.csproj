@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AssemblyName>HardwareTemplateBuilder.Lookup</AssemblyName>
+    <Product>Hardware Template Lookup</Product>
+    <Description>Standalone template lookup viewer for Hardware Template Builder</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.9" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.9" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.9" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.9" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.9" />
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.9">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.26" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HardwareTemplateBuilder.Core\HardwareTemplateBuilder.Core.csproj" />
+  </ItemGroup>
+</Project>
