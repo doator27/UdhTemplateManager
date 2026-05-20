@@ -67,5 +67,5 @@ public class JobHardware
     public string FullDisplayLabel =>
         $"{HardwareItem?.Manufacturer?.ManufacturerName ?? "?"} - " +
         $"{HardwareItem?.Description?.DescriptionText ?? "?"} - " +
-        $"{HardwareItem?.ModelNumber ?? "?"}";
+        $"{DisplayLabel}";
 }

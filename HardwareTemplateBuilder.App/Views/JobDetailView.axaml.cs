@@ -95,8 +95,9 @@ public partial class JobDetailView : UserControl
         MarkCompleteButton.Click  += async (_, _) => await MarkCompleteAsync();
         ReactivateButton.Click    += (_, _) => Reactivate();
 
-        RemoveHardwareButton.Click         += (_, _) => RemoveHardwareFromJob();
-        GeneratePackageButton.Click        += async (_, _) => await OnGeneratePackageAsync();
+        RemoveHardwareButton.Click                += (_, _) => RemoveHardwareFromJob();
+        GeneratePackageButton.Click               += async (_, _) => await OnGeneratePackageAsync();
+        GenerateForManufacturerButton.Click       += async (_, _) => await OnGenerateCoverSheetForManufacturerAsync();
         OpenCurrentPackageButton.Click     += (_, _) => OpenCurrentPackage();
         BrowseOldVersionsButton.Click      += (_, _) => BrowseOldVersions();
 
@@ -172,6 +173,25 @@ public partial class JobDetailView : UserControl
 
         foreach (var row in rows)
             _linkedHardware.Add(row);
+
+        LoadManufacturersForJob();
+    }
+
+    private void LoadManufacturersForJob()
+    {
+        var names = _linkedHardware
+            .Select(jh => jh.HardwareItem?.Manufacturer?.ManufacturerName ?? "")
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct()
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var previous = ManufacturerFilterComboBox.SelectedItem as string;
+        ManufacturerFilterComboBox.ItemsSource = names;
+        if (previous != null && names.Contains(previous))
+            ManufacturerFilterComboBox.SelectedItem = previous;
+        else if (names.Count > 0)
+            ManufacturerFilterComboBox.SelectedIndex = 0;
     }
 
     private void RemoveHardwareFromJob()
@@ -919,6 +939,132 @@ public partial class JobDetailView : UserControl
         {
             // History write failure is non-fatal.
         }
+    }
+
+    // --- Per-manufacturer cover sheet ---
+
+    /// <summary>
+    /// Generates a standalone cover sheet PDF containing only the hardware items belonging to the
+    /// manufacturer selected in <see cref="ManufacturerFilterComboBox"/>. No template PDFs are
+    /// merged; page numbers are left blank.
+    /// </summary>
+    private async Task OnGenerateCoverSheetForManufacturerAsync()
+    {
+        if (ManufacturerFilterComboBox.SelectedItem is not string manufacturerName)
+        {
+            PackageStatusLabel.Text = "Select a manufacturer first.";
+            return;
+        }
+
+        var filteredHardware = _linkedHardware
+            .Where(jh => jh.HardwareItem?.Manufacturer?.ManufacturerName == manufacturerName)
+            .ToList();
+
+        if (filteredHardware.Count == 0)
+        {
+            PackageStatusLabel.Text = "No hardware items found for the selected manufacturer.";
+            return;
+        }
+
+        GenerateForManufacturerButton.IsEnabled = false;
+        PackageProgress.IsVisible = true;
+        PackageStatusLabel.Text = "Building cover sheet...";
+
+        string outputPath;
+        try
+        {
+            outputPath = await Task.Run(() =>
+            {
+                using var context = DatabaseInitializer.CreateContext();
+
+                var job = context.Jobs
+                    .Include(j => j.Customer)
+                    .Include(j => j.ProjectManager)
+                    .First(j => j.Id == _jobId);
+
+                var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
+                var saveDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
+                if (string.IsNullOrWhiteSpace(saveDir))
+                    saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+                var allItemIds = filteredHardware.Select(jh => jh.HardwareItemId).Distinct().ToList();
+                var hardwareDict = context.HardwareItems
+                    .Include(h => h.Manufacturer)
+                    .Include(h => h.Description)
+                    .Where(h => allItemIds.Contains(h.Id))
+                    .ToDictionary(h => h.Id);
+
+                var rows = new List<CoverSheetRow>();
+                foreach (var jh in filteredHardware)
+                {
+                    if (!hardwareDict.TryGetValue(jh.HardwareItemId, out var item)) continue;
+
+                    var templateNumbers = context.HardwareItemTemplates
+                        .Include(hit => hit.IndividualTemplate)
+                        .Where(hit => hit.HardwareItemId == jh.HardwareItemId &&
+                                      (hit.JobId == null || hit.JobId == _jobId))
+                        .Select(hit => hit.IndividualTemplate.TemplateNumber)
+                        .ToList();
+
+                    var calloutRemark = !string.IsNullOrWhiteSpace(jh.CalloutRemarks) ? jh.CalloutRemarks : jh.Remarks;
+                    string? combinedRemarks = (item.Remarks, calloutRemark) switch
+                    {
+                        (null or "", null or "") => null,
+                        (var a, null or "")      => a,
+                        (null or "", var b)      => b,
+                        (var a, var b)           => $"{a} | {b}"
+                    };
+
+                    rows.Add(new CoverSheetRow
+                    {
+                        Manufacturer        = item.Manufacturer?.ManufacturerName ?? string.Empty,
+                        HardwareType        = item.Description?.DescriptionText   ?? string.Empty,
+                        HardwareDescription = !string.IsNullOrWhiteSpace(jh.CustomDescription)
+                                                ? jh.CustomDescription!
+                                                : item.ModelNumber,
+                        TemplateNumbers     = string.Join(", ", templateNumbers),
+                        PageNumbers         = string.Empty,
+                        Remarks             = combinedRemarks
+                    });
+                }
+
+                var coverData = new CoverSheetData
+                {
+                    JobNumber          = job.JobNumber,
+                    JobName            = job.JobName,
+                    CustomerName       = job.Customer?.CustomerName             ?? string.Empty,
+                    ProjectManagerName = job.ProjectManager?.ProjectManagerName ?? string.Empty,
+                    DateCreated        = DateTime.Now,
+                    PreparedBy         = profile?.UserName ?? string.Empty,
+                    Rows               = rows.AsReadOnly()
+                };
+
+                var safeName = string.Concat(manufacturerName.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+                var jobDir = Path.Combine(saveDir, job.JobNumber);
+                Directory.CreateDirectory(jobDir);
+                var outPath = Path.Combine(jobDir, $"Cover Sheet - {safeName}.pdf");
+
+                new CoverSheetBuilder().Build(coverData, outPath);
+                return outPath;
+            });
+        }
+        catch (Exception ex)
+        {
+            PackageStatusLabel.Text = "Cover sheet generation failed.";
+            var win = TopLevel.GetTopLevel(this) as Window;
+            if (win != null)
+                await DialogHelper.ShowScrollableInfoAsync(win, ex.Message, "Cover Sheet Generation Failed");
+            return;
+        }
+        finally
+        {
+            GenerateForManufacturerButton.IsEnabled = true;
+            PackageProgress.IsVisible = false;
+        }
+
+        PackageStatusLabel.Text = $"Generated: {Path.GetFileName(outputPath)}";
+        try { Process.Start(new ProcessStartInfo(outputPath) { UseShellExecute = true }); }
+        catch { }
     }
 
     /// <summary>Creates a fully wired <see cref="PdfAssemblyService"/> using the supplied HTTP client.</summary>

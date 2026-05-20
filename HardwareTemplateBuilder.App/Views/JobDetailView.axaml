@@ -65,6 +65,10 @@
                             <Button Name="OpenCurrentPackageButton" Content="Open Current Package" Margin="0,0,8,0"/>
                             <Button Name="BrowseOldVersionsButton"  Content="Browse Old Versions"/>
                         </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8" Spacing="6">
+                            <ComboBox Name="ManufacturerFilterComboBox" Width="220" PlaceholderText="Select manufacturer…"/>
+                            <Button Name="GenerateForManufacturerButton" Content="Generate Cover Sheet for Manufacturer"/>
+                        </StackPanel>
                         <ProgressBar Name="PackageProgress"
                                      IsIndeterminate="True" IsVisible="False"
                                      Height="14" Margin="0,0,0,4"/>
