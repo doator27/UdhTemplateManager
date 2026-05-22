@@ -65,9 +65,12 @@ class Program
                         dynamic wshCheck = Activator.CreateInstance(wshTypeCheck)!;
                         dynamic existingShortcut = wshCheck.CreateShortcut(shortcutPath);
                         string existingTarget = existingShortcut.TargetPath;
-                        
-                        // If target matches and shortcut exists, we're good
-                        if (string.Equals(existingTarget, exePath, StringComparison.OrdinalIgnoreCase))
+                        string existingIcon = existingShortcut.IconLocation ?? string.Empty;
+                        string expectedIcon = exePath + ",0";
+
+                        // If target and icon both match, shortcut is up to date
+                        if (string.Equals(existingTarget, exePath, StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(existingIcon, expectedIcon, StringComparison.OrdinalIgnoreCase))
                             return;
                         
                         // Otherwise delete and recreate
@@ -90,6 +93,7 @@ class Program
             shortcut.TargetPath = exePath;
             shortcut.WorkingDirectory = Path.GetDirectoryName(exePath) ?? string.Empty;
             shortcut.Description = "Hardware Template Builder";
+            shortcut.IconLocation = exePath + ",0";
             shortcut.Save();
 
             // Set AppUserModelID on the shortcut file itself using PropertyStore
