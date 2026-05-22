@@ -21,7 +21,13 @@
     <Description>Hardware Template Builder Application</Description>
     <Copyright>Copyright © 2024</Copyright>
     <AssemblyName>HardwareTemplateBuilder.App</AssemblyName>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\AppIcon.png" />
+    <None Include="Assets\AppIcon.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.9" />

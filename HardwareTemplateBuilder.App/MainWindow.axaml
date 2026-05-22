@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="HardwareTemplateBuilder.App.MainWindow"
         Title="Hardware Template Builder"
+        Icon="avares://HardwareTemplateBuilder.App/Assets/AppIcon.png"
         Width="1024"
         Height="768"
         WindowStartupLocation="CenterScreen">
