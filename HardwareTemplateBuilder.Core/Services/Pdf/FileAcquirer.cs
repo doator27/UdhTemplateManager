@@ -143,47 +143,12 @@ public class FileAcquirer
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         
-        // Set realistic browser headers to avoid being blocked by anti-bot measures
         request.Headers.TryAddWithoutValidation("User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
-        request.Headers.TryAddWithoutValidation("Accept",
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8");
-        request.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
-        request.Headers.TryAddWithoutValidation("Accept-Encoding", "gzip, deflate, br");
-        request.Headers.TryAddWithoutValidation("DNT", "1");
-        request.Headers.TryAddWithoutValidation("Connection", "keep-alive");
-        request.Headers.TryAddWithoutValidation("Upgrade-Insecure-Requests", "1");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-Dest", "document");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-Mode", "navigate");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "none");
-        request.Headers.TryAddWithoutValidation("Sec-Fetch-User", "?1");
         
-        // If the URL has a Referer (e.g., coming from a manufacturer's site), include it
-        if (!string.IsNullOrEmpty(url))
-        {
-            try
-            {
-                var uri = new System.Uri(url);
-                var referer = $"{uri.Scheme}://{uri.Host}";
-                request.Headers.TryAddWithoutValidation("Referer", referer);
-            }
-            catch
-            {
-                // If URL parsing fails, skip the Referer header
-            }
-        }
-
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         
-        // Provide a clear error message for HTTP errors (404, 403, 500, etc.)
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new System.InvalidOperationException(
-                $"Download from '{url}' failed with HTTP status {(int)response.StatusCode} ({response.ReasonPhrase}). " +
-                "The file may have been moved or deleted, or the server may be blocking access. " +
-                "Check the OnlineLink URL and try again.");
-        }
-
+        
         // Reject obvious HTML responses (redirect pages, auth walls, error pages).
         var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
         if (contentType.StartsWith("text/html", System.StringComparison.OrdinalIgnoreCase))
