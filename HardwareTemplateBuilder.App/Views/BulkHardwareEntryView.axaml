@@ -6,7 +6,10 @@
         <!-- Top toolbar -->
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <Button DockPanel.Dock="Left"  Name="BackButton" Content="← Back to Hub" Margin="0,0,8,0"/>
-            <Button DockPanel.Dock="Right" Name="SaveButton" Content="Save"/>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                <Button Name="GenerateCoverSheetButton" Content="Generate Cover Sheet" Padding="8,4"/>
+                <Button Name="SaveButton" Content="Save"/>
+            </StackPanel>
             <TextBlock Name="HeaderLabel" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
 

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -10,6 +12,8 @@ using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
+using HardwareTemplateBuilder.Core.Services.Pdf;
+using Microsoft.EntityFrameworkCore;
 
 namespace HardwareTemplateBuilder.App.Views;
 
@@ -109,6 +113,7 @@ public partial class BulkHardwareEntryView : UserControl
             SaveDraft();
             StatusLabel.Text = "Saved.";
         };
+        GenerateCoverSheetButton.Click += async (_, _) => await GenerateCoverSheetAsync();
         AddItemButton.Click += (_, _) => AddItem(null);
 
         if (!RestoreFromDraft())
@@ -752,5 +757,125 @@ public partial class BulkHardwareEntryView : UserControl
         }
 
         return string.Join(" / ", parts);
+    }
+
+    /// <summary>
+    /// Generates a cover sheet PDF showing all hardware items currently entered for this manufacturer.
+    /// </summary>
+    private async Task GenerateCoverSheetAsync()
+    {
+        if (_items.Count == 0 || _items.All(i => string.IsNullOrWhiteSpace(i.ModelNumber)))
+        {
+            StatusLabel.Text = "Add at least one item with a model number before generating.";
+            StatusLabel.Foreground = Brushes.DarkRed;
+            return;
+        }
+
+        StatusLabel.Text = "Generating cover sheet...";
+        StatusLabel.Foreground = Brushes.Black;
+
+        string outputPath;
+        try
+        {
+            outputPath = await Task.Run(() =>
+            {
+                using var ctx = DatabaseInitializer.CreateContext();
+                var job = ctx.Jobs
+                    .Include(j => j.Customer)
+                    .Include(j => j.ProjectManager)
+                    .FirstOrDefault(j => j.Id == _jobId);
+
+                if (job == null)
+                    throw new InvalidOperationException("Job not found.");
+
+                var profile = ctx.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
+                var saveDir = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
+                if (string.IsNullOrWhiteSpace(saveDir))
+                    saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+                var rows = new List<CoverSheetRow>();
+
+                // Build rows from the current in-memory items.
+                foreach (var item in _items.Where(i => !string.IsNullOrWhiteSpace(i.ModelNumber)))
+                {
+                    var descText = item.Description?.DescriptionText ?? string.Empty;
+
+                    // For each label in the item (or one unlabeled row if no labels).
+                    var labelEntries = item.Labels.Count > 0
+                        ? item.Labels
+                        : new List<LabelEntry> { new LabelEntry() };
+
+                    foreach (var label in labelEntries)
+                    {
+                        var hardwareDesc = !string.IsNullOrWhiteSpace(label.CustomLabel)
+                            ? label.CustomLabel
+                            : item.ModelNumber;
+
+                        // Combine item-level and label-level remarks.
+                        string? combinedRemarks = (item.HardwareItemRemarks, label.Remarks) switch
+                        {
+                            (null or "", null or "") => null,
+                            (var a, null or "")      => a,
+                            (null or "", var b)      => b,
+                            (var a, var b)           => $"{a} | {b}"
+                        };
+
+                        rows.Add(new CoverSheetRow
+                        {
+                            Manufacturer        = _manufacturer?.ManufacturerName ?? "Unknown",
+                            HardwareType        = descText,
+                            HardwareDescription = hardwareDesc,
+                            TemplateNumbers     = string.Empty,  // No template info in bulk entry
+                            PageNumbers         = string.Empty,
+                            Remarks             = combinedRemarks
+                        });
+                    }
+                }
+
+                if (rows.Count == 0)
+                    throw new InvalidOperationException("No items to include in the cover sheet.");
+
+                var coverData = new CoverSheetData
+                {
+                    JobNumber          = job.JobNumber,
+                    JobName            = job.JobName,
+                    CustomerName       = job.Customer?.CustomerName             ?? string.Empty,
+                    ProjectManagerName = job.ProjectManager?.ProjectManagerName ?? string.Empty,
+                    DateCreated        = DateTime.Now,
+                    PreparedBy         = profile?.UserName ?? string.Empty,
+                    Rows               = rows.AsReadOnly()
+                };
+
+                var safeName = string.Concat((_manufacturer?.ManufacturerName ?? "Unknown")
+                    .Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+                var jobDir = Path.Combine(saveDir, job.JobNumber);
+                Directory.CreateDirectory(jobDir);
+                var outPath = Path.Combine(jobDir, $"Bulk Entry - {safeName}.pdf");
+
+                new CoverSheetBuilder().Build(coverData, outPath);
+                return outPath;
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = $"Cover sheet generation failed: {ex.Message}";
+            StatusLabel.Foreground = Brushes.DarkRed;
+            var win = TopLevel.GetTopLevel(this) as Window;
+            if (win != null)
+                await DialogHelper.ShowScrollableInfoAsync(win, ex.Message, "Cover Sheet Generation Failed");
+            return;
+        }
+
+        StatusLabel.Text = $"Generated: {Path.GetFileName(outputPath)}";
+        StatusLabel.Foreground = Brushes.DarkGreen;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(outputPath) { UseShellExecute = true });
+        }
+        catch
+        {
+            // Non-fatal: file was generated but couldn't be auto-opened.
+        }
     }
 }
