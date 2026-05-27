@@ -10,10 +10,9 @@
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
     
-    <!-- Single-file publish settings -->
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- Disable trimming to ensure all XAML resources are included -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <TrimMode>none</TrimMode>
     
     <!-- Application information for Windows taskbar pinning -->
     <Company>Your Company</Company>
