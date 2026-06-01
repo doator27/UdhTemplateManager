@@ -65,6 +65,7 @@ public partial class MainWindow : Window
         _router.Register("AppSettings",      () => { var v = new AppSettingsView();      v.NavigationRequested += NavigateTo; return v; });
         _router.Register("RefreshTemplates",     () => { var v = new RefreshTemplatesView();     v.NavigationRequested += NavigateTo; return v; });
         _router.Register("DeduplicateHardware", () => { var v = new DeduplicateHardwareView(); v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("BackupDatabase",      () => { var v = new BackupDatabaseView();      v.NavigationRequested += NavigateTo; return v; });
     }
 
     /// <summary>Wires all menu item click events to their corresponding navigation targets.</summary>
@@ -100,6 +101,7 @@ public partial class MainWindow : Window
         MenuTemplateLookup.Click += (_, _) => NavigateTo("TemplateLookup");
         MenuRefreshTemplates.Click     += (_, _) => NavigateTo("RefreshTemplates");
         MenuDeduplicateHardware.Click  += (_, _) => NavigateTo("DeduplicateHardware");
+        MenuBackupDatabase.Click       += (_, _) => NavigateTo("BackupDatabase");
         MenuHardwareItems.Click += (_, _) => NavigateTo("HardwareItems");
         MenuTemplates.Click += (_, _) => NavigateTo("Templates");
         MenuCustomers.Click += (_, _) => NavigateTo("Customers");
