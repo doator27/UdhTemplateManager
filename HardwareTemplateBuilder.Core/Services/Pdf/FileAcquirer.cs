@@ -146,10 +146,15 @@ public class FileAcquirer
         request.Headers.TryAddWithoutValidation("User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
 
-        // Some APIs (e.g. abhmfg.com) use Origin/Referer to resolve tenant context; include
-        // them so requests aren't rejected as anonymous/unknown-company.
+        // Some APIs (e.g. abhmfg.com) use Origin/Referer to resolve tenant context.
+        // When the host has a subdomain (api.company.com), the frontend domain (company.com)
+        // is what identifies the tenant, so strip one subdomain level in that case.
         var uri = new System.Uri(url);
-        var origin = $"{uri.Scheme}://{uri.Host}";
+        var hostParts = uri.Host.Split('.');
+        var originHost = hostParts.Length >= 3
+            ? string.Join('.', hostParts.Skip(1))
+            : uri.Host;
+        var origin = $"{uri.Scheme}://{originHost}";
         request.Headers.TryAddWithoutValidation("Origin", origin);
         request.Headers.TryAddWithoutValidation("Referer", origin + "/");
 
