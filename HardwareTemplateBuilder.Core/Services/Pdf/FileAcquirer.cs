@@ -142,10 +142,17 @@ public class FileAcquirer
     private async Task DownloadAsync(string url, string destPath)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        
+
         request.Headers.TryAddWithoutValidation("User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
-        
+
+        // Some APIs (e.g. abhmfg.com) use Origin/Referer to resolve tenant context; include
+        // them so requests aren't rejected as anonymous/unknown-company.
+        var uri = new System.Uri(url);
+        var origin = $"{uri.Scheme}://{uri.Host}";
+        request.Headers.TryAddWithoutValidation("Origin", origin);
+        request.Headers.TryAddWithoutValidation("Referer", origin + "/");
+
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
         
         
