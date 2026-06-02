@@ -222,7 +222,12 @@ public partial class IndividualTemplatesView : UserControl
             }
 
             using var refreshCtx = DatabaseInitializer.CreateContext();
-            var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+            using var handler = new System.Net.Http.HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback =
+                    System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            };
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(60) };
             var service = new TemplateRefreshService(refreshCtx, http);
             var success = await service.RefreshSingleAsync(templateId, saveLocation);
 

@@ -74,7 +74,12 @@ public partial class RefreshTemplatesView : UserControl
             result = await Task.Run(async () =>
             {
                 using var ctx    = DatabaseInitializer.CreateContext();
-                var httpClient   = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+                using var httpHandler = new System.Net.Http.HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback =
+                        System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                };
+                var httpClient   = new HttpClient(httpHandler) { Timeout = TimeSpan.FromSeconds(60) };
                 var service      = new TemplateRefreshService(ctx, httpClient);
 
                 var progress = new Progress<RefreshProgress>(p =>

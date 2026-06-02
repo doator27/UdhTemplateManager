@@ -122,7 +122,11 @@ public partial class App : Application
             if (!needsRefresh) return;
 
             using var refreshCtx = DatabaseInitializer.CreateContext();
-            var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+            var http = new HttpClient(new System.Net.Http.HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback =
+                    System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            }) { Timeout = TimeSpan.FromSeconds(60) };
             var service = new TemplateRefreshService(refreshCtx, http);
             await service.RefreshAsync(saveLocation);
 
