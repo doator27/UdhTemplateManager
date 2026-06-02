@@ -159,26 +159,20 @@ public class FileAcquirer
         request.Headers.TryAddWithoutValidation("Referer", origin + "/");
 
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-        
-        
-        // Reject obvious HTML responses (redirect pages, auth walls, error pages).
-        var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
-        if (contentType.StartsWith("text/html", System.StringComparison.OrdinalIgnoreCase))
-            throw new System.InvalidOperationException(
-                $"Download from '{url}' returned HTML instead of a PDF (Content-Type: {contentType}). " +
-                "The server may require authentication or returned an error page. " +
-                "Try refreshing the template's local file via the Refresh button.");
 
-        // Read the full body so we can validate the magic bytes.
+        var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
         var bytes = await response.Content.ReadAsByteArrayAsync();
 
         // PDF files always begin with the 4-byte sequence %PDF (hex 25 50 44 46).
         if (bytes.Length < 4 ||
             bytes[0] != 0x25 || bytes[1] != 0x50 || bytes[2] != 0x44 || bytes[3] != 0x46)
         {
+            var bodyPreview = System.Text.Encoding.UTF8.GetString(bytes, 0, System.Math.Min(bytes.Length, 300))
+                                     .Replace("\r", "").Replace("\n", " ");
             throw new System.InvalidOperationException(
-                $"Download from '{url}' did not return a valid PDF file " +
-                $"(Content-Type: '{contentType}', first bytes: {(bytes.Length >= 4 ? $"0x{bytes[0]:X2} 0x{bytes[1]:X2} 0x{bytes[2]:X2} 0x{bytes[3]:X2}" : "< 4 bytes received")}). " +
+                $"Download failed: HTTP {(int)response.StatusCode} {response.ReasonPhrase}, " +
+                $"Content-Type: '{contentType}', " +
+                $"body: \"{bodyPreview}\". " +
                 "The server may have returned an error page or redirect. " +
                 "Try refreshing the template's local file via the Refresh button.");
         }

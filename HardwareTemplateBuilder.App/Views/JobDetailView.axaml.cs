@@ -517,13 +517,9 @@ public partial class JobDetailView : UserControl
                 var progress = new Progress<string>(msg =>
                     Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = msg));
 
-                // Create a single shared HTTP client (SSL bypass for manufacturer sites).
-                using var httpHandler = new System.Net.Http.HttpClientHandler
-                {
-                    ServerCertificateCustomValidationCallback =
-                        System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-                };
-                using var httpClient = new HttpClient(httpHandler);
+                var socketsHandler = new System.Net.Http.SocketsHttpHandler();
+                socketsHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+                using var httpClient = new HttpClient(socketsHandler);
 
                 // Pre-download any templates that don't have a valid local file yet.
                 // TemplateRefreshService uses the same context, so EF's identity map means

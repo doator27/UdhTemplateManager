@@ -252,21 +252,19 @@ public class TemplateRefreshService
 
         using var response = await _httpClient.SendAsync(
             request, HttpCompletionOption.ResponseHeadersRead, ct);
-        
 
         var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
-        if (contentType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException(
-                $"Download from '{url}' returned HTML instead of a PDF (Content-Type: {contentType}). " +
-                "The server may require authentication or returned an error page.");
-
         var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+
         if (bytes.Length < 4 ||
             bytes[0] != 0x25 || bytes[1] != 0x50 || bytes[2] != 0x44 || bytes[3] != 0x46)
         {
+            var bodyPreview = System.Text.Encoding.UTF8.GetString(bytes, 0, Math.Min(bytes.Length, 300))
+                                     .Replace("\r", "").Replace("\n", " ");
             throw new InvalidOperationException(
-                $"Download from '{url}' did not return a valid PDF file " +
-                $"(Content-Type: '{contentType}'). The server may have returned an error page.");
+                $"Download failed: HTTP {(int)response.StatusCode} {response.ReasonPhrase}, " +
+                $"Content-Type: '{contentType}', " +
+                $"body: \"{bodyPreview}\".");
         }
 
         await using var fs = File.Create(destPath);

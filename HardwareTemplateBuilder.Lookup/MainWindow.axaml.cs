@@ -275,11 +275,9 @@ public partial class MainWindow : Window
             var workDir = Path.Combine(Path.GetTempPath(), $"htb_lookup_{item.Id}_{Guid.NewGuid():N}");
             Directory.CreateDirectory(workDir);
 
-            var acquirer  = new FileAcquirer(new HttpClient(new System.Net.Http.HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback =
-                    System.Net.Http.HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-            }));
+            var socketsHandler = new System.Net.Http.SocketsHttpHandler();
+            socketsHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+            var acquirer  = new FileAcquirer(new HttpClient(socketsHandler));
             var parser    = new PageRangeParser();
             var extractor = new PageExtractor();
             var rotator   = new PageRotator();
