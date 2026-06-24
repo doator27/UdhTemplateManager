@@ -42,7 +42,7 @@ public partial class BulkManufacturerSelectionView : UserControl
         var selectedIds = new HashSet<int>(draft.ManufacturerIds);
 
         foreach (var m in _allManufacturers)
-            if (selectedIds.Contains(m.Id)) _selected.Add(m);
+            if (selectedIds.Contains(m.Id)) AddSorted(m);
 
         AllMfrList.ItemsSource      = _filtered;
         AllMfrList.DisplayMemberBinding      = new Avalonia.Data.Binding("ManufacturerName");
@@ -82,7 +82,7 @@ public partial class BulkManufacturerSelectionView : UserControl
     {
         if (AllMfrList.SelectedItem is not Manufacturer m) return;
         if (_selected.Any(s => s.Id == m.Id)) return;
-        _selected.Add(m);
+        AddSorted(m);
         _filtered.Remove(m);
         RefreshContinue();
         SaveDraft();
@@ -112,13 +112,22 @@ public partial class BulkManufacturerSelectionView : UserControl
 
         if (!_selected.Any(s => s.Id == created.Id))
         {
-            _selected.Add(created);
+            AddSorted(created);
             RefreshContinue();
             SaveDraft();
         }
 
         NewMfrNameBox.Text = string.Empty;
         ApplySearch();
+    }
+
+    private void AddSorted(Manufacturer m)
+    {
+        var index = 0;
+        while (index < _selected.Count &&
+               string.Compare(_selected[index].ManufacturerName, m.ManufacturerName, StringComparison.OrdinalIgnoreCase) < 0)
+            index++;
+        _selected.Insert(index, m);
     }
 
     private void RefreshContinue()
