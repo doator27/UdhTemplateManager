@@ -216,7 +216,7 @@ public partial class BulkHardwareEntryView : UserControl
 
         var matchLabel = new TextBlock
         {
-            Text = "—",
+            Text = "",
             FontSize = 11,
             VerticalAlignment = VerticalAlignment.Top,
             Foreground = Brushes.Gray,
@@ -315,18 +315,18 @@ public partial class BulkHardwareEntryView : UserControl
 
             if (string.IsNullOrWhiteSpace(entry.ModelNumber))
             {
-                compactMatchText.Text = "—";
+                compactMatchText.Text = "";
                 compactMatchText.Foreground = Brushes.Gray;
             }
             else if (entry.MatchedItem != null)
             {
-                compactMatchText.Text = "✓ Matched";
+                compactMatchText.Text = " ✓ Matched";
                 compactMatchText.Foreground = Brushes.DarkGreen;
             }
             else
             {
-                compactMatchText.Text = "(new)";
-                compactMatchText.Foreground = Brushes.Gray;
+                compactMatchText.Text = " (new)";
+                compactMatchText.Foreground = Brushes.DarkBlue;
             }
         };
 
@@ -693,18 +693,18 @@ public partial class BulkHardwareEntryView : UserControl
     {
         if (string.IsNullOrWhiteSpace(model))
         {
-            label.Text = "—";
+            label.Text = "";
             label.Foreground = Brushes.Gray;
         }
         else if (matched != null)
         {
-            label.Text = "✓ Matched";
+            label.Text = " ✓ Matched";
             label.Foreground = Brushes.DarkGreen;
         }
         else
         {
-            label.Text = "(new)";
-            label.Foreground = Brushes.Gray;
+            label.Text = " (new)";
+            label.Foreground = Brushes.DarkBlue;
         }
     }
 
