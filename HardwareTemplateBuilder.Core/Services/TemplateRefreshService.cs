@@ -98,13 +98,13 @@ public class TemplateRefreshService
         IProgress<RefreshProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var templates = _context.IndividualTemplates
+        var templates = await _context.IndividualTemplates
             .Include(t => t.Manufacturer)
             .Where(t => t.OnlineLink != null && t.OnlineLink != string.Empty)
-            .ToList();
+            .ToListAsync(cancellationToken);
 
         // Load all descriptions once to avoid repeated queries inside the loop.
-        var allDescriptions = _context.Descriptions.ToList();
+        var allDescriptions = await _context.Descriptions.ToListAsync(cancellationToken);
 
         Directory.CreateDirectory(saveLocation);
 
@@ -134,7 +134,7 @@ public class TemplateRefreshService
 
                 // Persist the updated local path immediately so partial progress is not lost.
                 template.LocalLink = destPath;
-                _context.SaveChanges();
+                await _context.SaveChangesAsync(cancellationToken);
                 successCount++;
             }
             catch (OperationCanceledException)
@@ -144,6 +144,10 @@ public class TemplateRefreshService
             }
             catch (Exception ex)
             {
+                // If SaveChangesAsync failed after LocalLink was set in-memory, reset the
+                // entity to Unchanged so the dirty change does not contaminate subsequent
+                // SaveChanges calls for other templates in the same loop iteration.
+                _context.Entry(template).State = EntityState.Unchanged;
                 failures.Add(new RefreshFailure
                 {
                     TemplateId   = template.Id,
@@ -187,7 +191,17 @@ public class TemplateRefreshService
         Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
         await DownloadAsync(template.OnlineLink!, destPath, cancellationToken);
         template.LocalLink = destPath;
-        _context.SaveChanges();
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // Reset entity state so a failed LocalLink update does not persist on any
+            // subsequent SaveChanges call made against the same context.
+            _context.Entry(template).State = EntityState.Unchanged;
+            throw;
+        }
         return true;
     }
 

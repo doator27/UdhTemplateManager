@@ -243,11 +243,12 @@ public partial class BulkManufacturerSessionView : UserControl
                 if (!group.DescriptionId.HasValue || string.IsNullOrWhiteSpace(group.ModelNumber))
                     continue;
 
-                // Find or create the HardwareItem.
+                // Find or create the HardwareItem (active items only).
                 var item = ctx.HardwareItems.FirstOrDefault(h =>
                     h.ManufacturerId == mfr.ManufacturerId &&
                     h.DescriptionId  == group.DescriptionId.Value &&
-                    h.ModelNumber    == group.ModelNumber);
+                    h.ModelNumber    == group.ModelNumber &&
+                    h.IsActive);
 
                 if (item == null)
                 {

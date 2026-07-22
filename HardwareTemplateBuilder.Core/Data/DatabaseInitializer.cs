@@ -164,11 +164,10 @@ public static class DatabaseInitializer
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "ALTER TABLE \"HardwareItems\" ADD COLUMN \"IsActive\" INTEGER NOT NULL DEFAULT 1";
             cmd.ExecuteNonQuery();
-        }
-        // Belt-and-suspenders: ensure all existing records are explicitly set to active.
-        using (var updateCmd = conn.CreateCommand())
-        {
-            updateCmd.CommandText = "UPDATE \"HardwareItems\" SET \"IsActive\" = 1 WHERE \"IsActive\" IS NULL OR \"IsActive\" = 0";
+
+            // Only set all existing records to active when the column is first added.
+            using var updateCmd = conn.CreateCommand();
+            updateCmd.CommandText = "UPDATE \"HardwareItems\" SET \"IsActive\" = 1 WHERE \"IsActive\" IS NULL";
             updateCmd.ExecuteNonQuery();
         }
 
