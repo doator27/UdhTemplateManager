@@ -348,6 +348,11 @@ public partial class JobDetailView : UserControl
             .Select(jh => jh.HardwareItemId)
             .ToList();
 
+        var hardwareItemsById = context.HardwareItems
+            .Include(h => h.Manufacturer)
+            .Where(h => hardwareIds.Contains(h.Id))
+            .ToDictionary(h => h.Id);
+
         var problems = new List<string>();
 
         foreach (var hwId in hardwareIds)
@@ -359,6 +364,14 @@ public partial class JobDetailView : UserControl
                               (hit.JobId == null || hit.JobId == _jobId))
                 .Select(hit => hit.IndividualTemplate)
                 .ToList();
+
+            if (templates.Count == 0)
+            {
+                var hw = hardwareItemsById.TryGetValue(hwId, out var h) ? h : null;
+                var mfr = hw?.Manufacturer?.ManufacturerName ?? "Unknown";
+                problems.Add($"  \u2022 {mfr} {hw?.ModelNumber}: no templates linked");
+                continue;
+            }
 
             foreach (var t in templates)
             {
@@ -378,9 +391,10 @@ public partial class JobDetailView : UserControl
 
         if (problems.Count == 0) return null;
 
-        return "The following templates cannot be acquired:\n\n"
+        return "The following problems will prevent package generation:\n\n"
              + string.Join("\n", problems)
-             + "\n\nSet a Local Link or Online Link for each template, then retry.";
+             + "\n\nLink a template to any hardware item missing one, and set a Local Link or "
+             + "Online Link for each template listed above, then retry.";
     }
 
     private async Task OnGeneratePackageAsync()
@@ -410,156 +424,28 @@ public partial class JobDetailView : UserControl
         PackageProgress.IsVisible = true;
         PackageStatusLabel.Text = "Loading job data...";
 
-        var orderedJobHardware = _linkedHardware.Select(jh => 
-            (jh.HardwareItemId, 
-             jh.CustomDescription, 
+        var orderedJobHardware = _linkedHardware.Select(jh =>
+            (jh.HardwareItemId,
+             jh.CustomDescription,
              // For backwards compatibility: prefer CalloutRemarks, fallback to Remarks
              CalloutRemarks: !string.IsNullOrWhiteSpace(jh.CalloutRemarks) ? jh.CalloutRemarks : jh.Remarks))
             .ToList();
 
+        var progress = new Progress<string>(msg =>
+            Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = msg));
+
+        var socketsHandler = new System.Net.Http.SocketsHttpHandler();
+        socketsHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+        using var httpClient = new HttpClient(socketsHandler);
+
         string outputPath;
-        IReadOnlyList<TemplateSnapshotInfo> snapshots;
 
         try
         {
-            (outputPath, snapshots) = await Task.Run(async () =>
-            {
-                using var context = DatabaseInitializer.CreateContext();
-
-                var job = context.Jobs
-                    .Include(j => j.Customer)
-                    .Include(j => j.ProjectManager)
-                    .First(j => j.Id == _jobId);
-
-                var allItemIds = orderedJobHardware.Select(x => x.HardwareItemId).Distinct().ToList();
-                var hardwareDict = context.HardwareItems
-                    .Include(h => h.Manufacturer)
-                    .Include(h => h.Description)
-                    .Where(h => allItemIds.Contains(h.Id))
-                    .ToDictionary(h => h.Id);
-
-                var hardware = orderedJobHardware
-                    .Where(x => hardwareDict.ContainsKey(x.HardwareItemId))
-                    .Select(x =>
-                    {
-                        var templates = context.HardwareItemTemplates
-                            .Include(hit => hit.IndividualTemplate)
-                                .ThenInclude(t => t.Manufacturer)
-                            .Include(hit => hit.IndividualTemplate)
-                                .ThenInclude(t => t.Description)
-                            .Where(hit => hit.HardwareItemId == x.HardwareItemId &&
-                                          (hit.JobId == null || hit.JobId == _jobId))
-                            .Select(hit => hit.IndividualTemplate)
-                            .ToList()
-                            .AsReadOnly();
-
-                        return new HardwareWithTemplates
-                        {
-                            Item              = hardwareDict[x.HardwareItemId],
-                            Templates         = templates,
-                            CustomDescription = x.CustomDescription,
-                            CalloutRemarks    = x.CalloutRemarks
-                        };
-                    })
-                    .ToList()
-                    .AsReadOnly();
-
-                var profile = context.UserProfiles
-                    .FirstOrDefault(u => u.Id == job.UserProfileId);
-                var saveDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
-                if (string.IsNullOrWhiteSpace(saveDir))
-                    saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-
-                var allDescriptions = context.Descriptions
-                    .ToDictionary(d => d.Id);
-
-                var request = new AssemblyRequest
-                {
-                    Job             = job,
-                    Hardware        = hardware,
-                    OutputDirectory = saveDir,
-                    AllDescriptions = allDescriptions,
-                    PreparedByName  = profile?.UserName ?? string.Empty
-                };
-
-                // Back up the entire job folder contents before regenerating.
-                // Everything except the "Old versions" folder is moved into
-                // Old versions/{timestamp}/ so the previous output is fully preserved.
-                var jobDir = Path.Combine(saveDir, job.JobNumber);
-                if (Directory.Exists(jobDir))
-                {
-                    var entries = Directory.GetFileSystemEntries(jobDir)
-                        .Where(e => !Path.GetFileName(e).Equals("Old versions",
-                                        StringComparison.OrdinalIgnoreCase)
-                                 && !Path.GetFileName(e).Equals("Attachments",
-                                        StringComparison.OrdinalIgnoreCase))
-                        .ToList();
-
-                    if (entries.Count > 0)
-                    {
-                        var versionStamp = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
-                        var backupDir    = Path.Combine(jobDir, "Old versions", versionStamp);
-                        Directory.CreateDirectory(backupDir);
-
-                        foreach (var entry in entries)
-                        {
-                            var dest = Path.Combine(backupDir, Path.GetFileName(entry));
-                            if (File.Exists(entry))
-                                File.Move(entry, dest);
-                            else if (Directory.Exists(entry))
-                                Directory.Move(entry, dest);
-                        }
-
-                        Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = "Backed up previous version...");
-                    }
-                }
-
-                var progress = new Progress<string>(msg =>
-                    Dispatcher.UIThread.Post(() => PackageStatusLabel.Text = msg));
-
-                var socketsHandler = new System.Net.Http.SocketsHttpHandler();
-                socketsHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
-                using var httpClient = new HttpClient(socketsHandler);
-
-                // Pre-download any templates that don't have a valid local file yet.
-                // TemplateRefreshService uses the same context, so EF's identity map means
-                // the LocalLink update lands on the same template objects already in `hardware`.
-                var allUniqueTemplates = hardware
-                    .SelectMany(h => h.Templates)
-                    .GroupBy(t => t.Id)
-                    .Select(g => g.First())
-                    .Where(t => string.IsNullOrWhiteSpace(t.LocalLink) || !File.Exists(t.LocalLink))
-                    .ToList();
-
-                if (allUniqueTemplates.Count > 0)
-                {
-                    var refreshService = new TemplateRefreshService(context, httpClient);
-                    for (int i = 0; i < allUniqueTemplates.Count; i++)
-                    {
-                        ct.ThrowIfCancellationRequested();
-                        var t = allUniqueTemplates[i];
-                        Dispatcher.UIThread.Post(() => PackageStatusLabel.Text =
-                            $"Downloading {t.TemplateNumber} ({i + 1}/{allUniqueTemplates.Count})...");
-                        try
-                        {
-                            await refreshService.RefreshSingleAsync(t.Id, saveDir, ct);
-                        }
-                        catch
-                        {
-                            // Download failures are reported by AssembleAsync's per-template error collection.
-                        }
-                    }
-                }
-
-                var service = BuildAssemblyService(httpClient);
-                var result  = await service.AssembleAsync(request, progress, ct);
-
-                // Append a history entry to job_history.txt in the job folder.
-                var historyPath = Path.Combine(saveDir, job.JobNumber, "job_history.txt");
-                AppendHistoryEntry(historyPath, job, hardware, result, profile?.UserName ?? "Unknown");
-
-                return (result.OutputPath, result.TemplateSnapshots);
-            }, ct);
+            var service = new JobPackageGenerationService(DatabaseInitializer.CreateContext, httpClient);
+            var result = await Task.Run(
+                () => service.GenerateAsync(_jobId, orderedJobHardware, progress, ct), ct);
+            outputPath = result.OutputPath;
         }
         catch (OperationCanceledException)
         {
@@ -578,31 +464,6 @@ public partial class JobDetailView : UserControl
         {
             GeneratePackageButton.IsEnabled = true;
             PackageProgress.IsVisible = false;
-        }
-
-        using (var ctx = DatabaseInitializer.CreateContext())
-        {
-            var snapshotRepo = new JobTemplateSnapshotRepository(ctx);
-            foreach (var info in snapshots)
-            {
-                snapshotRepo.Add(new JobTemplateSnapshot
-                {
-                    JobId                = _jobId,
-                    IndividualTemplateId = info.IndividualTemplateId,
-                    SnapshotLocalLink    = info.AcquiredFilePath,
-                    SnapshotDate         = DateTime.UtcNow,
-                    PagesToPrint         = info.PagesToPrint,
-                    PagesToRotate        = info.PagesToRotate,
-                    RotationDirection    = info.RotationDirection
-                });
-            }
-
-            var freqService = new FrequencyService(ctx);
-            foreach (var itemId in orderedJobHardware.Select(x => x.HardwareItemId).Distinct())
-            {
-                var item = ctx.HardwareItems.Find(itemId);
-                if (item != null) freqService.IncrementFrequency(item);
-            }
         }
 
         PackageStatusLabel.Text = $"Generated: {Path.GetFileName(outputPath)}";
@@ -887,55 +748,7 @@ public partial class JobDetailView : UserControl
     // --- Quick Create ---
 
     // --- History ---
-
-    /// <summary>
-    /// Appends a single generation record to <paramref name="historyPath"/>, creating the file
-    /// if it does not yet exist.  Each record captures the timestamp, user, hardware list,
-    /// and output file name so the full history of a job's packages is preserved in plain text.
-    /// </summary>
-    private static void AppendHistoryEntry(
-        string historyPath,
-        Job job,
-        IReadOnlyList<HardwareWithTemplates> hardware,
-        AssemblyResult result,
-        string preparedBy)
-    {
-        try
-        {
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"=== {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
-            sb.AppendLine($"Job:         {job.JobNumber} — {job.JobName}");
-            sb.AppendLine($"Prepared by: {preparedBy}");
-            sb.AppendLine($"Hardware Items ({hardware.Count}):");
-
-            int n = 1;
-            foreach (var hwt in hardware)
-            {
-                var item  = hwt.Item;
-                var mfr   = item.Manufacturer?.ManufacturerName ?? "Unknown";
-                var desc  = item.Description?.DescriptionText   ?? string.Empty;
-                var label = !string.IsNullOrWhiteSpace(hwt.CustomDescription)
-                    ? hwt.CustomDescription!
-                    : item.ModelNumber;
-                var tplNums = string.Join(", ", hwt.Templates.Select(t => t.TemplateNumber));
-
-                sb.AppendLine($"  {n++,2}. {mfr} — {label}" +
-                              (string.IsNullOrEmpty(desc) ? string.Empty : $" [{desc}]"));
-                if (!string.IsNullOrEmpty(tplNums))
-                    sb.AppendLine($"       Templates: {tplNums}");
-            }
-
-            sb.AppendLine($"Output: {Path.GetFileName(result.OutputPath)}");
-            sb.AppendLine(new string('─', 60));
-            sb.AppendLine();
-
-            File.AppendAllText(historyPath, sb.ToString());
-        }
-        catch
-        {
-            // History write failure is non-fatal.
-        }
-    }
+    // (job_history.txt append now lives in JobPackageGenerationService, shared with batch generation)
 
     // --- Per-manufacturer cover sheet ---
 
@@ -1061,19 +874,5 @@ public partial class JobDetailView : UserControl
         PackageStatusLabel.Text = $"Generated: {Path.GetFileName(outputPath)}";
         try { Process.Start(new ProcessStartInfo(outputPath) { UseShellExecute = true }); }
         catch { }
-    }
-
-    /// <summary>Creates a fully wired <see cref="PdfAssemblyService"/> using the supplied HTTP client.</summary>
-    private static PdfAssemblyService BuildAssemblyService(HttpClient httpClient)
-    {
-        return new PdfAssemblyService(
-            new TemplateSorter(new WeightTemplateSortStrategy()),
-            new FileAcquirer(httpClient),
-            new PageRangeParser(),
-            new PageExtractor(),
-            new PageRotator(),
-            new PdfMerger(),
-            new CoverSheetBuilder(),
-            new PageNumberer());
     }
 }

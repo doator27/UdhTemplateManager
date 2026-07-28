@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.BatchGenerateView">
+    <DockPanel Margin="8">
+
+        <TextBlock DockPanel.Dock="Top" Text="Batch Generate" FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
+
+        <!-- Status line (docked bottom so it is always visible) -->
+        <TextBlock DockPanel.Dock="Bottom"
+                   Name="StatusLabel"
+                   Foreground="#800000"
+                   TextWrapping="Wrap"
+                   Margin="0,4,0,0"/>
+
+        <!-- Live per-job results (hidden until the batch starts) -->
+        <Border DockPanel.Dock="Bottom"
+                Name="ResultsBorder" IsVisible="False"
+                BorderBrush="#808080" BorderThickness="1"
+                Margin="0,8,0,0">
+            <DockPanel Margin="4">
+                <TextBlock DockPanel.Dock="Top" Text="Results" FontWeight="Bold" Margin="0,0,0,4"/>
+                <ListBox Name="ResultsList" MaxHeight="220"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Progress area (hidden until running) -->
+        <StackPanel DockPanel.Dock="Bottom"
+                    Name="ProgressPanel" IsVisible="False"
+                    Margin="0,8,0,0">
+            <ProgressBar Name="BatchProgressBar" Minimum="0" Height="14" Margin="0,0,0,4"/>
+            <TextBlock Name="ProgressText" Foreground="#404040"/>
+        </StackPanel>
+
+        <!-- Filter / selection / run controls -->
+        <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <CheckBox Name="IncludeInactiveCheck" Content="Include inactive jobs" Margin="0,0,16,0"/>
+                <Button Name="SelectAllButton" Content="Select All" Margin="0,0,4,0"/>
+                <Button Name="SelectNoneButton" Content="Select None" Margin="0,0,16,0"/>
+                <TextBlock Name="SelectedCountLabel" VerticalAlignment="Center" Foreground="#404040"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Name="StartButton" Content="Generate Selected" Margin="0,0,8,0"/>
+                <Button Name="CancelButton" Content="Cancel" IsEnabled="False"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Job list, checkbox per row, sorted oldest/never-generated first -->
+        <Border BorderBrush="#808080" BorderThickness="1">
+            <ListBox Name="JobList"/>
+        </Border>
+
+    </DockPanel>
+</UserControl>

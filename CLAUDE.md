@@ -69,14 +69,20 @@ dotnet ef database update --project HardwareTemplateBuilder.Core        # Apply 
 
 ### PDF Assembly Pipeline (Core/Services/Pdf/)
 
-Orchestrated by `PdfAssemblyService`, which accepts an `AssemblyRequest` and executes:
+`PdfAssemblyService.AssembleAsync` accepts an `AssemblyRequest` and executes:
 
 1. `TemplateSorter` (uses `ITemplateSortStrategy` — default: `WeightTemplateSortStrategy`) → sorted template list
 2. `FileAcquirer` → local copies in `{JobNumber}/` subfolder as `{ManufacturerName}_{TemplateNumber}.pdf`
 3. `PageExtractor` → `PageRotator` → `PdfMerger` → merged body PDF
 4. `CoverSheetBuilder` (QuestPDF) → cover sheet PDF with header block and hardware table
 5. Prepend cover sheet + `PageNumberer` stamps sequential numbers offset past cover pages
-6. Write `JobTemplateSnapshot` records
+
+It does **not** write `JobTemplateSnapshot` records itself — that, along with the rest of the per-job generation workflow, is the caller's job:
+
+- **`JobPackageGenerationService`** wraps `AssembleAsync` with everything needed to generate one job's package end to end: loads job/hardware data, backs up any previous output into `{JobNumber}/Old versions/{timestamp}/`, pre-downloads templates missing a local copy, calls `AssembleAsync`, then writes the `JobTemplateSnapshot` rows, increments `HardwareItem.Frequency`, and appends a `job_history.txt` entry. This is the single shared pipeline behind both the "Generate Package" button (`JobDetailView`) and batch generation.
+- **`BatchJobPackageGenerationService`** loops `JobPackageGenerationService` over many jobs (used by `BatchGenerateView`, reachable from Jobs → Batch Generate). A failing job is recorded and skipped — not fatal to the run — while a cancellation request aborts the whole batch immediately, matching the collect-and-continue / cancel-aborts pattern already used by `TemplateRefreshService.RefreshAsync`.
+
+**Categorized failure reports:** `AssembleAsync` collects every problem into one report grouped by what it's attributed to — a hardware item with no linked templates, a specific template that couldn't be acquired/extracted/rotated (labeled with the owning hardware item's model number via `BuildTemplateToItemsMap`), or something else (a merge/cover-sheet/page-numbering failure). Still exactly one `InvalidOperationException` per call, just with a clearer, categorized message.
 
 #### QuestPDF constraints (CoverSheetBuilder)
 
@@ -92,9 +98,10 @@ Orchestrated by `PdfAssemblyService`, which accepts an `AssemblyRequest` and exe
 
 - **Architecture is code-behind, not MVVM** — views directly instantiate repositories and call services; there are no ViewModels or data-binding commands
 - `MainWindow` hosts a persistent menu bar (File, Jobs, Maintenance, Admin) and a content area
-- `ViewRouter` swaps child `UserControl` views for navigation — 27 views total; **a new instance is created on every navigate** (no view caching)
+- `ViewRouter` swaps child `UserControl` views for navigation — 28 views total; **a new instance is created on every navigate** (no view caching)
 - `SessionService` (static) holds the active `UserProfile` for the session lifetime; `BulkAddSession` (static) holds transient bulk-entry state across the multi-step bulk-add flow
 - **Bulk-add flow** is a multi-step wizard entirely within the content area: `BulkManufacturerSelectionView` → `BulkJobHubView` → `BulkManufacturerSessionView` → `BulkHardwareEntryView` → `TemplateResolutionWizardView` (persists `JobHardware` on Finish). State is shared via `BulkAddSession` and `BulkSessionDraft` static classes.
+- **`BatchGenerateView`** (Jobs → Batch Generate) lets the user select several jobs and generate all their packages in one run via `BatchJobPackageGenerationService`. Selection is a session-only `HashSet<int>` of job IDs (not persisted), sorted oldest/never-generated first; a checkbox toggle brings inactive (complete) jobs into the list. It's the first view with a per-row checkbox inside a `ListBox` `ItemTemplate` — built with `supportsRecycling: false` since recycled containers can desync their checked state from the underlying row on scroll.
 - **Import hardware flow** feeds into the same `TemplateResolutionWizardView`. `JobDetailView` shows an "Import Hardware" button that opens `ImportJobPickerDialog` (searchable job list), then populates `BulkAddSession.PendingRows` from the source job's base `JobHardware` rows (ordered by `Id`) and navigates to `TemplateResolutionWizard:{jobId}`. Job-scoped templates from the source job appear in `row.PendingTemplates` and are cloned at Finish time.
 - On first launch with no `UserProfile` records, `ProfilePickerDialog` prompts creation before proceeding; `DatabaseSetupDialog` handles unreachable DB paths at startup
 - Visual style: `#C0C0C0` background, beveled buttons, Tahoma/Arial fonts (Windows 98 aesthetic) via Avalonia `ControlTheme`/`Style`
@@ -127,7 +134,7 @@ Views that launch background work store a `CancellationTokenSource?` field and t
 
 #### Error Handling
 
-Batch operations (PDF assembly, template refresh) collect all per-item failures into a list and throw a single `InvalidOperationException` with a consolidated report — not fail-fast. Background startup tasks (missing-template alert, auto-refresh) swallow all exceptions to avoid disrupting the UI.
+Batch operations (PDF assembly, template refresh) collect all per-item failures into a list and throw a single `InvalidOperationException` with a consolidated report — not fail-fast. `PdfAssemblyService.AssembleAsync`'s report further groups failures by category (hardware item / template / other) — see PDF Assembly Pipeline above. Batch **job** generation (`BatchJobPackageGenerationService`) applies this same collect-and-continue idea one level up: a failing job is skipped and recorded, not fatal to the run, while cancellation aborts the whole batch rather than skipping just the current job. Background startup tasks (missing-template alert, auto-refresh) swallow all exceptions to avoid disrupting the UI.
 
 ### Description Hierarchy
 

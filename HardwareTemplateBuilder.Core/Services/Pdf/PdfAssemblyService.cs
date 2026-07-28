@@ -11,6 +11,12 @@ namespace HardwareTemplateBuilder.Core.Services.Pdf;
 /// </summary>
 public class PdfAssemblyService
 {
+    /// <summary>Identifies what kind of record an <see cref="AssemblyFailure"/> is attributed to.</summary>
+    private enum FailureCategory { HardwareItem, Template, Other }
+
+    /// <summary>A single problem encountered during assembly, attributed to a hardware item, a template, or something else.</summary>
+    private readonly record struct AssemblyFailure(string Label, string Error, FailureCategory Category);
+
     private readonly TemplateSorter _sorter;
     private readonly FileAcquirer _acquirer;
     private readonly PageRangeParser _pageRangeParser;
@@ -84,6 +90,20 @@ public class PdfAssemblyService
         // (a template might be shared across multiple items).
         var templateToItems = BuildTemplateToItemsMap(request.Hardware);
 
+        // Collect every problem encountered so we can report them all at once, grouped by
+        // what they're attributed to: a hardware item, a template, or something else.
+        var failures = new List<AssemblyFailure>();
+
+        // Hardware items with no linked templates are silently excluded from the package
+        // (they contribute nothing to allTemplates below) unless flagged here.
+        foreach (var hwt in request.Hardware)
+        {
+            if (hwt.Templates.Count > 0) continue;
+            var itemLabel = $"{hwt.Item.Manufacturer?.ManufacturerName ?? "Unknown"} — " +
+                             $"{(!string.IsNullOrWhiteSpace(hwt.CustomDescription) ? hwt.CustomDescription : hwt.Item.ModelNumber)}";
+            failures.Add(new AssemblyFailure(itemLabel, "No templates are linked to this hardware item.", FailureCategory.HardwareItem));
+        }
+
         // ----- Step 1: Sort templates -----
         progress?.Report("Sorting templates...");
         var sortedTemplates = _sorter.Sort(allTemplates, request.AllDescriptions);
@@ -98,14 +118,13 @@ public class PdfAssemblyService
             .ToDictionary(g => g.Key, _ => new List<int>());
         int bodyPageCursor = 1;
 
-        // Collect per-template failures so we can report all problems at once.
-        var templateFailures = new List<(string Label, string Error)>();
-
         foreach (var template in sortedTemplates)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             var templateLabel = $"{template.Manufacturer?.ManufacturerName ?? "Unknown"} — {template.TemplateNumber}";
+            if (templateToItems.TryGetValue(template.Id, out var templateOwners) && templateOwners.Count > 0)
+                templateLabel += $" (used by: {string.Join(", ", templateOwners.Select(o => o.ModelNumber))})";
             progress?.Report($"Acquiring {template.TemplateNumber}...");
 
             string acquiredPath;
@@ -115,7 +134,7 @@ public class PdfAssemblyService
             }
             catch (System.Exception ex)
             {
-                templateFailures.Add((templateLabel, ex.Message));
+                failures.Add(new AssemblyFailure(templateLabel, ex.Message, FailureCategory.Template));
                 continue;
             }
 
@@ -140,7 +159,7 @@ public class PdfAssemblyService
             }
             catch (System.Exception ex)
             {
-                templateFailures.Add((templateLabel, $"Failed to extract pages: {ex.Message}"));
+                failures.Add(new AssemblyFailure(templateLabel, $"Failed to extract pages: {ex.Message}", FailureCategory.Template));
                 continue;
             }
 
@@ -169,7 +188,7 @@ public class PdfAssemblyService
                     }
                     catch (System.Exception ex)
                     {
-                        templateFailures.Add((templateLabel, $"Failed to rotate pages: {ex.Message}"));
+                        failures.Add(new AssemblyFailure(templateLabel, $"Failed to rotate pages: {ex.Message}", FailureCategory.Template));
                         continue;
                     }
                 }
@@ -193,42 +212,46 @@ public class PdfAssemblyService
             bodyPageCursor += pageNumbers.Count;
         }
 
-        // If any templates failed, abort and report all failures before attempting the merge.
-        if (templateFailures.Count > 0)
+        // If any hardware items or templates failed, abort and report all problems at once.
+        if (failures.Count > 0)
+            throw new InvalidOperationException(BuildFailureReport(failures));
+
+        string finalPath;
+        int coverPageCount;
+        try
         {
-            var report = new System.Text.StringBuilder();
-            report.AppendLine($"{templateFailures.Count} template(s) could not be processed:");
-            report.AppendLine();
-            foreach (var (label, error) in templateFailures)
-            {
-                report.AppendLine($"• {label}");
-                report.AppendLine($"  {error}");
-                report.AppendLine();
-            }
-            report.AppendLine("Fix the issues above and try generating again.");
-            throw new InvalidOperationException(report.ToString().TrimEnd());
+            // ----- Step 4: Merge body PDF -----
+            progress?.Report("Merging body PDF...");
+            var bodyPdfPath = Path.Combine(workDir, "body.pdf");
+            _merger.Merge(bodyPdfs, bodyPdfPath);
+
+            // ----- Step 5: Build cover sheet -----
+            progress?.Report("Building cover sheet...");
+            var coverSheetData = BuildCoverSheetData(request, itemBodyPages);
+            var coverSheetPath = Path.Combine(workDir, "coversheet.pdf");
+            _coverSheetBuilder.Build(coverSheetData, coverSheetPath);
+            coverPageCount = CoverSheetBuilder.GetPageCount(coverSheetPath);
+
+            // ----- Step 6: Prepend cover sheet -----
+            progress?.Report("Assembling final PDF...");
+            var mergedPath = Path.Combine(workDir, "merged.pdf");
+            _merger.Merge(new[] { coverSheetPath, bodyPdfPath }, mergedPath);
+
+            // ----- Step 7: Stamp page numbers on body pages -----
+            finalPath = Path.Combine(jobDir, $"Templates for job {request.Job.JobNumber}.pdf");
+            _numberer.StampPageNumbers(mergedPath, coverPageCount, finalPath);
         }
-
-        // ----- Step 4: Merge body PDF -----
-        progress?.Report("Merging body PDF...");
-        var bodyPdfPath = Path.Combine(workDir, "body.pdf");
-        _merger.Merge(bodyPdfs, bodyPdfPath);
-
-        // ----- Step 5: Build cover sheet -----
-        progress?.Report("Building cover sheet...");
-        var coverSheetData = BuildCoverSheetData(request, itemBodyPages);
-        var coverSheetPath = Path.Combine(workDir, "coversheet.pdf");
-        _coverSheetBuilder.Build(coverSheetData, coverSheetPath);
-        int coverPageCount = CoverSheetBuilder.GetPageCount(coverSheetPath);
-
-        // ----- Step 6: Prepend cover sheet -----
-        progress?.Report("Assembling final PDF...");
-        var mergedPath = Path.Combine(workDir, "merged.pdf");
-        _merger.Merge(new[] { coverSheetPath, bodyPdfPath }, mergedPath);
-
-        // ----- Step 7: Stamp page numbers on body pages -----
-        var finalPath = Path.Combine(jobDir, $"Templates for job {request.Job.JobNumber}.pdf");
-        _numberer.StampPageNumbers(mergedPath, coverPageCount, finalPath);
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (System.Exception ex)
+        {
+            throw new InvalidOperationException(BuildFailureReport(new[]
+            {
+                new AssemblyFailure("Package assembly", ex.Message, FailureCategory.Other)
+            }));
+        }
 
         // Clean up intermediate work files — only the organised template copies and final PDF are kept.
         try { Directory.Delete(workDir, recursive: true); } catch { }
@@ -243,6 +266,42 @@ public class PdfAssemblyService
     }
 
     // ---------- Private helpers ----------
+
+    /// <summary>
+    /// Builds a single multi-line report from a set of assembly failures, grouped under a
+    /// heading per <see cref="FailureCategory"/> so the reader can immediately tell whether a
+    /// problem is with a hardware item, a template, or something else entirely. Categories with
+    /// no failures are omitted.
+    /// </summary>
+    private static string BuildFailureReport(IEnumerable<AssemblyFailure> failures)
+    {
+        var all = failures.ToList();
+        var report = new System.Text.StringBuilder();
+        report.AppendLine($"{all.Count} problem(s) prevented package assembly:");
+        report.AppendLine();
+
+        AppendSection(report, all, FailureCategory.HardwareItem, "Hardware items with no templates linked");
+        AppendSection(report, all, FailureCategory.Template, "Templates that could not be processed");
+        AppendSection(report, all, FailureCategory.Other, "Other errors");
+
+        report.AppendLine("Fix the issues above and try generating again.");
+        return report.ToString().TrimEnd();
+    }
+
+    private static void AppendSection(
+        System.Text.StringBuilder report, List<AssemblyFailure> all, FailureCategory category, string heading)
+    {
+        var inCategory = all.Where(f => f.Category == category).ToList();
+        if (inCategory.Count == 0) return;
+
+        report.AppendLine($"{heading} ({inCategory.Count}):");
+        foreach (var failure in inCategory)
+        {
+            report.AppendLine($"  • {failure.Label}");
+            report.AppendLine($"    {failure.Error}");
+        }
+        report.AppendLine();
+    }
 
     /// <summary>
     /// Builds a <see cref="CoverSheetData"/> from the assembly request and the
