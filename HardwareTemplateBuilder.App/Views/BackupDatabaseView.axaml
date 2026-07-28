@@ -96,7 +96,8 @@
                 Padding="12"
                 Margin="0,8,0,0">
             <StackPanel Spacing="6">
-                <TextBlock Text="Creating backup..."
+                <TextBlock Name="ProgressLabel"
+                           Text="Creating backup..."
                            FontWeight="Bold"
                            FontSize="11" />
                 <ProgressBar IsIndeterminate="True"
@@ -122,7 +123,20 @@
                          BorderBrush="#2C2F38"
                          BorderThickness="1" />
 
+                <TextBlock Name="NoBackupsLabel"
+                           Text="No backups found."
+                           FontSize="11"
+                           Foreground="#A7ADB8"
+                           IsVisible="False" />
+
                 <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Name="RestoreButton"
+                            Content="Restore Selected Backup"
+                            Padding="8,4"
+                            FontSize="11"
+                            FontWeight="Bold"
+                            Background="#5A2A2E"
+                            IsEnabled="False" />
                     <Button Name="OpenBackupLocationButton"
                             Content="Open Backup Folder"
                             Padding="8,4"

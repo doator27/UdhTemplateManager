@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using Avalonia.Media;
+using Avalonia.Controls.Templates;
 using Avalonia.Platform.Storage;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
@@ -14,11 +14,39 @@ using HardwareTemplateBuilder.Core.Services;
 namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
-/// View for creating timestamped backup copies of the SQLite database.
-/// Corresponds to the Maintenance menu "Backup Database" option.
+/// View for creating timestamped backup copies of the SQLite database, and restoring the
+/// database from a previously-created backup. Corresponds to the Maintenance menu
+/// "Backup Database" option.
 /// </summary>
 public partial class BackupDatabaseView : UserControl
 {
+    /// <summary>Prefix used for the automatic safety backup taken right before a restore.</summary>
+    private const string SafetyBackupPrefix = "hardware_templates_prerestore";
+
+    /// <summary>Row wrapper for the recent-backups list, carrying the file's full path.</summary>
+    private sealed class BackupFileRow
+    {
+        public string FullPath { get; }
+        public string FileName { get; }
+        public DateTime Timestamp { get; }
+        public long SizeBytes { get; }
+        public bool IsPreRestoreSafetyBackup { get; }
+
+        public string Display =>
+            $"{FileName} — {Timestamp:yyyy-MM-dd HH:mm:ss} — {DatabaseBackupService.FormatFileSize(SizeBytes)}"
+            + (IsPreRestoreSafetyBackup ? "  [pre-restore safety copy]" : "");
+
+        public BackupFileRow(string fullPath)
+        {
+            FullPath = fullPath;
+            FileName = Path.GetFileName(fullPath);
+            var info = new FileInfo(fullPath);
+            Timestamp = info.LastWriteTime;
+            SizeBytes = info.Length;
+            IsPreRestoreSafetyBackup = FileName.StartsWith(SafetyBackupPrefix, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     private string _sourceDatabasePath = string.Empty;
     private string _defaultBackupLocation = string.Empty;
 
@@ -37,20 +65,14 @@ public partial class BackupDatabaseView : UserControl
         // Get the current database path
         _sourceDatabasePath = DatabaseInitializer.GetDatabasePath();
         DatabasePathLabel.Text = _sourceDatabasePath;
-
-        // Display database size
-        if (File.Exists(_sourceDatabasePath))
-        {
-            var fileInfo = new FileInfo(_sourceDatabasePath);
-            DatabaseSizeLabel.Text = $"Size: {DatabaseBackupService.FormatFileSize(fileInfo.Length)}";
-        }
+        RefreshDatabaseSizeLabel();
 
         // Get the default backup location from app settings
         using (var ctx = DatabaseInitializer.CreateContext())
         {
             var settingsRepo = new AppSettingRepository(ctx);
             var configured = settingsRepo.GetValue("DatabaseBackupLocation");
-            
+
             if (!string.IsNullOrWhiteSpace(configured))
             {
                 _defaultBackupLocation = configured;
@@ -67,14 +89,32 @@ public partial class BackupDatabaseView : UserControl
         BackupPathBox.Text = _defaultBackupLocation;
         BackupLocationLabel.Text = $"({_defaultBackupLocation})";
 
+        RecentBackupsList.ItemTemplate = new FuncDataTemplate<BackupFileRow>((row, _) => new TextBlock
+        {
+            Text = row?.Display ?? string.Empty,
+            Foreground = (row?.IsPreRestoreSafetyBackup == true) ? AppColors.Warning : AppColors.Primary,
+            Padding = new Avalonia.Thickness(2)
+        }, supportsRecycling: false);
+
+        RecentBackupsList.SelectionChanged += (_, _) =>
+            RestoreButton.IsEnabled = RecentBackupsList.SelectedItem is BackupFileRow;
+
         // Load recent backups
         LoadRecentBackups();
 
         // Wire events
         BrowseButton.Click += async (_, _) => await BrowseForBackupLocationAsync();
         BackupButton.Click += async (_, _) => await CreateBackupAsync();
+        RestoreButton.Click += async (_, _) => await RestoreSelectedBackupAsync();
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Dashboard");
         OpenBackupLocationButton.Click += (_, _) => OpenBackupLocation();
+    }
+
+    private void RefreshDatabaseSizeLabel()
+    {
+        DatabaseSizeLabel.Text = File.Exists(_sourceDatabasePath)
+            ? $"Size: {DatabaseBackupService.FormatFileSize(new FileInfo(_sourceDatabasePath).Length)}"
+            : string.Empty;
     }
 
     /// <summary>
@@ -101,6 +141,8 @@ public partial class BackupDatabaseView : UserControl
             using var ctx = DatabaseInitializer.CreateContext();
             var settingsRepo = new AppSettingRepository(ctx);
             settingsRepo.SetValue("DatabaseBackupLocation", _defaultBackupLocation);
+
+            LoadRecentBackups();
         }
     }
 
@@ -111,25 +153,24 @@ public partial class BackupDatabaseView : UserControl
     {
         if (string.IsNullOrWhiteSpace(_defaultBackupLocation))
         {
-            StatusLabel.Foreground = Brushes.DarkRed;
+            StatusLabel.Foreground = AppColors.Danger;
             StatusLabel.Text = "Please select a backup location first.";
             return;
         }
 
         // Show progress
-        ProgressPanel.IsVisible = true;
-        BackupButton.IsEnabled = false;
+        SetProgressState(running: true, "Creating backup...");
         StatusLabel.Text = string.Empty;
 
         try
         {
             var service = new DatabaseBackupService();
-            var result = await Task.Run(() => 
+            var result = await Task.Run(() =>
                 service.CreateBackup(_sourceDatabasePath, _defaultBackupLocation));
 
             if (result.Success)
             {
-                StatusLabel.Foreground = Brushes.DarkGreen;
+                StatusLabel.Foreground = AppColors.Success;
                 StatusLabel.Text = $"Backup created successfully: {Path.GetFileName(result.BackupPath!)}\n" +
                                  $"Size: {DatabaseBackupService.FormatFileSize(result.FileSizeBytes)}";
 
@@ -152,54 +193,145 @@ public partial class BackupDatabaseView : UserControl
             }
             else
             {
-                StatusLabel.Foreground = Brushes.DarkRed;
+                StatusLabel.Foreground = AppColors.Danger;
                 StatusLabel.Text = $"Backup failed: {result.ErrorMessage}";
             }
         }
         catch (Exception ex)
         {
-            StatusLabel.Foreground = Brushes.DarkRed;
+            StatusLabel.Foreground = AppColors.Danger;
             StatusLabel.Text = $"Unexpected error: {ex.Message}";
         }
         finally
         {
-            ProgressPanel.IsVisible = false;
-            BackupButton.IsEnabled = true;
+            SetProgressState(running: false, "Creating backup...");
         }
     }
 
     /// <summary>
-    /// Loads the list of recent backup files from the backup directory.
+    /// Restores the live database from the backup selected in <see cref="RecentBackupsList"/>,
+    /// after an explicit confirmation. Makes a safety backup of the current live database first
+    /// (see <see cref="DatabaseBackupService.RestoreBackup"/>) and, on success, offers to restart
+    /// the application so no stale in-memory state (session, loaded views) survives the swap.
+    /// </summary>
+    private async Task RestoreSelectedBackupAsync()
+    {
+        if (RecentBackupsList.SelectedItem is not BackupFileRow row) return;
+
+        var window = TopLevel.GetTopLevel(this) as Window;
+        if (window == null) return;
+
+        // Re-validate right before acting — the list may be stale if the file was deleted
+        // externally since it was loaded.
+        if (!File.Exists(row.FullPath))
+        {
+            await DialogHelper.ShowInfoAsync(window,
+                $"\"{row.FileName}\" no longer exists at its expected location. The backup list will be refreshed.",
+                "Backup No Longer Available");
+            LoadRecentBackups();
+            return;
+        }
+
+        bool confirmed = await DialogHelper.ConfirmAsync(window,
+            $"Restore the database from:\n\n{row.FileName}\n({row.Timestamp:yyyy-MM-dd HH:mm:ss})\n\n" +
+            "All changes made since that backup will be PERMANENTLY LOST.\n\n" +
+            "A safety copy of the current database will be made automatically before restoring, " +
+            "in case you need to undo this.\n\nContinue?",
+            "Restore Database — This Cannot Be Undone");
+        if (!confirmed) return;
+
+        SetProgressState(running: true, "Restoring backup...");
+        StatusLabel.Text = string.Empty;
+
+        RestoreResult result;
+        try
+        {
+            var backupPath = row.FullPath;
+            result = await Task.Run(() =>
+                new DatabaseBackupService().RestoreBackup(backupPath, _sourceDatabasePath, _defaultBackupLocation));
+        }
+        catch (Exception ex)
+        {
+            result = new RestoreResult { Success = false, ErrorMessage = $"Unexpected error: {ex.Message}" };
+        }
+        finally
+        {
+            SetProgressState(running: false, "Creating backup...");
+        }
+
+        if (result.Success)
+        {
+            StatusLabel.Foreground = AppColors.Success;
+            StatusLabel.Text = "Database restored successfully."
+                + (result.SafetyBackupPath != null
+                    ? $"\nYour previous database was saved to: {result.SafetyBackupPath}"
+                    : string.Empty);
+
+            RefreshDatabaseSizeLabel();
+            LoadRecentBackups();
+
+            bool restartNow = await DialogHelper.ConfirmAsync(window,
+                "The database has been restored." +
+                (result.SafetyBackupPath != null
+                    ? $"\n\nYour previous database was saved to:\n{result.SafetyBackupPath}"
+                    : string.Empty) +
+                "\n\nThe application must restart before continuing — data loaded into memory during " +
+                "this session no longer matches what's on disk. Do not keep using the app without restarting.\n\n" +
+                "Restart now?",
+                "Restore Complete — Restart Required");
+
+            if (restartNow)
+            {
+                if (!ProcessRelaunchHelper.RelaunchAndExit(window))
+                {
+                    await DialogHelper.ShowInfoAsync(window,
+                        "Could not restart the application automatically. Please close and reopen it manually.",
+                        "Manual Restart Needed");
+                }
+            }
+        }
+        else
+        {
+            StatusLabel.Foreground = AppColors.Danger;
+            StatusLabel.Text = "Restore failed — see details.";
+            await DialogHelper.ShowScrollableInfoAsync(window, result.ErrorMessage ?? "Unknown error.", "Restore Failed");
+        }
+    }
+
+    /// <summary>
+    /// Loads the list of recent backup files (including pre-restore safety backups) from the
+    /// backup directory.
     /// </summary>
     private void LoadRecentBackups()
     {
+        RestoreButton.IsEnabled = false;
+
         if (!Directory.Exists(_defaultBackupLocation))
         {
-            RecentBackupsList.ItemsSource = new[] { "(No backups found)" };
+            RecentBackupsList.ItemsSource = null;
+            NoBackupsLabel.IsVisible = true;
             return;
         }
 
         try
         {
             var backupFiles = Directory.GetFiles(_defaultBackupLocation, "hardware_templates_backup_*.db")
+                .Concat(Directory.GetFiles(_defaultBackupLocation, $"{SafetyBackupPrefix}_*.db"))
                 .OrderByDescending(File.GetLastWriteTime)
-                .Take(10)
-                .Select(f =>
-                {
-                    var fileInfo = new FileInfo(f);
-                    var timestamp = fileInfo.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss");
-                    var size = DatabaseBackupService.FormatFileSize(fileInfo.Length);
-                    return $"{Path.GetFileName(f)} � {timestamp} � {size}";
-                })
+                .Take(15)
+                .Select(f => new BackupFileRow(f))
                 .ToList();
 
-            RecentBackupsList.ItemsSource = backupFiles.Count > 0
-                ? backupFiles
-                : new[] { "(No backups found)" };
+            RecentBackupsList.ItemsSource = null;
+            RecentBackupsList.ItemsSource = backupFiles;
+            NoBackupsLabel.IsVisible = backupFiles.Count == 0;
         }
-        catch
+        catch (Exception ex)
         {
-            RecentBackupsList.ItemsSource = new[] { "(Error reading backup folder)" };
+            RecentBackupsList.ItemsSource = null;
+            NoBackupsLabel.IsVisible = true;
+            StatusLabel.Foreground = AppColors.Danger;
+            StatusLabel.Text = $"Could not read the backup folder: {ex.Message}";
         }
     }
 
@@ -219,8 +351,16 @@ public partial class BackupDatabaseView : UserControl
         }
         catch (Exception ex)
         {
-            StatusLabel.Foreground = Brushes.DarkRed;
+            StatusLabel.Foreground = AppColors.Danger;
             StatusLabel.Text = $"Could not open folder: {ex.Message}";
         }
+    }
+
+    private void SetProgressState(bool running, string progressText)
+    {
+        ProgressLabel.Text = progressText;
+        ProgressPanel.IsVisible = running;
+        BackupButton.IsEnabled = !running;
+        RestoreButton.IsEnabled = !running && RecentBackupsList.SelectedItem is BackupFileRow;
     }
 }
