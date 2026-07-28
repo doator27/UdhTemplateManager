@@ -97,12 +97,18 @@ public static class DatabaseInitializer
         if (conn.State != System.Data.ConnectionState.Open)
             conn.Open();
 
-        // Patch: Enable WAL journal mode for concurrent multi-user access.
-        // Idempotent — SQLite silently keeps WAL if already set.
-        using (var walCmd = conn.CreateCommand())
+        // Patch: Force the DELETE (rollback) journal mode. The database may be hosted on a
+        // shared network drive for multi-machine access (see DatabaseLocationService), and
+        // WAL mode is unsafe there — it depends on a shared-memory index file for reader/writer
+        // coordination that network filesystems (SMB/NFS) do not support correctly, which can
+        // silently revert recently-written values. DELETE mode works correctly over a network
+        // share; busy_timeout + RetryHelper absorb the added lock contention.
+        // Idempotent — this re-asserts the mode on every startup, which also self-heals any
+        // database that was previously left in WAL mode.
+        using (var journalCmd = conn.CreateCommand())
         {
-            walCmd.CommandText = "PRAGMA journal_mode=WAL;";
-            walCmd.ExecuteNonQuery();
+            journalCmd.CommandText = "PRAGMA journal_mode=DELETE;";
+            journalCmd.ExecuteNonQuery();
         }
 
         // Patch: 5-second busy timeout so concurrent writers queue rather than fail immediately.

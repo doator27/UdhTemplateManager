@@ -16,17 +16,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 HardwareTemplateBuilder.sln
-├── HardwareTemplateBuilder.Core/   # Class library: models, EF context, repositories, services
-├── HardwareTemplateBuilder.App/    # Avalonia UI application
-├── HardwareTemplateBuilder.Tests/  # xUnit tests
-└── HardwareTemplateBuilder.SmokeTest/  # Console smoke tests
+├── HardwareTemplateBuilder.Core/       # Class library: models, EF context, repositories, services
+├── HardwareTemplateBuilder.App/        # Avalonia UI application (main product)
+├── HardwareTemplateBuilder.Lookup/     # Standalone read-only Avalonia app: search + generate/open a merged template PDF, no write access to the DB
+├── HardwareTemplateBuilder.Tests/      # xUnit tests
+└── HardwareTemplateBuilder.SmokeTest/  # Console smoke tests: full CRUD against all entity types
+
+HardwareTemplateBuilder.Diagnostic/     # Standalone console scratch project (not in the .sln) for probing manufacturer
+                                         # websites/sitemaps to find template PDF URLs when configuring TemplateSource data
 ```
 
 ## Commands
 
 ```bash
 dotnet build                          # Build the solution
-dotnet run --project HardwareTemplateBuilder.App  # Run the app
+dotnet run --project HardwareTemplateBuilder.App  # Run the main app
+dotnet run --project HardwareTemplateBuilder.Lookup  # Run the standalone read-only template lookup app
 dotnet test                           # Run all tests
 dotnet test --filter "FullyQualifiedName~PageRangeParser"  # Run a single test class
 dotnet ef migrations add <Name> --project HardwareTemplateBuilder.Core  # Add EF migration
@@ -37,12 +42,12 @@ dotnet ef database update --project HardwareTemplateBuilder.Core        # Apply 
 
 ### Data Layer (Core/Data/ and Core/Models/)
 
-- **AppDbContext** manages 16 SQLite tables via EF Core
+- **AppDbContext** manages 17 SQLite tables via EF Core
 - **DatabaseInitializer** handles creation, migration, and post-migration schema patches (`EnsureSchemaPatches()`) on startup; patches are idempotent and used for retroactive schema fixes
 - **DatabaseInitializer.CreateContext()** is the standard way to obtain a db context — contexts are created per-operation, not shared
 - **DatabaseLocationService** manages the configurable database file path (default: `%AppData%/HardwareTemplateBuilder/hardware_templates.db`)
 - **MachineIdentityService** generates a stable machine UUID stored in `UserProfile.MachineId`, enabling auto-selection of the matching profile on login
-- **SqlitePragmaInterceptor** (EF Core `DbConnectionInterceptor`) applies `PRAGMA busy_timeout=5000` on every connection open; WAL mode is set once at startup via `DatabaseInitializer` and persists in the DB file
+- **SqlitePragmaInterceptor** (EF Core `DbConnectionInterceptor`) applies `PRAGMA busy_timeout=5000` on every connection open; the `DELETE` journal mode is (re)asserted once at startup via `DatabaseInitializer` and persists in the DB file — **not** `WAL`: the database may live on a shared network drive (see `DatabaseLocationService`), and WAL's shared-memory reader/writer coordination is unsafe over SMB/NFS and can silently revert recently-written values
 - **RetryHelper** provides `ExecuteWithRetry()` for write operations that may hit `SQLITE_BUSY`/`SQLITE_LOCKED` — exponential back-off, 3 retries by default
 - **Generic `IRepository<T>`** with `GetById`, `GetAll`, `Add`, `Update`, `Delete`; `IHardwareItemRepository` adds `Search(manufacturer, description, modelNumber)` returning results sorted by `Frequency` descending
 - All `Add()` methods include duplicate detection — return existing record if already present
@@ -81,11 +86,13 @@ Orchestrated by `PdfAssemblyService`, which accepts an `AssemblyRequest` and exe
 - `IDynamicComponent` (non-generic) is in `QuestPDF.Infrastructure`; `IDynamicComponent<TState>` extends it with a `State` property
 - Cover sheet row ordering is by **minimum body page number** (not description path), so the Page # column always ascends in document order
 
+**Duplicated pipeline logic:** `TemplateLookupView` (in `HardwareTemplateBuilder.App`) and `HardwareTemplateBuilder.Lookup` both bypass `PdfAssemblyService` and manually re-implement steps 1–3 (`TemplateSorter` → `FileAcquirer` → `PageExtractor`/`PageRotator`/`PdfMerger`) to produce a quick merged PDF without a cover sheet or `JobTemplateSnapshot` write. Changes to those four classes' behavior/signatures must be mirrored in both call sites, not just `PdfAssemblyService`.
+
 ### UI (App/)
 
 - **Architecture is code-behind, not MVVM** — views directly instantiate repositories and call services; there are no ViewModels or data-binding commands
 - `MainWindow` hosts a persistent menu bar (File, Jobs, Maintenance, Admin) and a content area
-- `ViewRouter` swaps child `UserControl` views for navigation — 25 views total; **a new instance is created on every navigate** (no view caching)
+- `ViewRouter` swaps child `UserControl` views for navigation — 27 views total; **a new instance is created on every navigate** (no view caching)
 - `SessionService` (static) holds the active `UserProfile` for the session lifetime; `BulkAddSession` (static) holds transient bulk-entry state across the multi-step bulk-add flow
 - **Bulk-add flow** is a multi-step wizard entirely within the content area: `BulkManufacturerSelectionView` → `BulkJobHubView` → `BulkManufacturerSessionView` → `BulkHardwareEntryView` → `TemplateResolutionWizardView` (persists `JobHardware` on Finish). State is shared via `BulkAddSession` and `BulkSessionDraft` static classes.
 - **Import hardware flow** feeds into the same `TemplateResolutionWizardView`. `JobDetailView` shows an "Import Hardware" button that opens `ImportJobPickerDialog` (searchable job list), then populates `BulkAddSession.PendingRows` from the source job's base `JobHardware` rows (ordered by `Id`) and navigates to `TemplateResolutionWizard:{jobId}`. Job-scoped templates from the source job appear in `row.PendingTemplates` and are cloned at Finish time.

@@ -12,8 +12,9 @@ namespace HardwareTemplateBuilder.Core.Data;
 ///   <item><c>busy_timeout=5000</c> — waits up to 5 seconds before returning a lock error,
 ///   allowing concurrent users to queue rather than fail immediately.</item>
 /// </list>
-/// WAL journal mode is set once at startup via <see cref="DatabaseInitializer"/> because it
-/// persists in the database file and does not need to be reapplied per connection.
+/// Journal mode (DELETE — safe for shared network drives) is set once at startup via
+/// <see cref="DatabaseInitializer"/> because it persists in the database file and does not
+/// need to be reapplied per connection.
 /// </summary>
 public sealed class SqlitePragmaInterceptor : DbConnectionInterceptor
 {
