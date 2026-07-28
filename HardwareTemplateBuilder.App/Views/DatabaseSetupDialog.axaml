@@ -7,21 +7,21 @@
         Height="510"
         WindowStartupLocation="CenterScreen"
         CanResize="False"
-        Background="#C0C0C0">
+        Background="#2C2F38">
     <DockPanel Margin="16">
 
         <!-- Error banner — shown only when previously configured path is unreachable -->
         <Border Name="ErrorPanel"
                 DockPanel.Dock="Top"
-                Background="#fff0f0"
-                BorderBrush="#cc0000"
+                Background="#3B1219"
+                BorderBrush="#FF6B6B"
                 BorderThickness="1"
                 Padding="10"
                 Margin="0,0,0,10"
                 IsVisible="False">
             <StackPanel>
-                <TextBlock Text="Database Unreachable" FontWeight="Bold" Foreground="#800000" Margin="0,0,0,4"/>
-                <TextBlock Name="UnreachablePathLabel" TextWrapping="Wrap" Foreground="#800000"/>
+                <TextBlock Text="Database Unreachable" FontWeight="Bold" Foreground="#FF6B6B" Margin="0,0,0,4"/>
+                <TextBlock Name="UnreachablePathLabel" TextWrapping="Wrap" Foreground="#FF6B6B"/>
             </StackPanel>
         </Border>
 
@@ -34,12 +34,12 @@
         <TextBlock DockPanel.Dock="Top"
                    Text="The database is shared across the team. Point every workstation at the same file."
                    TextWrapping="Wrap"
-                   Foreground="#404040"
+                   Foreground="#A7ADB8"
                    Margin="0,0,0,12"/>
 
         <!-- Option A: Create new database -->
         <Border DockPanel.Dock="Top"
-                BorderBrush="#808080" BorderThickness="1"
+                BorderBrush="#454952" BorderThickness="1"
                 Padding="10" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="Create a new database" FontWeight="Bold" Margin="0,0,0,6"/>
@@ -52,13 +52,13 @@
                              Content="..." Width="32" Margin="4,0,0,0"/>
                 </Grid>
                 <Button Name="CreateButton" Content="Create Database Here" HorizontalAlignment="Left"/>
-                <TextBlock Name="CreateStatusLabel" Foreground="#800000"
+                <TextBlock Name="CreateStatusLabel" Foreground="#FF6B6B"
                            TextWrapping="Wrap" Margin="0,4,0,0"/>
             </StackPanel>
         </Border>
 
         <!-- Option B: Connect to existing database -->
-        <Border BorderBrush="#808080" BorderThickness="1" Padding="10">
+        <Border BorderBrush="#454952" BorderThickness="1" Padding="10">
             <StackPanel>
                 <TextBlock Text="Connect to an existing database" FontWeight="Bold" Margin="0,0,0,6"/>
                 <TextBlock Text="Select the hardware_templates.db file already on your network share."
@@ -70,7 +70,7 @@
                              Content="..." Width="32" Margin="4,0,0,0"/>
                 </Grid>
                 <Button Name="ConnectButton" Content="Connect to This Database" HorizontalAlignment="Left"/>
-                <TextBlock Name="ConnectStatusLabel" Foreground="#800000"
+                <TextBlock Name="ConnectStatusLabel" Foreground="#FF6B6B"
                            TextWrapping="Wrap" Margin="0,4,0,0"/>
             </StackPanel>
         </Border>

@@ -2,6 +2,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Repositories;
 
@@ -74,7 +75,7 @@ public partial class AppSettingsView : UserControl
 
     private void ConnectDatabase()
     {
-        DbStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+        DbStatusLabel.Foreground = AppColors.Danger;
         DbStatusLabel.Text = string.Empty;
 
         var path = DbConnectPathBox.Text?.Trim();
@@ -88,7 +89,7 @@ public partial class AppSettingsView : UserControl
             CurrentDbPathLabel.Text   = path;
             PointerFilePathLabel.Text = DatabaseLocationService.GetActivePointerFilePath();
             DbConnectPathBox.Text     = string.Empty;
-            DbStatusLabel.Foreground  = Avalonia.Media.Brushes.DarkGreen;
+            DbStatusLabel.Foreground  = AppColors.Success;
             DbStatusLabel.Text = $"Connected. Restart the app to use the new database.";
         }
         catch (System.Exception ex)
@@ -136,13 +137,13 @@ public partial class AppSettingsView : UserControl
         _repo!.SetValue("SmtpPassword",   SmtpPasswordBox.Text?.Trim()   ?? string.Empty);
         _repo!.SetValue("AlertEmailTo",   AlertEmailToBox.Text?.Trim()   ?? string.Empty);
         _repo!.SetValue("AlertEmailFrom", AlertEmailFromBox.Text?.Trim() ?? string.Empty);
-        SmtpStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        SmtpStatusLabel.Foreground = AppColors.Success;
         SmtpStatusLabel.Text = "SMTP settings saved.";
     }
 
     private void MoveDatabase()
     {
-        DbStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+        DbStatusLabel.Foreground = AppColors.Danger;
         DbStatusLabel.Text = string.Empty;
 
         var targetFolder = DbMoveTargetBox.Text?.Trim();
@@ -173,7 +174,7 @@ public partial class AppSettingsView : UserControl
             DatabaseLocationService.SetConfiguredPath(destPath);
             CurrentDbPathLabel.Text = destPath;
             DbMoveTargetBox.Text    = string.Empty;
-            DbStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+            DbStatusLabel.Foreground = AppColors.Success;
             DbStatusLabel.Text = $"Database moved to {destPath}";
         }
         catch (System.Exception ex)

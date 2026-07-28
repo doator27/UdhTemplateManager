@@ -166,7 +166,7 @@ public partial class BulkHardwareEntryView : UserControl
         var descLabel = new TextBlock
         {
             Text = "(none)",
-            Foreground = Brushes.Gray,
+            Foreground = AppColors.Muted,
             FontSize = 10,
             TextWrapping = TextWrapping.Wrap
         };
@@ -219,7 +219,7 @@ public partial class BulkHardwareEntryView : UserControl
             Text = "",
             FontSize = 11,
             VerticalAlignment = VerticalAlignment.Top,
-            Foreground = Brushes.Gray,
+            Foreground = AppColors.Muted,
             TextWrapping = TextWrapping.Wrap
         };
 
@@ -227,7 +227,7 @@ public partial class BulkHardwareEntryView : UserControl
         {
             Content = "× Remove",
             FontSize = 10,
-            Foreground = Brushes.DarkRed,
+            Foreground = AppColors.Danger,
             Padding = new Avalonia.Thickness(6, 2)
         };
 
@@ -281,7 +281,7 @@ public partial class BulkHardwareEntryView : UserControl
         var compactRemarksText = new TextBlock
         {
             FontSize = 11,
-            Foreground = Brushes.DimGray,
+            Foreground = AppColors.Muted,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
@@ -306,7 +306,7 @@ public partial class BulkHardwareEntryView : UserControl
             compactDescText.Text = entry.Description != null
                 ? BuildDescPath(entry.Description)
                 : "(no description)";
-            compactDescText.Foreground = entry.Description != null ? Brushes.Black : Brushes.Gray;
+            compactDescText.Foreground = entry.Description != null ? AppColors.Primary : AppColors.Muted;
 
             compactModelText.Text = string.IsNullOrWhiteSpace(entry.ModelNumber)
                 ? "(no model)" : entry.ModelNumber;
@@ -316,17 +316,17 @@ public partial class BulkHardwareEntryView : UserControl
             if (string.IsNullOrWhiteSpace(entry.ModelNumber))
             {
                 compactMatchText.Text = "";
-                compactMatchText.Foreground = Brushes.Gray;
+                compactMatchText.Foreground = AppColors.Muted;
             }
             else if (entry.MatchedItem != null)
             {
                 compactMatchText.Text = " ✓ Matched";
-                compactMatchText.Foreground = Brushes.DarkGreen;
+                compactMatchText.Foreground = AppColors.Success;
             }
             else
             {
                 compactMatchText.Text = " (new)";
-                compactMatchText.Foreground = Brushes.DarkBlue;
+                compactMatchText.Foreground = AppColors.Info;
             }
         };
 
@@ -346,7 +346,7 @@ public partial class BulkHardwareEntryView : UserControl
 
         var card = new Border
         {
-            BorderBrush = Brushes.Gray,
+            BorderBrush = AppColors.Muted,
             BorderThickness = new Avalonia.Thickness(1),
             CornerRadius = new Avalonia.CornerRadius(2),
             Padding = new Avalonia.Thickness(10, 8),
@@ -443,7 +443,7 @@ public partial class BulkHardwareEntryView : UserControl
             entry.Description = desc;
             entry.DescriptionId = desc?.Id;
             descLabel.Text = desc != null ? BuildDescPath(desc) : "(none)";
-            descLabel.Foreground = desc != null ? Brushes.Black : Brushes.Gray;
+            descLabel.Foreground = desc != null ? AppColors.Primary : AppColors.Muted;
             descCombo.Text = string.Empty;
             descCombo.SelectedItem = null;
             descMatchList.IsVisible = false;
@@ -694,17 +694,17 @@ public partial class BulkHardwareEntryView : UserControl
         if (string.IsNullOrWhiteSpace(model))
         {
             label.Text = "";
-            label.Foreground = Brushes.Gray;
+            label.Foreground = AppColors.Muted;
         }
         else if (matched != null)
         {
             label.Text = " ✓ Matched";
-            label.Foreground = Brushes.DarkGreen;
+            label.Foreground = AppColors.Success;
         }
         else
         {
             label.Text = " (new)";
-            label.Foreground = Brushes.DarkBlue;
+            label.Foreground = AppColors.Info;
         }
     }
 
@@ -767,12 +767,12 @@ public partial class BulkHardwareEntryView : UserControl
         if (_items.Count == 0 || _items.All(i => string.IsNullOrWhiteSpace(i.ModelNumber)))
         {
             StatusLabel.Text = "Add at least one item with a model number before generating.";
-            StatusLabel.Foreground = Brushes.DarkRed;
+            StatusLabel.Foreground = AppColors.Danger;
             return;
         }
 
         StatusLabel.Text = "Generating cover sheet...";
-        StatusLabel.Foreground = Brushes.Black;
+        StatusLabel.Foreground = AppColors.Primary;
 
         string outputPath;
         try
@@ -859,7 +859,7 @@ public partial class BulkHardwareEntryView : UserControl
         catch (Exception ex)
         {
             StatusLabel.Text = $"Cover sheet generation failed: {ex.Message}";
-            StatusLabel.Foreground = Brushes.DarkRed;
+            StatusLabel.Foreground = AppColors.Danger;
             var win = TopLevel.GetTopLevel(this) as Window;
             if (win != null)
                 await DialogHelper.ShowScrollableInfoAsync(win, ex.Message, "Cover Sheet Generation Failed");
@@ -867,7 +867,7 @@ public partial class BulkHardwareEntryView : UserControl
         }
 
         StatusLabel.Text = $"Generated: {Path.GetFileName(outputPath)}";
-        StatusLabel.Foreground = Brushes.DarkGreen;
+        StatusLabel.Foreground = AppColors.Success;
 
         try
         {

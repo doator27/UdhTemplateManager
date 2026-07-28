@@ -10,7 +10,7 @@
         </DockPanel>
 
         <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Margin="0,6,0,0"
-                   Foreground="#800000" TextWrapping="Wrap"/>
+                   Foreground="#FF6B6B" TextWrapping="Wrap"/>
 
         <!-- Manufacturer cards (added in code-behind) -->
         <ScrollViewer>

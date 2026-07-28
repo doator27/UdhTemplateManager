@@ -12,7 +12,7 @@
             <Button DockPanel.Dock="Left"  Name="PrevButton"   Content="← Previous" Margin="0,0,8,0"/>
             <Button DockPanel.Dock="Right" Name="FinishButton" Content="Finish"      IsVisible="False"/>
             <Button DockPanel.Dock="Right" Name="NextButton"   Content="Next →"      Margin="0,0,8,0"/>
-            <TextBlock Name="WizardStatusLabel" VerticalAlignment="Center" Foreground="#800000" TextWrapping="Wrap"/>
+            <TextBlock Name="WizardStatusLabel" VerticalAlignment="Center" Foreground="#FF6B6B" TextWrapping="Wrap"/>
         </DockPanel>
 
         <!-- Scrollable body -->
@@ -20,21 +20,21 @@
             <StackPanel Spacing="8">
 
                 <!-- Labels (read-only, set in item entry view) -->
-                <Border BorderBrush="#B0B0B0" BorderThickness="1" Padding="8">
+                <Border BorderBrush="#454952" BorderThickness="1" Padding="8">
                     <StackPanel>
                         <TextBlock Text="Labels / Line Items:" FontWeight="SemiBold" Margin="0,0,0,4"/>
                         <StackPanel Name="LabelsDisplayPanel" Spacing="2"/>
                         <TextBlock Name="NoLabelsHint" Text="(no custom labels — will use model number)"
-                                   Foreground="#808080" FontStyle="Italic" FontSize="11"/>
+                                   Foreground="#454952" FontStyle="Italic" FontSize="11"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Status panel (shown for both cases) -->
-                <TextBlock Name="ItemStatusLabel" TextWrapping="Wrap" FontStyle="Italic" Foreground="#404040"/>
+                <TextBlock Name="ItemStatusLabel" TextWrapping="Wrap" FontStyle="Italic" Foreground="#A7ADB8"/>
 
                 <!-- Linked templates list (Case A — matched item) -->
                 <Border Name="MatchedPanel" IsVisible="False"
-                        BorderBrush="#B0B0B0" BorderThickness="1" Padding="8">
+                        BorderBrush="#454952" BorderThickness="1" Padding="8">
                     <StackPanel>
                         <TextBlock Text="Templates already linked to this item:" FontWeight="Bold" Margin="0,0,0,4"/>
                         <ListBox Name="LinkedTemplatesList" Height="80"/>
@@ -51,7 +51,7 @@
 
                 <!-- Template add form (Case B — new item) -->
                 <Border Name="NewItemPanel" IsVisible="False"
-                        BorderBrush="#B0B0B0" BorderThickness="1" Padding="8">
+                        BorderBrush="#454952" BorderThickness="1" Padding="8">
                     <StackPanel>
                         <TextBlock Text="Add Templates for this new item:" FontWeight="Bold" Margin="0,0,0,6"/>
 
@@ -95,7 +95,7 @@
                         </Grid>
 
                         <Button Name="AddTemplateButton" Content="Add Template" HorizontalAlignment="Left" Margin="0,0,0,6"/>
-                        <TextBlock Name="AddTemplateStatusLabel" Foreground="#800000" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                        <TextBlock Name="AddTemplateStatusLabel" Foreground="#FF6B6B" TextWrapping="Wrap" Margin="0,0,0,6"/>
 
                         <TextBlock Text="Staged templates:" FontWeight="Bold" Margin="0,4,0,4"/>
                         <ListBox Name="PendingTemplatesList" Height="100"/>
@@ -105,7 +105,7 @@
                         <Button Name="ToggleSearchButton" Content="Search for existing template…"
                                 HorizontalAlignment="Left" Margin="0,10,0,0"/>
                         <Border Name="SearchExistingPanel" IsVisible="False"
-                                BorderBrush="#D0D0D0" BorderThickness="1" Padding="8" Margin="0,4,0,0">
+                                BorderBrush="#454952" BorderThickness="1" Padding="8" Margin="0,4,0,0">
                             <StackPanel>
                                 <TextBlock Text="Search existing templates for this manufacturer:"
                                            FontWeight="Bold" Margin="0,0,0,6"/>
@@ -119,7 +119,7 @@
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button Name="StageSearchResultButton" Content="Stage Selected"/>
                                 </StackPanel>
-                                <TextBlock Name="SearchTplStatusLabel" Foreground="#800000"
+                                <TextBlock Name="SearchTplStatusLabel" Foreground="#FF6B6B"
                                            TextWrapping="Wrap" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>

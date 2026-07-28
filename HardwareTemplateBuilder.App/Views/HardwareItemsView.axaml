@@ -24,10 +24,10 @@
             </DockPanel>
             <!-- Right: form -->
             <ScrollViewer Grid.Column="1">
-                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
                     <StackPanel>
                         <TextBlock Text="Selected Item Details:" FontWeight="Bold" Margin="0,0,0,8"/>
-                        <Border BorderBrush="#808080" BorderThickness="1" Padding="8" Margin="0,0,0,12" Background="#F0F0F0">
+                        <Border BorderBrush="#454952" BorderThickness="1" Padding="8" Margin="0,0,0,12" Background="#2C2F38">
                             <StackPanel>
                                 <TextBlock Name="SelectedMfrLabel" Margin="0,0,0,4"/>
                                 <TextBlock Name="SelectedDescLabel" Margin="0,0,0,4"/>
@@ -42,14 +42,14 @@
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="Description:" Margin="0,0,0,2"/>
                             <DockPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
                                 <Button DockPanel.Dock="Right" Name="PickDescriptionButton" Content="Pick" Width="46" Margin="4,0,0,0"/>
-                                <Border BorderBrush="#808080" BorderThickness="1" Padding="5,3">
+                                <Border BorderBrush="#454952" BorderThickness="1" Padding="5,3">
                                     <TextBlock Name="DescriptionLabel" Text="(none)" VerticalAlignment="Center" TextWrapping="Wrap"/>
                                 </Border>
                             </DockPanel>
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Model Number:" Margin="0,0,8,2"/>
                             <TextBox Grid.Row="3" Grid.Column="0" Name="ModelNumberBox" Margin="0,0,8,8"/>
                             <TextBlock Grid.Row="2" Grid.Column="1" Text="Frequency (read-only):" Margin="0,0,0,2"/>
-                            <TextBox Grid.Row="3" Grid.Column="1" Name="FrequencyBox" IsReadOnly="True" Background="#E0E0E0" Margin="0,0,0,8"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" Name="FrequencyBox" IsReadOnly="True" Background="#1E2127" Margin="0,0,0,8"/>
                             <CheckBox Grid.Row="4" Grid.Column="0" Name="IsActiveCheck" Content="Active" Margin="0,0,8,8"/>
                             <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Text="Remarks (optional):" Margin="0,0,0,2"/>
                             <TextBox Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Name="RemarksBox"/>
@@ -60,7 +60,7 @@
                             <Button Name="DeleteButton"   Content="Delete"    Margin="0,0,8,0"/>
                             <Button Name="OpenItemButton" Content="Open Item"/>
                         </StackPanel>
-                        <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                        <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
                     </StackPanel>
                 </Border>
             </ScrollViewer>

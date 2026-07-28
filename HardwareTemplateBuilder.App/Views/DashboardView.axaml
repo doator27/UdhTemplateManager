@@ -8,7 +8,7 @@
                        FontSize="18" FontWeight="Bold"
                        Margin="0,0,0,4"/>
             <TextBlock Name="WelcomeLabel"
-                       FontSize="12" Foreground="#444444"
+                       FontSize="12" Foreground="#A7ADB8"
                        Margin="0,0,0,20"/>
 
             <!-- Primary work area -->

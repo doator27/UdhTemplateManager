@@ -1,0 +1,181 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        Dark app theme layered on top of Avalonia's FluentTheme (see App.axaml for
+        RequestedThemeVariant="Dark" and the accent-color resource overrides). This deliberately
+        avoids replacing control ControlTemplates — FluentTheme's own templates already provide
+        correct hover/pressed/disabled/focus visuals; these Styles only adjust the neutral
+        palette, corner radius, spacing, and typography on top of them.
+    -->
+
+    <!-- ── Palette reference (for anyone editing this file) ──────────────────────
+         Page background   #1A1D23      Border / divider     #454952
+         Surface (cards)    #23262D      Border, subtle       #33363E
+         Surface, alt/hover #2C2F38      Danger               #FF6B6B
+         Text primary       #E8EAED      Danger background    #3B1219
+         Text secondary     #A7ADB8      Success               #5FD68C
+         Text tertiary      #6B7280      Success background    #123524
+         Accent             #4FA3D1      Accent fill (buttons) #3D82AA
+    -->
+
+    <!-- Global font and background -->
+    <Style Selector="Window">
+        <Setter Property="Background" Value="#1A1D23" />
+        <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <Style Selector="UserControl">
+        <Setter Property="Background" Value="#1A1D23" />
+        <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <Style Selector="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="#E8EAED" />
+    </Style>
+
+    <!-- ── Button: flat, rounded, neutral by default ──────────────────────────── -->
+    <Style Selector="Button">
+        <Setter Property="Background" Value="#2C2F38" />
+        <Setter Property="Foreground" Value="#E8EAED" />
+        <Setter Property="BorderBrush" Value="#454952" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="MinWidth" Value="80" />
+        <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.1" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <!--
+        Hover/pressed/disabled/focus states are intentionally NOT set here via template-part
+        selectors (e.g. "Button:pointerover /template/ ContentPresenter") — that depends on
+        FluentTheme's internal template structure, which isn't a stable public contract across
+        versions. Those states are themed the supported way instead: by overriding FluentTheme's
+        own DynamicResource brush keys (ButtonBackgroundPointerOver, TextControlBorderBrushFocused,
+        etc.) in App.axaml, which is the mechanism FluentTheme's control templates are actually
+        built to read from.
+    -->
+
+    <!-- ── TextBox: clean bordered field ───────────────────────────────────────── -->
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="#23262D" />
+        <Setter Property="Foreground" Value="#E8EAED" />
+        <Setter Property="BorderBrush" Value="#454952" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CaretBrush" Value="#4FA3D1" />
+        <Setter Property="SelectionBrush" Value="#2B6183" />
+    </Style>
+
+    <!-- ── ListBox: dark surface, rounded ──────────────────────────────────────── -->
+    <Style Selector="ListBox">
+        <Setter Property="Background" Value="#23262D" />
+        <Setter Property="BorderBrush" Value="#454952" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="2" />
+        <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <Style Selector="ListBoxItem">
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="Margin" Value="0,1" />
+    </Style>
+
+    <!-- ── ComboBox ─────────────────────────────────────────────────────────────── -->
+    <Style Selector="ComboBox">
+        <Setter Property="Background" Value="#23262D" />
+        <Setter Property="Foreground" Value="#E8EAED" />
+        <Setter Property="BorderBrush" Value="#454952" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <!-- ── CheckBox: align typography; checked-state color already follows SystemAccentColor ── -->
+    <Style Selector="CheckBox">
+        <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="#E8EAED" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <!-- ── Menu bar ─────────────────────────────────────────────────────────────── -->
+    <Style Selector="Menu">
+        <Setter Property="Background" Value="#23262D" />
+        <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <Style Selector="MenuItem">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <!-- ── Card panel (used throughout for form/content containers) ───────────────
+         Slightly-raised dark card with a soft border, distinguishing it from the page
+         background behind it. -->
+    <Style Selector="Border.panel">
+        <Setter Property="Background" Value="#23262D" />
+        <Setter Property="BorderBrush" Value="#33363E" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="14" />
+    </Style>
+
+    <!-- ── Dashboard tiles ──────────────────────────────────────────────────────── -->
+    <Style Selector="Button.dashboard">
+        <Setter Property="Width" Value="160" />
+        <Setter Property="Height" Value="64" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="6" />
+        <Setter Property="Background" Value="#23262D" />
+        <Setter Property="BorderBrush" Value="#33363E" />
+        <Setter Property="CornerRadius" Value="10" />
+    </Style>
+
+    <!--
+        Note: hover/pressed on this class falls back to the app-wide ButtonBackgroundPointerOver
+        / ButtonBackgroundPressed resource (see App.axaml) rather than a bespoke accent-darkened
+        shade — FluentTheme's Button template applies those resources on top of the control's own
+        Background regardless of style class, so a class-scoped hover color isn't achievable
+        without a custom ControlTheme. Still reads cleanly: rest-state accent fill, neutral-gray
+        dim on hover.
+    -->
+
+    <!-- Primary dashboard buttons — Jobs and Template Lookup: accent-filled hero tiles.
+         Uses the darker Dark1 accent tint (not the brighter base accent) so white text on top
+         keeps good contrast. -->
+    <Style Selector="Button.dashboard-primary">
+        <Setter Property="Width" Value="200" />
+        <Setter Property="Height" Value="84" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Margin" Value="6" />
+        <Setter Property="Background" Value="#3D82AA" />
+        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="BorderBrush" Value="#3D82AA" />
+        <Setter Property="CornerRadius" Value="12" />
+    </Style>
+
+</Styles>

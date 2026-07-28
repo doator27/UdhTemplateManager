@@ -21,7 +21,7 @@
             </DockPanel>
             <!-- Right: metadata form -->
             <ScrollViewer Grid.Column="1">
-                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
                     <StackPanel>
                         <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Job Number:" Margin="0,0,8,2"/>
@@ -59,13 +59,13 @@
                             <Button Name="ToggleCompleteButton" Content="Mark Complete" Margin="0,0,0,0"/>
                         </StackPanel>
 
-                        <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                        <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
 
                         <!-- Notes -->
                         <DockPanel Margin="0,12,0,2">
                             <TextBlock DockPanel.Dock="Left" Text="Notes:" VerticalAlignment="Center"/>
                             <TextBlock Name="NotesDateLabel" DockPanel.Dock="Right"
-                                       FontSize="11" Foreground="#666"
+                                       FontSize="11" Foreground="#A7ADB8"
                                        VerticalAlignment="Center" TextAlignment="Right"/>
                         </DockPanel>
                         <TextBox Name="NotesBox"
@@ -77,7 +77,7 @@
                         <StackPanel Orientation="Horizontal">
                             <Button Name="SaveNotesButton" Content="Save Notes" Margin="0,0,8,0"/>
                             <Button Name="ClearNotesButton" Content="Clear Note" Margin="0,0,0,0"/>
-                            <TextBlock Name="NotesStatusLabel" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="#800000"/>
+                            <TextBlock Name="NotesStatusLabel" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="#FF6B6B"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>

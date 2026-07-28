@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="HardwareTemplateBuilder.App.Views.BackupDatabaseView"
-             Background="#C0C0C0">
+             Background="#2C2F38">
 
     <StackPanel Margin="12" Spacing="12">
         <!-- Header -->
@@ -13,12 +13,12 @@
         <TextBlock Text="Create a timestamped backup copy of the database at the specified location."
                    TextWrapping="Wrap"
                    FontSize="11"
-                   Foreground="#404040"
+                   Foreground="#A7ADB8"
                    Margin="0,0,0,8" />
 
         <!-- Current database path -->
         <Border Background="White"
-                BorderBrush="#808080"
+                BorderBrush="#454952"
                 BorderThickness="1"
                 Padding="8"
                 Margin="0,0,0,8">
@@ -30,17 +30,17 @@
                            Text="Loading..."
                            TextWrapping="Wrap"
                            FontSize="11"
-                           Foreground="#404040" />
+                           Foreground="#A7ADB8" />
                 <TextBlock Name="DatabaseSizeLabel"
                            Text=""
                            FontSize="10"
-                           Foreground="#606060" />
+                           Foreground="#A7ADB8" />
             </StackPanel>
         </Border>
 
         <!-- Backup location -->
         <Border Background="White"
-                BorderBrush="#808080"
+                BorderBrush="#454952"
                 BorderThickness="1"
                 Padding="8">
             <StackPanel Spacing="6">
@@ -51,7 +51,7 @@
                 <Grid ColumnDefinitions="*,Auto">
                     <TextBox Name="BackupPathBox"
                              IsReadOnly="True"
-                             Background="#F0F0F0"
+                             Background="#2C2F38"
                              Padding="4"
                              FontSize="11" />
                     <Button Grid.Column="1"
@@ -63,7 +63,7 @@
 
                 <TextBlock Text="Backup files will be named: hardware_templates_backup_yyyy-MM-dd_HH-mm-ss.db"
                            FontSize="10"
-                           Foreground="#606060"
+                           Foreground="#A7ADB8"
                            TextWrapping="Wrap"
                            Margin="0,4,0,0" />
             </StackPanel>
@@ -91,7 +91,7 @@
         <Border Name="ProgressPanel"
                 IsVisible="False"
                 Background="White"
-                BorderBrush="#808080"
+                BorderBrush="#454952"
                 BorderThickness="1"
                 Padding="12"
                 Margin="0,8,0,0">
@@ -107,7 +107,7 @@
         <!-- Recent backups list -->
         <Border Name="RecentBackupsPanel"
                 Background="White"
-                BorderBrush="#808080"
+                BorderBrush="#454952"
                 BorderThickness="1"
                 Padding="8"
                 Margin="0,16,0,0">
@@ -118,8 +118,8 @@
                 
                 <ListBox Name="RecentBackupsList"
                          Height="150"
-                         Background="#FAFAFA"
-                         BorderBrush="#C0C0C0"
+                         Background="#2C2F38"
+                         BorderBrush="#2C2F38"
                          BorderThickness="1" />
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -130,7 +130,7 @@
                     <TextBlock Name="BackupLocationLabel"
                                Text=""
                                FontSize="10"
-                               Foreground="#606060"
+                               Foreground="#A7ADB8"
                                VerticalAlignment="Center" />
                 </StackPanel>
             </StackPanel>

@@ -606,7 +606,7 @@ public partial class JobDetailView : UserControl
         try
         {
             AttachmentStatusLabel.Text = "";
-            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Foreground = AppColors.Danger;
             
             var topLevel = TopLevel.GetTopLevel(this) as Window;
             if (topLevel == null)
@@ -684,13 +684,13 @@ public partial class JobDetailView : UserControl
             }
 
             AttachmentNoteBox.Text = "";
-            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+            AttachmentStatusLabel.Foreground = AppColors.Success;
             AttachmentStatusLabel.Text = $"Added {added} file{(added == 1 ? "" : "s")}.";
             LoadAttachments();
         }
         catch (Exception ex)
         {
-            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Foreground = AppColors.Danger;
             AttachmentStatusLabel.Text = $"Error adding attachment: {ex.Message}";
         }
     }
@@ -699,13 +699,13 @@ public partial class JobDetailView : UserControl
     {
         if (AttachmentList.SelectedItem is not JobAttachment a)
         {
-            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Foreground = AppColors.Danger;
             AttachmentStatusLabel.Text = "Select an attachment to open.";
             return;
         }
         if (!File.Exists(a.StoredPath))
         {
-            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Foreground = AppColors.Danger;
             AttachmentStatusLabel.Text = "File not found on disk.";
             return;
         }
@@ -715,7 +715,7 @@ public partial class JobDetailView : UserControl
         }
         catch (Exception ex)
         {
-            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Foreground = AppColors.Danger;
             AttachmentStatusLabel.Text = $"Could not open: {ex.Message}";
         }
     }
@@ -724,7 +724,7 @@ public partial class JobDetailView : UserControl
     {
         if (AttachmentList.SelectedItem is not JobAttachment a)
         {
-            AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            AttachmentStatusLabel.Foreground = AppColors.Danger;
             AttachmentStatusLabel.Text = "Select an attachment to remove.";
             return;
         }
@@ -740,7 +740,7 @@ public partial class JobDetailView : UserControl
         // Delete the copied file if it still exists.
         try { if (File.Exists(a.StoredPath)) File.Delete(a.StoredPath); } catch { }
 
-        AttachmentStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        AttachmentStatusLabel.Foreground = AppColors.Success;
         AttachmentStatusLabel.Text = $"Removed: {a.FileName}";
         LoadAttachments();
     }

@@ -13,11 +13,11 @@
         <!-- Bottom action bar -->
         <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
             <Button DockPanel.Dock="Right" Name="AddAllButton" Content="Add All to Job →" IsEnabled="False"/>
-            <TextBlock Name="StatusLabel" VerticalAlignment="Center" Foreground="#800000" TextWrapping="Wrap"/>
+            <TextBlock Name="StatusLabel" VerticalAlignment="Center" Foreground="#FF6B6B" TextWrapping="Wrap"/>
         </DockPanel>
 
         <!-- Add-manufacturer panel -->
-        <Border DockPanel.Dock="Top" BorderBrush="#808080" BorderThickness="1"
+        <Border DockPanel.Dock="Top" BorderBrush="#454952" BorderThickness="1"
                 Padding="8" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="Add Manufacturer to Session:" FontWeight="SemiBold" Margin="0,0,0,4"/>

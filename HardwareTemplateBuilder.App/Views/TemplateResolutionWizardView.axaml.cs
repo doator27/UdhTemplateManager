@@ -202,7 +202,7 @@ public partial class TemplateResolutionWizardView : UserControl
 
     private void AddPendingTemplate()
     {
-        AddTemplateStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+        AddTemplateStatusLabel.Foreground = AppColors.Danger;
         var row = _rows[_currentIndex];
 
         var desc     = TplDescCombo.SelectedItem as DescriptionComboItem;
@@ -262,7 +262,7 @@ public partial class TemplateResolutionWizardView : UserControl
             row.PendingTemplates.Add(new BulkPendingTemplate { Template = saved, IsJobSpecific = isJobSpecific });
 
         RefreshPendingList(row);
-        AddTemplateStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        AddTemplateStatusLabel.Foreground = AppColors.Success;
         AddTemplateStatusLabel.Text = $"Staged: {saved.TemplateNumber}";
 
         TplNumberBox.Text              = "";
@@ -526,14 +526,14 @@ public partial class TemplateResolutionWizardView : UserControl
         if (SearchTplResultsList.SelectedItem is not IndividualTemplate t)
         {
             SearchTplStatusLabel.Text = "Select a template from the list first.";
-            SearchTplStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            SearchTplStatusLabel.Foreground = AppColors.Danger;
             return;
         }
 
         if (row.PendingTemplates.Any(p => p.Template.Id == t.Id))
         {
             SearchTplStatusLabel.Text = $"Already staged: {t.TemplateNumber}";
-            SearchTplStatusLabel.Foreground = Avalonia.Media.Brushes.DarkRed;
+            SearchTplStatusLabel.Foreground = AppColors.Danger;
             return;
         }
 
@@ -541,7 +541,7 @@ public partial class TemplateResolutionWizardView : UserControl
         row.PendingTemplates.Add(new BulkPendingTemplate { Template = t, IsJobSpecific = false });
         RefreshPendingList(row);
         SearchTplStatusLabel.Text = $"Staged: {t.TemplateNumber}";
-        SearchTplStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        SearchTplStatusLabel.Foreground = AppColors.Success;
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

@@ -16,7 +16,7 @@
             <TextBlock Text="Select a job to import hardware from:" Margin="0,0,0,6"/>
             <TextBox Name="FilterBox" Watermark="Search by job number or name…" Margin="0,0,0,6"/>
             <ListBox Name="JobList" Height="200"/>
-            <TextBlock Name="StatusLabel" Foreground="#800000" Margin="0,6,0,0"/>
+            <TextBlock Name="StatusLabel" Foreground="#FF6B6B" Margin="0,6,0,0"/>
         </StackPanel>
     </DockPanel>
 </Window>

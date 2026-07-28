@@ -15,7 +15,7 @@
 
         <!-- Status label -->
         <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Margin="0,6,0,0"
-                   VerticalAlignment="Center" Foreground="#800000" TextWrapping="Wrap"/>
+                   VerticalAlignment="Center" Foreground="#FF6B6B" TextWrapping="Wrap"/>
 
         <!-- Item cards with Add button pinned below the last card -->
         <ScrollViewer>

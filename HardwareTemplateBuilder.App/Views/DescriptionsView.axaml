@@ -24,7 +24,7 @@
                 </TreeView>
             </DockPanel>
             <!-- Right: form -->
-            <Border Grid.Column="1" Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+            <Border Grid.Column="1" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
                 <StackPanel>
                     <TextBlock Text="Name:" Margin="0,0,0,2"/>
                     <TextBox Name="DescriptionBox" Margin="0,0,0,10"/>
@@ -34,7 +34,7 @@
                         <Button Name="AddChildButton"    Content="+ Child"        Margin="0,0,8,0"/>
                         <Button Name="DeleteButton"      Content="Delete"/>
                     </StackPanel>
-                    <TextBlock Name="StatusLabel" Margin="0,10,0,0" Foreground="#800000" TextWrapping="Wrap"/>
+                    <TextBlock Name="StatusLabel" Margin="0,10,0,0" Foreground="#FF6B6B" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
         </Grid>

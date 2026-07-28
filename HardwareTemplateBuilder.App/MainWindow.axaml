@@ -45,14 +45,14 @@
 
         <!-- Status bar at the bottom -->
         <Border DockPanel.Dock="Bottom"
-                Background="#C0C0C0"
-                BorderBrush="#808080"
+                Background="#2C2F38"
+                BorderBrush="#454952"
                 BorderThickness="0,1,0,0"
                 Padding="4,2">
             <TextBlock Name="StatusText" Text="Ready" FontSize="11" />
         </Border>
 
         <!-- Main content area — views are swapped in here -->
-        <ContentControl Name="ContentArea" Background="#C0C0C0" />
+        <ContentControl Name="ContentArea" Background="#2C2F38" />
     </DockPanel>
 </Window>

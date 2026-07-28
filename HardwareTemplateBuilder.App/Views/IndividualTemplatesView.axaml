@@ -16,7 +16,7 @@
             </DockPanel>
             <!-- Right: form -->
             <ScrollViewer Grid.Column="1">
-                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
                     <StackPanel>
                         <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer:" Margin="0,0,8,2"/>
@@ -53,7 +53,7 @@
                             <Button Name="NewButton" Content="New" Margin="0,0,8,0"/>
                             <Button Name="DeleteButton" Content="Delete"/>
                         </StackPanel>
-                        <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                        <TextBlock Name="StatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
                     </StackPanel>
                 </Border>
             </ScrollViewer>

@@ -12,7 +12,7 @@
 
         <!-- Status bar -->
         <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Margin="0,6,0,0"
-                   Foreground="#800000" TextWrapping="Wrap"/>
+                   Foreground="#FF6B6B" TextWrapping="Wrap"/>
 
         <Grid ColumnDefinitions="*,Auto,*">
 
@@ -22,7 +22,7 @@
                 <TextBox DockPanel.Dock="Top" Name="SearchBox" Watermark="Search…" Margin="0,0,0,4"/>
 
                 <!-- Create new -->
-                <Border DockPanel.Dock="Bottom" BorderBrush="#B0B0B0" BorderThickness="1"
+                <Border DockPanel.Dock="Bottom" BorderBrush="#454952" BorderThickness="1"
                         Padding="8" Margin="0,8,0,0">
                     <StackPanel>
                         <TextBlock Text="Create new manufacturer:" FontSize="11" Margin="0,0,0,4"/>
@@ -31,7 +31,7 @@
                             <Button  Grid.Column="1" Name="CreateMfrButton" Content="Add New"
                                      Width="70" Margin="6,0,0,0"/>
                         </Grid>
-                        <TextBlock Name="CreateStatusLabel" FontSize="11" Foreground="#800000" Margin="0,4,0,0"/>
+                        <TextBlock Name="CreateStatusLabel" FontSize="11" Foreground="#FF6B6B" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
 
@@ -48,7 +48,7 @@
             <DockPanel Grid.Column="2">
                 <TextBlock DockPanel.Dock="Top" Text="Selected (for this job):" FontWeight="Bold" Margin="0,0,0,4"/>
                 <TextBlock DockPanel.Dock="Top" Name="SelectedCountLabel" FontSize="11"
-                           Foreground="#404040" Margin="0,0,0,4"/>
+                           Foreground="#A7ADB8" Margin="0,0,0,4"/>
                 <ListBox Name="SelectedMfrList"/>
             </DockPanel>
 

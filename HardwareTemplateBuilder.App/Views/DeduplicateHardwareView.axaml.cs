@@ -4,6 +4,7 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using Microsoft.EntityFrameworkCore;
@@ -11,42 +12,13 @@ using Microsoft.EntityFrameworkCore;
 namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
-/// Maintenance view with two scan-and-merge tools:
-/// (1) hardware items sharing the same Manufacturer + Description + Model Number,
-/// (2) templates sharing the same Online Link or Local File path.
+/// Maintenance view with a scan-and-merge tool for templates that share the same
+/// Online Link or Local File path.
 /// </summary>
 public partial class DeduplicateHardwareView : UserControl
 {
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event Action<string>? NavigationRequested;
-
-    // ── Hardware duplicate models ──────────────────────────────────────────────
-
-    private sealed record ItemInfo(
-        int Id,
-        string ManufacturerName,
-        string DescriptionText,
-        string ModelNumber,
-        int TemplateCount,
-        int JobCount,
-        int Frequency,
-        string? Remarks)
-    {
-        public string DisplayLabel =>
-            $"ID {Id}  │  {TemplateCount} template(s)  │  {JobCount} job link(s)  │  freq {Frequency}"
-            + (string.IsNullOrWhiteSpace(Remarks) ? string.Empty : $"  \u2502  \"{Remarks}\"");
-    }
-
-    private sealed class DupGroup
-    {
-        public string ManufacturerName { get; init; } = string.Empty;
-        public string DescriptionText  { get; init; } = string.Empty;
-        public string ModelNumber      { get; init; } = string.Empty;
-        public List<ItemInfo> Items    { get; init; } = new();
-        public ListBox? KeepListBox    { get; set; }
-    }
-
-    private List<DupGroup> _groups = new();
 
     // ── Template duplicate models ──────────────────────────────────────────────
 
@@ -86,257 +58,9 @@ public partial class DeduplicateHardwareView : UserControl
         InitializeComponent();
         Loaded += (_, _) =>
         {
-            ScanButton.Click              += (_, _) => RunHardwareScan();
-            MergeAllButton.Click          += async (_, _) => await MergeAllHardwareAsync();
             ScanTemplatesButton.Click     += (_, _) => RunTemplateScan();
             MergeAllTemplatesButton.Click += async (_, _) => await MergeAllTemplatesAsync();
         };
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // Hardware scan + merge
-    // ══════════════════════════════════════════════════════════════════════════
-
-    private void RunHardwareScan()
-    {
-        StatusLabel.Text = string.Empty;
-        GroupsPanel.Children.Clear();
-        _groups.Clear();
-
-        using var ctx = DatabaseInitializer.CreateContext();
-
-        var duplicateKeys = ctx.HardwareItems
-            .GroupBy(h => new { h.ManufacturerId, h.DescriptionId, h.ModelNumber })
-            .Where(g => g.Count() > 1)
-            .Select(g => new { g.Key.ManufacturerId, g.Key.DescriptionId, g.Key.ModelNumber })
-            .ToList();
-
-        if (duplicateKeys.Count == 0)
-        {
-            StatusLabel.Text       = "No duplicate hardware items found.";
-            StatusLabel.Foreground = Brushes.DarkGreen;
-            MergeAllButton.IsEnabled = false;
-            return;
-        }
-
-        foreach (var key in duplicateKeys)
-        {
-            var items = ctx.HardwareItems
-                .Include(h => h.Manufacturer)
-                .Include(h => h.Description)
-                .Where(h => h.ManufacturerId == key.ManufacturerId
-                         && h.DescriptionId  == key.DescriptionId
-                         && h.ModelNumber    == key.ModelNumber)
-                .ToList();
-
-            var mfrName  = items[0].Manufacturer?.ManufacturerName ?? "Unknown";
-            var descText = items[0].Description?.DescriptionText   ?? "Unknown";
-
-            var infoList = items.Select(h =>
-            {
-                var tplCount = ctx.HardwareItemTemplates.Count(t => t.HardwareItemId == h.Id);
-                var jobCount = ctx.JobHardware.Count(jh => jh.HardwareItemId == h.Id);
-                return new ItemInfo(h.Id, mfrName, descText, h.ModelNumber,
-                                    tplCount, jobCount, h.Frequency, h.Remarks);
-            }).ToList();
-
-            var group = new DupGroup
-            {
-                ManufacturerName = mfrName,
-                DescriptionText  = descText,
-                ModelNumber      = key.ModelNumber,
-                Items            = infoList
-            };
-
-            _groups.Add(group);
-            GroupsPanel.Children.Add(BuildHardwareGroupPanel(group));
-        }
-
-        StatusLabel.Text       = $"Found {_groups.Count} duplicate hardware group(s). Select which item to keep, then click Merge.";
-        StatusLabel.Foreground = Brushes.DarkRed;
-        MergeAllButton.IsEnabled = true;
-    }
-
-    private Border BuildHardwareGroupPanel(DupGroup group)
-    {
-        var header = new TextBlock
-        {
-            Text = $"{group.ManufacturerName}  —  {group.DescriptionText}  —  {group.ModelNumber}"
-                 + $"  ({group.Items.Count} duplicates)",
-            FontWeight   = FontWeight.Bold,
-            TextWrapping = TextWrapping.Wrap,
-            Margin       = new Avalonia.Thickness(0, 0, 0, 6)
-        };
-
-        var instruction = new TextBlock
-        {
-            Text       = "Select the item to KEEP (all others will be merged into it then deleted):",
-            FontSize   = 11,
-            Foreground = Brushes.DimGray,
-            Margin     = new Avalonia.Thickness(0, 0, 0, 4)
-        };
-
-        var listBox = new ListBox
-        {
-            ItemsSource   = group.Items,
-            SelectionMode = SelectionMode.Single,
-            Margin        = new Avalonia.Thickness(0, 0, 0, 6)
-        };
-        listBox.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayLabel");
-
-        var suggested = group.Items
-            .OrderByDescending(i => i.JobCount)
-            .ThenByDescending(i => i.TemplateCount)
-            .ThenByDescending(i => i.Frequency)
-            .First();
-        listBox.SelectedItem  = suggested;
-        group.KeepListBox     = listBox;
-
-        var mergeBtn = new Button
-        {
-            Content = "Merge This Group",
-            Padding = new Avalonia.Thickness(8, 3)
-        };
-        var groupRef = group;
-        mergeBtn.Click += async (_, _) =>
-        {
-            if (listBox.SelectedItem is not ItemInfo keep)
-            {
-                StatusLabel.Foreground = Brushes.DarkRed;
-                StatusLabel.Text = $"Select an item to keep in group: {groupRef.ModelNumber}";
-                return;
-            }
-            await MergeHardwareGroupAsync(groupRef, keep.Id);
-        };
-
-        var content = new StackPanel { Margin = new Avalonia.Thickness(8, 6) };
-        content.Children.Add(header);
-        content.Children.Add(instruction);
-        content.Children.Add(listBox);
-        content.Children.Add(mergeBtn);
-
-        return new Border
-        {
-            BorderBrush     = Brushes.Gray,
-            BorderThickness = new Avalonia.Thickness(1),
-            CornerRadius    = new Avalonia.CornerRadius(2),
-            Margin          = new Avalonia.Thickness(0, 0, 0, 8),
-            Child           = content
-        };
-    }
-
-    private async System.Threading.Tasks.Task MergeAllHardwareAsync()
-    {
-        var unselected = _groups.Where(g => g.KeepListBox?.SelectedItem == null).ToList();
-        if (unselected.Count > 0)
-        {
-            StatusLabel.Foreground = Brushes.DarkRed;
-            StatusLabel.Text = $"{unselected.Count} hardware group(s) have no item selected.";
-            return;
-        }
-
-        var win = TopLevel.GetTopLevel(this) as Window;
-        if (win == null) return;
-
-        bool confirmed = await Helpers.DialogHelper.ConfirmAsync(win,
-            $"Merge {_groups.Count} hardware duplicate group(s)?\n"
-            + "All job links and templates will be re-pointed to the kept items.",
-            "Confirm Merge All Hardware");
-        if (!confirmed) return;
-
-        int merged = 0;
-        foreach (var group in _groups.ToList())
-        {
-            if (group.KeepListBox?.SelectedItem is ItemInfo keep)
-            {
-                await MergeHardwareGroupAsync(group, keep.Id, suppressConfirm: true);
-                merged++;
-            }
-        }
-
-        StatusLabel.Foreground   = Brushes.DarkGreen;
-        StatusLabel.Text         = $"Merged {merged} hardware group(s). Run Scan again to verify.";
-        MergeAllButton.IsEnabled = false;
-    }
-
-    private async System.Threading.Tasks.Task MergeHardwareGroupAsync(
-        DupGroup group, int keepId, bool suppressConfirm = false)
-    {
-        if (!suppressConfirm)
-        {
-            var win = TopLevel.GetTopLevel(this) as Window;
-            if (win == null) return;
-
-            var discardIds = group.Items.Where(i => i.Id != keepId).Select(i => i.Id).ToList();
-            bool confirmed = await Helpers.DialogHelper.ConfirmAsync(win,
-                $"Keep item ID {keepId}.\n"
-                + $"Discard and delete {discardIds.Count} item(s): IDs {string.Join(", ", discardIds)}.\n\n"
-                + "All job links and templates will be re-pointed to the kept item. Continue?",
-                "Confirm Merge");
-            if (!confirmed) return;
-        }
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        var toDiscard = group.Items.Where(i => i.Id != keepId).ToList();
-
-        foreach (var discard in toDiscard)
-        {
-            // Re-link JobHardware rows.
-            var jobLinks = ctx.JobHardware.Where(jh => jh.HardwareItemId == discard.Id).ToList();
-            foreach (var jh in jobLinks)
-                jh.HardwareItemId = keepId;
-
-            // Re-link HardwareItemTemplates (deduplicating).
-            var keptTemplateIds = ctx.HardwareItemTemplates
-                .Where(t => t.HardwareItemId == keepId)
-                .Select(t => t.IndividualTemplateId)
-                .ToHashSet();
-
-            var discardTemplates = ctx.HardwareItemTemplates
-                .Where(t => t.HardwareItemId == discard.Id)
-                .ToList();
-
-            foreach (var hit in discardTemplates)
-            {
-                if (keptTemplateIds.Contains(hit.IndividualTemplateId))
-                    ctx.HardwareItemTemplates.Remove(hit);
-                else
-                {
-                    hit.HardwareItemId = keepId;
-                    keptTemplateIds.Add(hit.IndividualTemplateId);
-                }
-            }
-
-            ctx.SaveChanges();
-
-            var entity = ctx.HardwareItems.Find(discard.Id);
-            if (entity != null)
-                ctx.HardwareItems.Remove(entity);
-        }
-
-        ctx.SaveChanges();
-
-        _groups.Remove(group);
-        RebuildHardwarePanel();
-
-        if (!suppressConfirm)
-        {
-            StatusLabel.Foreground   = Brushes.DarkGreen;
-            StatusLabel.Text         = $"Merged hardware group '{group.ModelNumber}'. {_groups.Count} group(s) remaining.";
-            MergeAllButton.IsEnabled = _groups.Count > 0;
-        }
-    }
-
-    private void RebuildHardwarePanel()
-    {
-        GroupsPanel.Children.Clear();
-        foreach (var g in _groups)
-        {
-            g.KeepListBox = null;
-            GroupsPanel.Children.Add(BuildHardwareGroupPanel(g));
-        }
-        if (_groups.Count == 0)
-            MergeAllButton.IsEnabled = false;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -429,13 +153,13 @@ public partial class DeduplicateHardwareView : UserControl
         if (_tplGroups.Count == 0)
         {
             StatusLabel.Text       = "No duplicate templates found.";
-            StatusLabel.Foreground = Brushes.DarkGreen;
+            StatusLabel.Foreground = AppColors.Success;
             MergeAllTemplatesButton.IsEnabled = false;
             return;
         }
 
         StatusLabel.Text       = $"Found {_tplGroups.Count} duplicate template group(s). Select which template to keep, then click Merge.";
-        StatusLabel.Foreground = Brushes.DarkRed;
+        StatusLabel.Foreground = AppColors.Danger;
         MergeAllTemplatesButton.IsEnabled = true;
     }
 
@@ -453,7 +177,7 @@ public partial class DeduplicateHardwareView : UserControl
         {
             Text       = $"{group.Items.Count} templates share this link:",
             FontSize   = 11,
-            Foreground = Brushes.DimGray,
+            Foreground = AppColors.Muted,
             Margin     = new Avalonia.Thickness(0, 0, 0, 4)
         };
 
@@ -461,7 +185,7 @@ public partial class DeduplicateHardwareView : UserControl
         {
             Text       = "Select the template to KEEP (others will be merged into it then deleted):",
             FontSize   = 11,
-            Foreground = Brushes.DimGray,
+            Foreground = AppColors.Muted,
             Margin     = new Avalonia.Thickness(0, 0, 0, 4)
         };
 
@@ -490,7 +214,7 @@ public partial class DeduplicateHardwareView : UserControl
         {
             if (listBox.SelectedItem is not TplInfo keep)
             {
-                StatusLabel.Foreground = Brushes.DarkRed;
+                StatusLabel.Foreground = AppColors.Danger;
                 StatusLabel.Text = "Select a template to keep.";
                 return;
             }
@@ -522,7 +246,7 @@ public partial class DeduplicateHardwareView : UserControl
 
         return new Border
         {
-            BorderBrush     = Brushes.Gray,
+            BorderBrush     = AppColors.Muted,
             BorderThickness = new Avalonia.Thickness(1),
             CornerRadius    = new Avalonia.CornerRadius(2),
             Margin          = new Avalonia.Thickness(0, 0, 0, 8),
@@ -535,7 +259,7 @@ public partial class DeduplicateHardwareView : UserControl
         var unselected = _tplGroups.Where(g => g.KeepListBox?.SelectedItem == null).ToList();
         if (unselected.Count > 0)
         {
-            StatusLabel.Foreground = Brushes.DarkRed;
+            StatusLabel.Foreground = AppColors.Danger;
             StatusLabel.Text = $"{unselected.Count} template group(s) have no item selected.";
             return;
         }
@@ -559,7 +283,7 @@ public partial class DeduplicateHardwareView : UserControl
             }
         }
 
-        StatusLabel.Foreground            = Brushes.DarkGreen;
+        StatusLabel.Foreground            = AppColors.Success;
         StatusLabel.Text                  = $"Merged {merged} template group(s). Run Scan again to verify.";
         MergeAllTemplatesButton.IsEnabled = false;
     }
@@ -634,7 +358,7 @@ public partial class DeduplicateHardwareView : UserControl
 
         if (!suppressConfirm)
         {
-            StatusLabel.Foreground            = Brushes.DarkGreen;
+            StatusLabel.Foreground            = AppColors.Success;
             StatusLabel.Text                  = $"Merged template group. {_tplGroups.Count} group(s) remaining.";
             MergeAllTemplatesButton.IsEnabled = _tplGroups.Count > 0;
         }
@@ -690,7 +414,7 @@ public partial class DeduplicateHardwareView : UserControl
         _tplGroups.Remove(group);
         RebuildTemplatePanel();
 
-        StatusLabel.Foreground            = Brushes.DarkGreen;
+        StatusLabel.Foreground            = AppColors.Success;
         StatusLabel.Text                  = $"Marked duplicate as ignored. {_tplGroups.Count} group(s) remaining.";
         MergeAllTemplatesButton.IsEnabled = _tplGroups.Count > 0;
     }

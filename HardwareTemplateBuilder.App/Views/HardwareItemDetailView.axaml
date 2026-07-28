@@ -12,17 +12,17 @@
             <StackPanel>
 
                 <!-- Linked Templates list -->
-                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="Linked Templates" FontWeight="Bold" Margin="0,0,0,6"/>
                         <ListBox Name="LinkedTemplatesList" Height="120" Margin="0,0,0,8"/>
                         <Button Name="RemoveTemplateButton" Content="Remove Selected" HorizontalAlignment="Left"/>
-                        <TextBlock Name="RemoveStatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                        <TextBlock Name="RemoveStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Quick-Add Template (primary) -->
-                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="Add Template" FontWeight="Bold" Margin="0,0,0,8"/>
                         <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
@@ -49,12 +49,12 @@
                             </Grid>
                         </Grid>
                         <Button Name="AddTemplateButton" Content="Add / Link Template" HorizontalAlignment="Left" Margin="0,8,0,0"/>
-                        <TextBlock Name="AddStatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                        <TextBlock Name="AddStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Search and Link (secondary) -->
-                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
                     <StackPanel>
                         <TextBlock Text="Search Existing Templates to Link" FontWeight="Bold" Margin="0,0,0,8"/>
                         <Grid ColumnDefinitions="*,*" Margin="0,0,0,4">
@@ -63,7 +63,7 @@
                         </Grid>
                         <ListBox Name="TemplateSearchList" Height="120" Margin="0,4,0,8"/>
                         <Button Name="LinkButton" Content="Link Selected" HorizontalAlignment="Left"/>
-                        <TextBlock Name="LinkStatusLabel" Margin="0,8,0,0" Foreground="#800000"/>
+                        <TextBlock Name="LinkStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
                     </StackPanel>
                 </Border>
 

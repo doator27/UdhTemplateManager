@@ -1,9 +1,90 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="HardwareTemplateBuilder.App.App"
-             RequestedThemeVariant="Light">
+             RequestedThemeVariant="Dark">
+
+    <!--
+        Dark theme, chosen for long-session eye comfort. RequestedThemeVariant="Dark" makes
+        FluentTheme fall back to its own dark-mode defaults for anything not explicitly
+        overridden below (ScrollBar, ProgressBar, TabItem, etc.); the overrides here re-accent
+        and re-neutral everything the app actually uses on top of that baseline. FluentTheme's
+        control templates read these Color/DynamicResource keys internally, so this alone
+        re-tints standard interactive states app-wide; AppTheme.axaml layers additional Style
+        overrides (Window/UserControl background, typography, rounded corners) on top.
+
+        The accent (#4FA3D1) is deliberately lighter than a light-theme accent would be — dark
+        themes need a brighter accent to stay visible against a dark background; darkening
+        everything else would otherwise make the accent disappear rather than just "less bright".
+    -->
+    <Application.Resources>
+        <Color x:Key="SystemAccentColor">#4FA3D1</Color>
+        <Color x:Key="SystemAccentColorLight1">#6FB6DB</Color>
+        <Color x:Key="SystemAccentColorLight2">#8FC9E5</Color>
+        <Color x:Key="SystemAccentColorLight3">#AFDCEF</Color>
+        <Color x:Key="SystemAccentColorDark1">#3D82AA</Color>
+        <Color x:Key="SystemAccentColorDark2">#2B6183</Color>
+        <Color x:Key="SystemAccentColorDark3">#19405C</Color>
+
+        <!--
+            FluentTheme's Button/TextBox/ComboBox/CheckBox/MenuFlyout control templates read
+            their interaction-state colors from these DynamicResource keys — overriding them
+            here re-skins hover/pressed/focus/disabled visuals app-wide without needing to
+            replace any ControlTemplate.
+        -->
+        <SolidColorBrush x:Key="ButtonBackground">#2C2F38</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#363A44</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonBackgroundPressed">#40444F</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonBackgroundDisabled">#23262D</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonBorderBrush">#454952</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">#565B66</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonBorderBrushPressed">#656B77</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonBorderBrushDisabled">#33363E</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonForeground">#E8EAED</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonForegroundPointerOver">#E8EAED</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonForegroundPressed">#E8EAED</SolidColorBrush>
+        <SolidColorBrush x:Key="ButtonForegroundDisabled">#6B7280</SolidColorBrush>
+
+        <SolidColorBrush x:Key="TextControlBackground">#23262D</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlBackgroundPointerOver">#262930</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlBackgroundFocused">#23262D</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlBackgroundDisabled">#1E2127</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlBorderBrush">#454952</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver">#565B66</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlBorderBrushFocused">#4FA3D1</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlBorderBrushDisabled">#33363E</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlForeground">#E8EAED</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlForegroundPointerOver">#E8EAED</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlForegroundFocused">#E8EAED</SolidColorBrush>
+        <SolidColorBrush x:Key="TextControlForegroundDisabled">#6B7280</SolidColorBrush>
+
+        <SolidColorBrush x:Key="ComboBoxBackground">#23262D</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxBackgroundUnfocused">#23262D</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver">#2C2F38</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxBackgroundPressed">#363A44</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxBackgroundDisabled">#1E2127</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxBorderBrush">#454952</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">#565B66</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxBorderBrushPressed">#4FA3D1</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled">#33363E</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxForeground">#E8EAED</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxForegroundDisabled">#6B7280</SolidColorBrush>
+        <SolidColorBrush x:Key="ComboBoxDropDownBackground">#23262D</SolidColorBrush>
+
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBackground">#23262D</SolidColorBrush>
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush">#33363E</SolidColorBrush>
+        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver">#2C2F38</SolidColorBrush>
+        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed">#363A44</SolidColorBrush>
+        <SolidColorBrush x:Key="MenuFlyoutItemForeground">#E8EAED</SolidColorBrush>
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver">#E8EAED</SolidColorBrush>
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed">#E8EAED</SolidColorBrush>
+
+        <!-- Rounds corners on Button/TextBox/ComboBox/CheckBox/etc. app-wide from one place. -->
+        <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
+        <CornerRadius x:Key="OverlayCornerRadius">10</CornerRadius>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
-        <StyleInclude Source="avares://HardwareTemplateBuilder.App/Styles/Win98Theme.axaml" />
+        <StyleInclude Source="avares://HardwareTemplateBuilder.App/Styles/AppTheme.axaml" />
     </Application.Styles>
 </Application>

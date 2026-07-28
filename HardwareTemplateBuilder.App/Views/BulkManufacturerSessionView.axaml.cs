@@ -95,7 +95,7 @@ public partial class BulkManufacturerSessionView : UserControl
             SessionPanel.Children.Add(new TextBlock
             {
                 Text = "No manufacturers added yet. Use the panel above to start.",
-                Foreground = Brushes.Gray,
+                Foreground = AppColors.Muted,
                 Margin = new Avalonia.Thickness(4)
             });
             AddAllButton.IsEnabled = false;
@@ -121,7 +121,7 @@ public partial class BulkManufacturerSessionView : UserControl
                 Text = itemCount == 0
                     ? "No items yet"
                     : $"{itemCount} item{(itemCount == 1 ? "" : "s")}, {calloutCount} line{(calloutCount == 1 ? "" : "s")}",
-                Foreground = itemCount == 0 ? Brushes.Gray : Brushes.DarkGreen,
+                Foreground = itemCount == 0 ? AppColors.Muted : AppColors.Success,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Avalonia.Thickness(12, 0)
             };
@@ -140,7 +140,7 @@ public partial class BulkManufacturerSessionView : UserControl
             var removeBtn = new Button
             {
                 Content = "✕",
-                Foreground = Brushes.DarkRed,
+                Foreground = AppColors.Danger,
                 Width = 28,
                 HorizontalContentAlignment = HorizontalAlignment.Center
             };
@@ -164,7 +164,7 @@ public partial class BulkManufacturerSessionView : UserControl
 
             var border = new Border
             {
-                BorderBrush = Brushes.Gray,
+                BorderBrush = AppColors.Muted,
                 BorderThickness = new Avalonia.Thickness(1),
                 CornerRadius = new Avalonia.CornerRadius(2),
                 Padding = new Avalonia.Thickness(8, 6),

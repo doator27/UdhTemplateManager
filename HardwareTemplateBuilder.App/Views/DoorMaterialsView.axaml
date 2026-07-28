@@ -6,7 +6,7 @@
             <TextBlock Text="Door Materials" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
         <TextBlock DockPanel.Dock="Top" Text="Door materials are fixed: Hollow Metal and Wood. These records are seeded automatically."
-                   Foreground="#404040" Margin="0,0,0,12" TextWrapping="Wrap" />
+                   Foreground="#A7ADB8" Margin="0,0,0,12" TextWrapping="Wrap" />
         <ListBox Name="RecordList" MaxHeight="120" />
     </DockPanel>
 </UserControl>

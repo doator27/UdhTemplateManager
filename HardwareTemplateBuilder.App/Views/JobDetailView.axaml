@@ -7,7 +7,7 @@
             <Button DockPanel.Dock="Left" Name="BackButton"         Content="← Back to Jobs"  Margin="0,0,8,0"/>
             <Button DockPanel.Dock="Left" Name="MarkCompleteButton" Content="✓ Mark Complete"  Margin="0,0,6,0"/>
             <Button DockPanel.Dock="Left" Name="ReactivateButton"   Content="↺ Reactivate"    IsVisible="False" Margin="0,0,6,0"/>
-            <TextBlock Name="JobStatusLabel" DockPanel.Dock="Left"  VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#606060" FontStyle="Italic"/>
+            <TextBlock Name="JobStatusLabel" DockPanel.Dock="Left"  VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#A7ADB8" FontStyle="Italic"/>
             <TextBlock Name="JobTitleLabel" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
 
@@ -15,7 +15,7 @@
             <StackPanel>
 
                 <!-- Job Attachments sub-panel -->
-                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="Job Attachments" FontWeight="Bold" Margin="0,0,0,6"/>
                         <StackPanel Name="AttachmentsBody">
@@ -30,13 +30,13 @@
                                 <Button Name="OpenAttachmentButton"   Content="Open"/>
                                 <Button Name="RemoveAttachmentButton" Content="Remove"/>
                             </StackPanel>
-                            <TextBlock Name="AttachmentStatusLabel" Foreground="#800000" TextWrapping="Wrap"/>
+                            <TextBlock Name="AttachmentStatusLabel" Foreground="#FF6B6B" TextWrapping="Wrap"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <!-- Linked Hardware Items sub-panel -->
-                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                     <StackPanel>
                         <StackPanel Margin="0,0,0,6">
                             <TextBlock Text="Linked Hardware Items" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,0,6"/>
@@ -50,13 +50,13 @@
 
                             <ListBox Name="LinkedHardwareList" Height="180" Margin="0,0,0,8"/>
                             <Button Name="RemoveHardwareButton" Content="Remove from Job" HorizontalAlignment="Left" Margin="0,0,0,6"/>
-                            <TextBlock Name="LinkStatusLabel" Foreground="#800000"/>
+                            <TextBlock Name="LinkStatusLabel" Foreground="#FF6B6B"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <!-- PDF Package Generation sub-panel -->
-                <Border Classes="panel" BorderBrush="#808080" BorderThickness="1" Padding="10">
+                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
                     <StackPanel>
                         <TextBlock Text="PDF Package Generation" FontWeight="Bold" Margin="0,0,0,6"/>
 
@@ -72,7 +72,7 @@
                         <ProgressBar Name="PackageProgress"
                                      IsIndeterminate="True" IsVisible="False"
                                      Height="14" Margin="0,0,0,4"/>
-                        <TextBlock Name="PackageStatusLabel" Foreground="#800000" TextWrapping="Wrap"/>
+                        <TextBlock Name="PackageStatusLabel" Foreground="#FF6B6B" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
 

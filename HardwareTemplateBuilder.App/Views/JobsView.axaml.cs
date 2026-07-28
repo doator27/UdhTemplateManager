@@ -72,8 +72,8 @@ public partial class JobsView : UserControl
                 Text     = row?.Display ?? "",
                 Padding  = new Avalonia.Thickness(2),
                 Foreground = (row?.IsOverdue == true)
-                    ? Avalonia.Media.Brushes.DarkRed
-                    : Avalonia.Media.Brushes.Black,
+                    ? AppColors.Danger
+                    : AppColors.Primary,
             };
             return tb;
         }, supportsRecycling: false);
@@ -262,8 +262,8 @@ public partial class JobsView : UserControl
             ? $"Saved {j.NotesUpdatedAt.Value.ToLocalTime():yyyy-MM-dd HH:mm}"
             : "";
         NotesDateLabel.Foreground = (row.IsOverdue)
-            ? Avalonia.Media.Brushes.DarkRed
-            : Avalonia.Media.Brushes.Gray;
+            ? AppColors.Danger
+            : AppColors.Muted;
 
     }
 
@@ -346,8 +346,8 @@ public partial class JobsView : UserControl
 
         var savedAt = job.NotesUpdatedAt?.ToLocalTime();
         NotesDateLabel.Text      = savedAt.HasValue ? $"Saved {savedAt.Value:yyyy-MM-dd HH:mm}" : "";
-        NotesDateLabel.Foreground = Avalonia.Media.Brushes.Gray;
-        NotesStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        NotesDateLabel.Foreground = AppColors.Muted;
+        NotesStatusLabel.Foreground = AppColors.Success;
         NotesStatusLabel.Text    = "Saved.";
         LoadJobList();
     }
@@ -365,7 +365,7 @@ public partial class JobsView : UserControl
 
         NotesBox.Text             = "";
         NotesDateLabel.Text       = "";
-        NotesStatusLabel.Foreground = Avalonia.Media.Brushes.DarkGreen;
+        NotesStatusLabel.Foreground = AppColors.Success;
         NotesStatusLabel.Text     = "Note cleared.";
         LoadJobList();
     }

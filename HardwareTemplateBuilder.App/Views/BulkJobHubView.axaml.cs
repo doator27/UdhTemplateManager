@@ -4,6 +4,7 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
@@ -74,7 +75,7 @@ public partial class BulkJobHubView : UserControl
             var countLabel = new TextBlock
             {
                 Text = itemCount == 0 ? "No items yet" : $"{itemCount} item{(itemCount == 1 ? "" : "s")}",
-                Foreground = itemCount == 0 ? Brushes.DarkOrange : Brushes.DarkGreen,
+                Foreground = itemCount == 0 ? AppColors.Warning : AppColors.Success,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Avalonia.Thickness(8, 0)
             };
@@ -101,7 +102,7 @@ public partial class BulkJobHubView : UserControl
 
             var card = new Border
             {
-                BorderBrush     = Brushes.Gray,
+                BorderBrush     = AppColors.Muted,
                 BorderThickness = new Avalonia.Thickness(1),
                 Padding         = new Avalonia.Thickness(10, 8),
                 Child           = row
