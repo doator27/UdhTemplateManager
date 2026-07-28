@@ -40,6 +40,8 @@
 
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                 <CheckBox Name="IncludeInactiveCheck" Content="Include inactive jobs" Margin="0,0,16,0"/>
+                <TextBlock Text="User:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox Name="CreatorFilterCombo" PlaceholderText="(Any)" MinWidth="140" Margin="0,0,16,0"/>
                 <Button Name="SelectAllButton" Content="Select All" Margin="0,0,4,0"/>
                 <Button Name="SelectNoneButton" Content="Select None" Margin="0,0,16,0"/>
                 <TextBlock Name="SelectedCountLabel" VerticalAlignment="Center" Foreground="#404040"/>

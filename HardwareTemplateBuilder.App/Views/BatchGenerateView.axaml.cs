@@ -7,9 +7,11 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Threading;
+using HardwareTemplateBuilder.App;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
+using HardwareTemplateBuilder.Core.Repositories;
 using HardwareTemplateBuilder.Core.Services.Pdf;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,6 +50,7 @@ public partial class BatchGenerateView : UserControl
     private readonly HashSet<int> _selectedJobIds = new();
 
     private List<BatchJobRow> _currentRows = new();
+    private List<UserProfile> _userProfiles = new();
     private CancellationTokenSource? _batchCts;
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
@@ -81,24 +84,51 @@ public partial class BatchGenerateView : UserControl
                                        // checked state can desync from the underlying row on scroll.
 
         IncludeInactiveCheck.IsCheckedChanged += (_, _) => LoadJobList();
+        CreatorFilterCombo.SelectionChanged += (_, _) => LoadJobList();
         SelectAllButton.Click += (_, _) => SetSelection(_currentRows.Select(r => r.Job.Id), selected: true);
         SelectNoneButton.Click += (_, _) => SetSelection(_currentRows.Select(r => r.Job.Id), selected: false);
         StartButton.Click += async (_, _) => await OnStartBatchAsync();
         CancelButton.Click += (_, _) => _batchCts?.Cancel();
 
+        LoadUserProfiles();
         LoadJobList();
     }
 
     // ---------- Job list ----------
 
+    /// <summary>
+    /// Populates the creator filter combo: "(Any)" sentinel at the top, then each user profile
+    /// by name, defaulting the selection to the active session user.
+    /// </summary>
+    private void LoadUserProfiles()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        _userProfiles = new UserProfileRepository(ctx).GetAll().OrderBy(p => p.UserName).ToList();
+
+        var items = new List<UserProfile?> { null }.Concat(_userProfiles.Cast<UserProfile?>()).ToList();
+        CreatorFilterCombo.ItemsSource = items;
+        CreatorFilterCombo.DisplayMemberBinding = new Avalonia.Data.Binding("UserName");
+
+        var activeId = SessionService.ActiveUserProfile?.Id;
+        int selectIndex = 0;
+        if (activeId.HasValue)
+        {
+            var idx = items.FindIndex(p => p?.Id == activeId.Value);
+            if (idx >= 0) selectIndex = idx;
+        }
+        CreatorFilterCombo.SelectedIndex = selectIndex;
+    }
+
     private void LoadJobList()
     {
         var includeInactive = IncludeInactiveCheck.IsChecked == true;
+        var creatorFilter = CreatorFilterCombo.SelectedItem as UserProfile;
 
         using var context = DatabaseInitializer.CreateContext();
         var jobs = context.Jobs
             .Include(j => j.Snapshots)
             .Where(j => includeInactive || !j.IsComplete)
+            .Where(j => creatorFilter == null || j.UserProfileId == creatorFilter.Id)
             .ToList();
 
         _currentRows = jobs
@@ -244,6 +274,7 @@ public partial class BatchGenerateView : UserControl
         CancelButton.IsEnabled = running;
         ProgressPanel.IsVisible = running;
         IncludeInactiveCheck.IsEnabled = !running;
+        CreatorFilterCombo.IsEnabled = !running;
         SelectAllButton.IsEnabled = !running;
         SelectNoneButton.IsEnabled = !running;
         JobList.IsEnabled = !running;
