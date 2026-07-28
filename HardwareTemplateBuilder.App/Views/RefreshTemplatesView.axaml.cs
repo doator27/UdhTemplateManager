@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -18,6 +20,7 @@ namespace HardwareTemplateBuilder.App.Views;
 public partial class RefreshTemplatesView : UserControl
 {
     private CancellationTokenSource? _cts;
+    private string? _reportPath;
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event System.Action<string>? NavigationRequested;
@@ -33,6 +36,7 @@ public partial class RefreshTemplatesView : UserControl
     {
         StartButton.Click  += async (_, _) => await OnStartRefreshAsync();
         CancelButton.Click += (_, _) => _cts?.Cancel();
+        OpenReportButton.Click += (_, _) => OpenReport();
     }
 
     // ---------- Refresh ----------
@@ -103,6 +107,11 @@ public partial class RefreshTemplatesView : UserControl
         }
 
         SetRunningState(running: false);
+
+        _reportPath = result.Failures.Count > 0
+            ? WriteFailureReport(saveLocation, result)
+            : null;
+
         ShowResults(result);
     }
 
@@ -137,6 +146,9 @@ public partial class RefreshTemplatesView : UserControl
                 .ToList();
             FailuresPanel.IsVisible   = true;
             NoFailuresLabel.IsVisible = false;
+
+            ReportPathLabel.Text    = _reportPath != null ? $"Report saved to: {_reportPath}" : string.Empty;
+            OpenReportButton.IsVisible = _reportPath != null;
         }
         else
         {
@@ -148,5 +160,56 @@ public partial class RefreshTemplatesView : UserControl
         StatusLabel.Text = result.Failures.Count == 0
             ? "Refresh complete."
             : $"Refresh complete with {result.Failures.Count} failure(s). See list below.";
+    }
+
+    /// <summary>
+    /// Writes a timestamped text report listing every failed template — ID, name, online link,
+    /// and the full error — to <paramref name="saveLocation"/> so problem templates can be
+    /// reviewed and fixed outside the app. Best-effort: a write failure is reported in
+    /// <see cref="StatusLabel"/> rather than throwing, since the refresh itself already succeeded.
+    /// </summary>
+    private string? WriteFailureReport(string saveLocation, RefreshResult result)
+    {
+        try
+        {
+            var reportPath = Path.Combine(saveLocation,
+                $"TemplateRefreshFailures_{DateTime.Now:yyyy-MM-dd_HHmmss}.txt");
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"Template Refresh Report — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"{result.SuccessCount} of {result.TotalAttempted} template(s) updated successfully.");
+            sb.AppendLine($"{result.Failures.Count} failure(s):");
+            sb.AppendLine();
+
+            foreach (var f in result.Failures)
+            {
+                sb.AppendLine($"[ID {f.TemplateId}] {f.TemplateName}");
+                sb.AppendLine($"  Online Link: {f.OnlineLink}");
+                sb.AppendLine($"  Error: {f.ErrorMessage}");
+                sb.AppendLine();
+            }
+
+            Directory.CreateDirectory(saveLocation);
+            File.WriteAllText(reportPath, sb.ToString());
+            return reportPath;
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = $"Refresh complete, but the failure report could not be written: {ex.Message}";
+            return null;
+        }
+    }
+
+    private void OpenReport()
+    {
+        if (_reportPath == null) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo(_reportPath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = $"Could not open the report: {ex.Message}";
+        }
     }
 }

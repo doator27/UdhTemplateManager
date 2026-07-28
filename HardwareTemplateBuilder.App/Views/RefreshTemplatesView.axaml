@@ -52,7 +52,12 @@
                     <TextBlock Name="FailuresLabel"
                                Foreground="#FF6B6B" FontWeight="Bold"
                                Margin="0,0,0,4"/>
-                    <ListBox Name="FailuresList" MaxHeight="300"/>
+                    <ListBox Name="FailuresList" MaxHeight="300" Margin="0,0,0,8"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Name="ReportPathLabel" Foreground="#A7ADB8" TextWrapping="Wrap"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <Button Name="OpenReportButton" Content="Open Report" IsVisible="False"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <TextBlock Name="NoFailuresLabel"

@@ -39,6 +39,9 @@ public class RefreshFailure
 
     /// <summary>Gets the error message returned by the failed download attempt.</summary>
     public string ErrorMessage { get; init; } = string.Empty;
+
+    /// <summary>Gets the online link that was attempted, for inclusion in failure reports.</summary>
+    public string OnlineLink { get; init; } = string.Empty;
 }
 
 /// <summary>
@@ -152,7 +155,8 @@ public class TemplateRefreshService
                 {
                     TemplateId   = template.Id,
                     TemplateName = $"{template.Manufacturer?.ManufacturerName} {template.TemplateNumber}",
-                    ErrorMessage = ex.Message
+                    ErrorMessage = ex.Message,
+                    OnlineLink   = template.OnlineLink ?? string.Empty
                 });
             }
         }
@@ -241,29 +245,65 @@ public class TemplateRefreshService
         return new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
     }
 
+    /// <summary>Maximum number of retry attempts for a transient download failure (network-level, not content-mismatch).</summary>
+    private const int MaxDownloadRetries = 2;
+
+    /// <summary>Base delay between retries; doubles each attempt (500ms, 1000ms, ...).</summary>
+    private const int RetryBaseDelayMs = 500;
+
     /// <summary>
-    /// Downloads the file at <paramref name="url"/> to <paramref name="destPath"/>.
-    /// Validates that the response is a PDF by checking the Content-Type header and the
-    /// <c>%PDF</c> magic bytes; throws <see cref="InvalidOperationException"/> otherwise.
+    /// Downloads the file at <paramref name="url"/> to <paramref name="destPath"/>, retrying a
+    /// handful of times on transient network failures (connection resets, timeouts). Does not
+    /// retry when the server responds but with the wrong content — that's a deterministic
+    /// mismatch a retry cannot fix.
     /// </summary>
     private async Task DownloadAsync(string url, string destPath, CancellationToken ct)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                await DownloadOnceAsync(url, destPath, ct);
+                return;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw; // Caller-requested cancellation — never retry.
+            }
+            catch (Exception ex) when (attempt < MaxDownloadRetries && IsTransientDownloadError(ex))
+            {
+                await Task.Delay(RetryBaseDelayMs * (int)Math.Pow(2, attempt), ct);
+            }
+        }
+    }
+
+    /// <summary>
+    /// True for network-level failures worth retrying (the request may simply not have reached
+    /// the server). False for <see cref="InvalidOperationException"/> content-mismatch failures,
+    /// where the server responded successfully but with the wrong content — retrying would just
+    /// get the same wrong response again.
+    /// </summary>
+    private static bool IsTransientDownloadError(Exception ex) =>
+        ex is HttpRequestException or IOException or TaskCanceledException;
+
+    /// <summary>
+    /// Makes a single download attempt. Validates that the response is a PDF by checking the
+    /// Content-Type header and the <c>%PDF</c> magic bytes; throws
+    /// <see cref="InvalidOperationException"/> otherwise.
+    /// </summary>
+    private async Task DownloadOnceAsync(string url, string destPath, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
 
         request.Headers.TryAddWithoutValidation("User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
 
-        // Some APIs (e.g. abhmfg.com) use Origin/Referer to resolve tenant context.
-        // Strip one subdomain level (api.company.com → company.com) to match the frontend origin.
-        var uri = new Uri(url);
-        var hostParts = uri.Host.Split('.');
-        var originHost = hostParts.Length >= 3
-            ? string.Join('.', hostParts.Skip(1))
-            : uri.Host;
-        var origin = $"{uri.Scheme}://{originHost}";
-        request.Headers.TryAddWithoutValidation("Origin", origin);
-        request.Headers.TryAddWithoutValidation("Referer", origin + "/");
-
+        // Deliberately no Origin/Referer headers: previously added unconditionally for every
+        // host on the theory that some APIs (e.g. abhmfg.com) need them to resolve tenant
+        // context, but confirmed that host now works fine without them, while at least one
+        // real source (an S3 bucket with referrer-based hotlink protection) actively returns
+        // 403 Forbidden when a non-matching Referer is present. Omitting them is safe for every
+        // host currently in use and avoids that failure mode.
         using var response = await _httpClient.SendAsync(
             request, HttpCompletionOption.ResponseHeadersRead, ct);
 
@@ -275,6 +315,17 @@ public class TemplateRefreshService
         {
             var bodyPreview = System.Text.Encoding.UTF8.GetString(bytes, 0, Math.Min(bytes.Length, 300))
                                      .Replace("\r", "").Replace("\n", " ");
+
+            if (contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"The server returned a webpage instead of a PDF (HTTP {(int)response.StatusCode} " +
+                    $"{response.ReasonPhrase}, Content-Type: '{contentType}'). The manufacturer's " +
+                    $"website has likely reorganized its files and this link is now outdated — " +
+                    $"the correct download URL will need to be found and updated manually. " +
+                    $"Page preview: \"{bodyPreview}\"");
+            }
+
             throw new InvalidOperationException(
                 $"Download failed: HTTP {(int)response.StatusCode} {response.ReasonPhrase}, " +
                 $"Content-Type: '{contentType}', " +

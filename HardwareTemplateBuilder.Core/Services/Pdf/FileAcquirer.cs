@@ -146,18 +146,12 @@ public class FileAcquirer
         request.Headers.TryAddWithoutValidation("User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
 
-        // Some APIs (e.g. abhmfg.com) use Origin/Referer to resolve tenant context.
-        // When the host has a subdomain (api.company.com), the frontend domain (company.com)
-        // is what identifies the tenant, so strip one subdomain level in that case.
-        var uri = new System.Uri(url);
-        var hostParts = uri.Host.Split('.');
-        var originHost = hostParts.Length >= 3
-            ? string.Join('.', hostParts.Skip(1))
-            : uri.Host;
-        var origin = $"{uri.Scheme}://{originHost}";
-        request.Headers.TryAddWithoutValidation("Origin", origin);
-        request.Headers.TryAddWithoutValidation("Referer", origin + "/");
-
+        // Deliberately no Origin/Referer headers: previously added unconditionally for every
+        // host on the theory that some APIs (e.g. abhmfg.com) need them to resolve tenant
+        // context, but confirmed that host now works fine without them, while at least one
+        // real source (an S3 bucket with referrer-based hotlink protection) actively returns
+        // 403 Forbidden when a non-matching Referer is present. Omitting them is safe for every
+        // host currently in use and avoids that failure mode.
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
 
         var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
