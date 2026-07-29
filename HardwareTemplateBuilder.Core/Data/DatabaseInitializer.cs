@@ -97,28 +97,14 @@ public static class DatabaseInitializer
         if (conn.State != System.Data.ConnectionState.Open)
             conn.Open();
 
-        // Patch: Force the DELETE (rollback) journal mode. The database may be hosted on a
-        // shared network drive for multi-machine access (see DatabaseLocationService), and
-        // WAL mode is unsafe there — it depends on a shared-memory index file for reader/writer
-        // coordination that network filesystems (SMB/NFS) do not support correctly, which can
-        // silently revert recently-written values. DELETE mode works correctly over a network
-        // share; busy_timeout + RetryHelper absorb the added lock contention.
-        // Idempotent — this re-asserts the mode on every startup, which also self-heals any
-        // database that was previously left in WAL mode.
-        using (var journalCmd = conn.CreateCommand())
-        {
-            journalCmd.CommandText = "PRAGMA journal_mode=DELETE;";
-            journalCmd.ExecuteNonQuery();
-        }
-
-        // Patch: 5-second busy timeout so concurrent writers queue rather than fail immediately.
+        // Patch: 5-second busy timeout so operations queue rather than fail immediately.
         using (var busyCmd = conn.CreateCommand())
         {
             busyCmd.CommandText = "PRAGMA busy_timeout=5000;";
             busyCmd.ExecuteNonQuery();
         }
 
-        // Patch: CalloutRemarks on JobHardware (AddCalloutRemarks migration)
+        // Patch: CalloutRemarks
         if (!ColumnExists(conn, "JobHardware", "CalloutRemarks"))
         {
             using var cmd = conn.CreateCommand();
@@ -178,7 +164,9 @@ public static class DatabaseInitializer
         }
 
         // Patch: SMTP / alert email settings (Phase 24).
-        // Uses INSERT OR IGNORE so the operation is safe on both new and existing databases.
+        // Read first: only acquire a write lock when rows are actually missing.
+        // On a fully-initialised database this reduces 6 write-lock acquisitions to zero,
+        // which eliminates the main source of startup lock contention on shared network drives.
         var smtpDefaults = new (string Key, string Value)[]
         {
             ("SmtpHost",       ""),
@@ -188,11 +176,24 @@ public static class DatabaseInitializer
             ("AlertEmailTo",   ""),
             ("AlertEmailFrom", "")
         };
-        foreach (var (key, value) in smtpDefaults)
+        using (var countCmd = conn.CreateCommand())
         {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"INSERT OR IGNORE INTO \"AppSettings\" (\"Key\", \"Value\") VALUES ('{key}', '{value}')";
-            cmd.ExecuteNonQuery();
+            countCmd.CommandText =
+                "SELECT COUNT(*) FROM \"AppSettings\" WHERE \"Key\" IN " +
+                "('SmtpHost','SmtpPort','SmtpUsername','SmtpPassword','AlertEmailTo','AlertEmailFrom')";
+            var existing = (long)(countCmd.ExecuteScalar() ?? 0L);
+            if (existing < smtpDefaults.Length)
+            {
+                using var tx = conn.BeginTransaction();
+                foreach (var (key, value) in smtpDefaults)
+                {
+                    using var cmd = conn.CreateCommand();
+                    cmd.Transaction = tx;
+                    cmd.CommandText = $"INSERT OR IGNORE INTO \"AppSettings\" (\"Key\", \"Value\") VALUES ('{key}', '{value}')";
+                    cmd.ExecuteNonQuery();
+                }
+                tx.Commit();
+            }
         }
 
         // Patch: IgnoredTemplateDuplicates table (migration 20260420120000)

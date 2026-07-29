@@ -108,6 +108,7 @@ public static class DialogHelper
                         TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                         FontFamily = new Avalonia.Media.FontFamily("Courier New, Consolas, monospace"),
                         FontSize = 12,
+                        Foreground = Avalonia.Media.Brushes.Black,
                     }
                 }
             }
