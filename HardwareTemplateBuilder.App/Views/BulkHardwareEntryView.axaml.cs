@@ -294,7 +294,8 @@ public partial class BulkHardwareEntryView : UserControl
         var compactRow = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("200,150,*,70"),
-            Cursor = new Cursor(StandardCursorType.Hand)
+            Cursor = new Cursor(StandardCursorType.Hand),
+            Background = Brushes.Transparent
         };
         Grid.SetColumn(compactDescText,   0); compactRow.Children.Add(compactDescText);
         Grid.SetColumn(compactModelText,  1); compactRow.Children.Add(compactModelText);
