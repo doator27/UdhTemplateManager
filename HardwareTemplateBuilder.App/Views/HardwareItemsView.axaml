@@ -41,7 +41,7 @@
                             <ComboBox Grid.Row="1" Grid.Column="0" Name="ManufacturerCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="Description:" Margin="0,0,0,2"/>
                             <DockPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
-                                <Button DockPanel.Dock="Right" Name="PickDescriptionButton" Content="Pick" Width="46" Margin="4,0,0,0"/>
+                                <Button DockPanel.Dock="Right" Name="PickDescriptionButton" Content="Pick" Width="46" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                 <Border BorderBrush="#454952" BorderThickness="1" Padding="5,3">
                                     <TextBlock Name="DescriptionLabel" Text="(none)" VerticalAlignment="Center" TextWrapping="Wrap"/>
                                 </Border>

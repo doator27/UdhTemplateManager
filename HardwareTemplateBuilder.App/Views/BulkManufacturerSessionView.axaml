@@ -12,8 +12,8 @@
 
         <!-- Bottom action bar -->
         <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-            <Button DockPanel.Dock="Right" Name="AddAllButton" Content="Add All to Job →" IsEnabled="False"/>
-            <Button DockPanel.Dock="Right" Name="ItemsToFixButton" Content="Items to Fix" IsEnabled="False" Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Right" Name="AddAllButton" Content="Add All to Job →" IsEnabled="False" VerticalAlignment="Center"/>
+            <Button DockPanel.Dock="Right" Name="ItemsToFixButton" Content="Items to Fix" IsEnabled="False" Margin="0,0,8,0" VerticalAlignment="Center"/>
             <TextBlock Name="StatusLabel" VerticalAlignment="Center" Foreground="#FF6B6B" TextWrapping="Wrap"/>
         </DockPanel>
 

@@ -82,8 +82,7 @@ public partial class BulkJobHubView : UserControl
 
             var editBtn = new Button
             {
-                Content = "Edit Items →",
-                Padding = new Avalonia.Thickness(8, 4)
+                Content = "Edit Items →"
             };
             var capturedId = mfr.Id;
             editBtn.Click += (_, _) =>

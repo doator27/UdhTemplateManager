@@ -9,9 +9,9 @@
 
         <!-- Navigation footer -->
         <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-            <Button DockPanel.Dock="Left"  Name="PrevButton"   Content="← Previous" Margin="0,0,8,0"/>
-            <Button DockPanel.Dock="Right" Name="FinishButton" Content="Finish"      IsVisible="False"/>
-            <Button DockPanel.Dock="Right" Name="NextButton"   Content="Next →"      Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Left"  Name="PrevButton"   Content="← Previous" Margin="0,0,8,0" VerticalAlignment="Center"/>
+            <Button DockPanel.Dock="Right" Name="FinishButton" Content="Finish"      IsVisible="False" VerticalAlignment="Center"/>
+            <Button DockPanel.Dock="Right" Name="NextButton"   Content="Next →"      Margin="0,0,8,0" VerticalAlignment="Center"/>
             <TextBlock Name="WizardStatusLabel" VerticalAlignment="Center" Foreground="#FF6B6B" TextWrapping="Wrap"/>
         </DockPanel>
 

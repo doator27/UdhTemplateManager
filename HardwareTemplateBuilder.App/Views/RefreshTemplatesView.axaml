@@ -56,7 +56,7 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Name="ReportPathLabel" Foreground="#A7ADB8" TextWrapping="Wrap"
                                    VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <Button Name="OpenReportButton" Content="Open Report" IsVisible="False"/>
+                        <Button Name="OpenReportButton" Content="Open Report" IsVisible="False" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
 

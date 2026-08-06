@@ -15,7 +15,7 @@
                 <ComboBox DockPanel.Dock="Top" Name="CreatorFilterCombo" HorizontalAlignment="Stretch"
                           PlaceholderText="(Any)" Margin="0,0,0,4"/>
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="4" Margin="0,0,0,6">
-                    <Button Name="SortByCreatorButton" Content="Sort: Creator ↑" FontSize="11" Padding="6,2"/>
+                    <Button Name="SortByCreatorButton" Content="Sort: Creator ↑"/>
                 </StackPanel>
                 <ListBox Name="JobList" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
             </DockPanel>

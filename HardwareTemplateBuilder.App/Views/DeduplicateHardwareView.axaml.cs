@@ -206,8 +206,7 @@ public partial class DeduplicateHardwareView : UserControl
 
         var mergeBtn = new Button
         {
-            Content = "Merge This Group",
-            Padding = new Avalonia.Thickness(8, 3)
+            Content = "Merge This Group"
         };
         var groupRef = group;
         mergeBtn.Click += async (_, _) =>
@@ -224,7 +223,6 @@ public partial class DeduplicateHardwareView : UserControl
         var keepBothBtn = new Button
         {
             Content = "Keep Both (Ignore)",
-            Padding = new Avalonia.Thickness(8, 3),
             Margin  = new Avalonia.Thickness(8, 0, 0, 0)
         };
         keepBothBtn.Click += async (_, _) => await KeepBothTemplatesAsync(groupRef);
