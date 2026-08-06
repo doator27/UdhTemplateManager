@@ -18,9 +18,7 @@
                 <Separator />
                 <MenuItem Header="_Exit" Name="MenuFileExit" />
             </MenuItem>
-            <MenuItem Header="_Jobs">
-                <MenuItem Header="_All Jobs" Name="MenuJobs" />
-            </MenuItem>
+            <MenuItem Header="_Jobs" Name="MenuJobs" />
             <MenuItem Header="_Template Lookup" Name="MenuTemplateLookup" />
             <MenuItem Header="_Maintenance">
                 <MenuItem Header="_Batch Generate..."        Name="MenuBatchGenerate" />
