@@ -56,7 +56,7 @@ public partial class HardwareItemsView : UserControl
         DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
         DescCombo.SelectedIndex = 0;
 
-        // Wire search controls — manufacturer drives description cascade.
+        // Wire search controls ï¿½ manufacturer drives description cascade.
         MfrCombo.SelectionChanged  += (_, _) => OnSearchMfrChanged();
         DescCombo.SelectionChanged += (_, _) => { if (!_updatingDescCombo) LoadList(); };
         FilterBox.TextChanged      += (_, _) => LoadList();
@@ -133,7 +133,12 @@ public partial class HardwareItemsView : UserControl
         LoadList();
     }
 
-    private void LoadList()
+    /// <summary>
+    /// Reloads the search results. When <paramref name="selectItemId"/> is given, the matching
+    /// row is selected and scrolled into view afterward â€” used after Save() so a newly created
+    /// or edited item is immediately visible instead of requiring the user to search for it.
+    /// </summary>
+    private void LoadList(int? selectItemId = null)
     {
         var mfr      = MfrCombo.SelectedItem as Manufacturer;
         var descItem = DescCombo.SelectedItem as DescriptionComboItem;
@@ -149,6 +154,18 @@ public partial class HardwareItemsView : UserControl
 
         RecordList.ItemsSource = results;
         RecordList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+
+        if (selectItemId.HasValue)
+        {
+            var match = results.FirstOrDefault(r => r.Item.Id == selectItemId.Value);
+            if (match != null)
+            {
+                RecordList.SelectedItem = match;
+                RecordList.ScrollIntoView(match);
+                RecordList.Focus();
+                return;
+            }
+        }
 
         // Default to first item.
         if (results.Count > 0)
@@ -208,9 +225,12 @@ public partial class HardwareItemsView : UserControl
         var modelNumber = ModelNumberBox.Text?.Trim();
         if (string.IsNullOrEmpty(modelNumber)) { StatusLabel.Text = "Model Number is required."; return; }
 
-        if (_selectedId == 0)
+        bool isNew = _selectedId == 0;
+        int savedId;
+
+        if (isNew)
         {
-            _repo!.Add(new HardwareItem
+            var created = _repo!.Add(new HardwareItem
             {
                 ManufacturerId = mfr.Id,
                 DescriptionId  = desc.Id,
@@ -218,6 +238,7 @@ public partial class HardwareItemsView : UserControl
                 Remarks        = string.IsNullOrEmpty(RemarksBox.Text?.Trim()) ? null : RemarksBox.Text.Trim(),
                 IsActive       = IsActiveCheck.IsChecked == true
             });
+            savedId = created.Id;
         }
         else
         {
@@ -231,9 +252,22 @@ public partial class HardwareItemsView : UserControl
                 existing.IsActive       = IsActiveCheck.IsChecked == true;
                 _repo.Update(existing);
             }
+            savedId = _selectedId;
         }
         StatusLabel.Text = "Saved.";
-        LoadList();
+        _selectedId = savedId;
+
+        if (isNew)
+        {
+            // Broaden the search filters so the newly created item is guaranteed to appear,
+            // rather than silently staying hidden if it doesn't match whatever the search
+            // panel happened to be filtered by.
+            MfrCombo.SelectedIndex = 0;
+            FilterBox.Text = "";
+            if (IsActiveCheck.IsChecked != true)
+                ShowInactiveCheck.IsChecked = true;
+        }
+        LoadList(savedId);
     }
 
     private void DeleteSelected()
@@ -284,7 +318,7 @@ public partial class HardwareItemsView : UserControl
             Item = item;
             var mfr  = item.Manufacturer?.ManufacturerName ?? "?";
             var desc = item.Description?.DescriptionText    ?? "?";
-            DisplayText = $"{mfr} — {desc} — {item.ModelNumber}";
+            DisplayText = $"{mfr} ï¿½ {desc} ï¿½ {item.ModelNumber}";
         }
     }
 }

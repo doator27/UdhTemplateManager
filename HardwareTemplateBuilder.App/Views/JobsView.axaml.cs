@@ -213,7 +213,12 @@ public partial class JobsView : UserControl
         box.Text = "";
     }
 
-    private void LoadJobList()
+    /// <summary>
+    /// Reloads the job list. When <paramref name="selectJobId"/> is given, the matching row is
+    /// selected and scrolled into view afterward — used after Save() so a newly created or
+    /// edited job is immediately visible instead of requiring the user to search for it.
+    /// </summary>
+    private void LoadJobList(int? selectJobId = null)
     {
         var filter           = FilterBox.Text?.ToLower() ?? "";
         var showComplete     = ShowCompletedCheck.IsChecked == true;
@@ -238,8 +243,20 @@ public partial class JobsView : UserControl
             _     => unsorted.OrderBy(r => r.Job.JobNumber)
         };
 
-        JobList.ItemsSource = rows;
+        var rowList = rows.ToList();
+        JobList.ItemsSource = rowList;
         _lastRefreshed = DateTime.UtcNow;
+
+        if (selectJobId.HasValue)
+        {
+            var match = rowList.FirstOrDefault(r => r.Job.Id == selectJobId.Value);
+            if (match != null)
+            {
+                JobList.SelectedItem = match;
+                JobList.ScrollIntoView(match);
+                JobList.Focus();
+            }
+        }
     }
 
     private void OnJobSelected()
@@ -291,6 +308,7 @@ public partial class JobsView : UserControl
         if (ProjectManagerCombo.SelectedItem is not ProjectManager pm) { StatusLabel.Text = "Project Manager is required."; return; }
 
         var userProfileId = SessionService.ActiveUserProfile?.Id ?? 0;
+        int savedJobId;
 
         if (_selectedJobId == 0)
         {
@@ -303,7 +321,7 @@ public partial class JobsView : UserControl
                 ProjectManagerId = pm.Id,
                 UserProfileId    = userProfileId
             });
-
+            savedJobId = newJob.Id;
         }
         else
         {
@@ -318,9 +336,11 @@ public partial class JobsView : UserControl
                 existing.ProjectManagerId = pm.Id;
                 repo.Update(existing);
             }
+            savedJobId = _selectedJobId;
         }
         StatusLabel.Text = "Saved.";
-        LoadJobList();
+        _selectedJobId = savedJobId;
+        LoadJobList(savedJobId);
     }
 
     private void DeleteSelected()

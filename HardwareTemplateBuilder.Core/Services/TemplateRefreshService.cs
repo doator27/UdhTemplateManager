@@ -302,12 +302,19 @@ public class TemplateRefreshService
         request.Headers.TryAddWithoutValidation("User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
 
-        // Deliberately no Origin/Referer headers: previously added unconditionally for every
-        // host on the theory that some APIs (e.g. abhmfg.com) need them to resolve tenant
-        // context, but confirmed that host now works fine without them, while at least one
-        // real source (an S3 bucket with referrer-based hotlink protection) actively returns
-        // 403 Forbidden when a non-matching Referer is present. Omitting them is safe for every
-        // host currently in use and avoids that failure mode.
+        // Deliberately no blanket Origin/Referer headers: previously added unconditionally for
+        // every host, but at least one real source (an S3 bucket with referrer-based hotlink
+        // protection) actively returns 403 Forbidden when a non-matching Referer is present.
+        //
+        // abhmfg.com's newer "/api/Resource/view/{guid}" endpoint is the opposite case: it
+        // resolves which company's document to serve from the Referer's domain, and returns
+        // 404 "Tenant Not Found" without one (confirmed via curl — no Referer or one from an
+        // unrelated/api-subdomain host both fail; "https://abhmfg.com/" succeeds). Their older
+        // "/Storage/ProductDocument/{file}" endpoint doesn't care either way, so it's safe to
+        // scope this to just the abhmfg.com host rather than reintroducing it for everyone.
+        if (new Uri(url).Host.EndsWith("abhmfg.com", StringComparison.OrdinalIgnoreCase))
+            request.Headers.TryAddWithoutValidation("Referer", "https://abhmfg.com/");
+
         using var response = await _httpClient.SendAsync(
             request, HttpCompletionOption.ResponseHeadersRead, ct);
 
