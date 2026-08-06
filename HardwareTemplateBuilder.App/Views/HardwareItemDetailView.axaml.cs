@@ -23,6 +23,7 @@ public partial class HardwareItemDetailView : UserControl
     private readonly int _itemId;
     private int _itemManufacturerId;
     private int _itemDescriptionId;
+    private int _editingTemplateId;
     private List<DescriptionComboItem> _descComboItems = new();
     private List<DoorMaterial> _doorMaterials = new();
 
@@ -87,6 +88,121 @@ public partial class HardwareItemDetailView : UserControl
         SearchDescCombo.SelectionChanged += (_, _) => SearchTemplates();
         SearchTemplateNumBox.TextChanged  += (_, _) => SearchTemplates();
         LinkButton.Click += (_, _) => LinkSearchResult();
+
+        LinkedTemplatesList.SelectionChanged += (_, _) => OnLinkedTemplateSelected();
+        SaveTemplateChangesButton.Click += (_, _) => SaveTemplateChanges();
+        CancelEditButton.Click += (_, _) => CancelEdit();
+    }
+
+    /// <summary>
+    /// Populates the Add/Edit panel from the selected linked template so its fields can be
+    /// edited directly, switching the panel from "add" mode into "edit" mode.
+    /// </summary>
+    private void OnLinkedTemplateSelected()
+    {
+        if (LinkedTemplatesList.SelectedItem is not IndividualTemplate t)
+            return;
+
+        _editingTemplateId = t.Id;
+        AddPanelHeader.Text = $"Edit Linked Template: {t.TemplateNumber}";
+        AddTemplateNumBox.Text       = t.TemplateNumber;
+        AddDescCombo.SelectedItem    = _descComboItems.FirstOrDefault(d => d.Id == t.DescriptionId);
+        AddDoorMatCombo.SelectedItem = _doorMaterials.FirstOrDefault(dm => dm.Id == t.DoorMaterialId);
+        AddNumPagesBox.Text          = t.NumPages.ToString();
+        AddPagesToPrintBox.Text      = t.PagesToPrint;
+        AddPagesToRotateBox.Text     = t.PagesToRotate ?? "";
+        AddRotationDirectionBox.Text = t.RotationDirection.ToString();
+        AddOnlineLinkBox.Text        = t.OnlineLink ?? "";
+        AddLocalLinkBox.Text         = t.LocalLink ?? "";
+        AddStatusLabel.Text          = "";
+
+        AddTemplateButton.IsVisible         = false;
+        SaveTemplateChangesButton.IsVisible = true;
+        CancelEditButton.IsVisible          = true;
+    }
+
+    /// <summary>Resets the Add/Edit panel back to its blank "add a new template" state.</summary>
+    private void ResetAddForm()
+    {
+        _editingTemplateId = 0;
+        AddPanelHeader.Text          = "Add Template";
+        AddTemplateNumBox.Text       = "";
+        AddPagesToPrintBox.Text      = "1";
+        AddNumPagesBox.Text          = "1";
+        AddPagesToRotateBox.Text     = "";
+        AddRotationDirectionBox.Text = "0";
+        AddOnlineLinkBox.Text        = "";
+        AddLocalLinkBox.Text         = "";
+        AddDescCombo.SelectedItem    = null;
+        AddDoorMatCombo.SelectedItem = null;
+
+        AddTemplateButton.IsVisible         = true;
+        SaveTemplateChangesButton.IsVisible = false;
+        CancelEditButton.IsVisible          = false;
+        LinkedTemplatesList.SelectedItem    = null;
+    }
+
+    private void CancelEdit()
+    {
+        ResetAddForm();
+        AddStatusLabel.Text = "";
+    }
+
+    /// <summary>
+    /// Saves in-place edits to the template currently selected in the Linked Templates list
+    /// (an update to the existing <see cref="IndividualTemplate"/> row — not a new record).
+    /// </summary>
+    private void SaveTemplateChanges()
+    {
+        if (_editingTemplateId == 0) return;
+        if (AddDescCombo.SelectedItem is not DescriptionComboItem desc) { AddStatusLabel.Text = "Description is required."; return; }
+        if (AddDoorMatCombo.SelectedItem is not DoorMaterial mat)  { AddStatusLabel.Text = "Door Material is required."; return; }
+
+        var templateNum = AddTemplateNumBox.Text?.Trim();
+        if (string.IsNullOrEmpty(templateNum)) { AddStatusLabel.Text = "Template # is required."; return; }
+
+        var pagesToPrint = AddPagesToPrintBox.Text?.Trim();
+        if (string.IsNullOrEmpty(pagesToPrint)) pagesToPrint = "1";
+        try { new PageRangeParser().Parse(pagesToPrint); }
+        catch { AddStatusLabel.Text = "Pages To Print format invalid. Use e.g. 1,3-5,8."; return; }
+
+        if (!int.TryParse(AddNumPagesBox.Text?.Trim(), out var numPages) || numPages < 1)
+        { AddStatusLabel.Text = "Num Pages must be a positive integer."; return; }
+
+        var pagesToRotate = AddPagesToRotateBox.Text?.Trim();
+        if (!string.IsNullOrEmpty(pagesToRotate))
+        {
+            try { new PageRangeParser().Parse(pagesToRotate); }
+            catch { AddStatusLabel.Text = "Pages To Rotate format invalid."; return; }
+        }
+
+        if (!int.TryParse(AddRotationDirectionBox.Text?.Trim() ?? "0", out var rotationDirection))
+        { AddStatusLabel.Text = "Rotation Direction must be an integer (e.g. 90 or -90)."; return; }
+
+        var onlineLink = AddOnlineLinkBox.Text?.Trim();
+        var localLink  = AddLocalLinkBox.Text?.Trim();
+        if (string.IsNullOrEmpty(onlineLink) && string.IsNullOrEmpty(localLink))
+        { AddStatusLabel.Text = "Provide at least an Online Link or a Local File path."; return; }
+
+        using var context = DatabaseInitializer.CreateContext();
+        var existing = context.IndividualTemplates.Find(_editingTemplateId);
+        if (existing == null) { AddStatusLabel.Text = "That template no longer exists."; return; }
+
+        existing.DescriptionId     = desc.Id;
+        existing.DoorMaterialId    = mat.Id;
+        existing.TemplateNumber    = templateNum;
+        existing.PagesToPrint      = pagesToPrint;
+        existing.NumPages          = numPages;
+        existing.PagesToRotate     = string.IsNullOrEmpty(pagesToRotate) ? null : pagesToRotate;
+        existing.RotationDirection = rotationDirection;
+        existing.OnlineLink        = string.IsNullOrEmpty(onlineLink) ? null : onlineLink;
+        existing.LocalLink         = string.IsNullOrEmpty(localLink)  ? null : localLink;
+        context.SaveChanges();
+
+        var savedNumber = existing.TemplateNumber;
+        LoadLinkedTemplates();
+        ResetAddForm();
+        AddStatusLabel.Text = $"Saved changes to: {savedNumber}";
     }
 
     private void LoadLinkedTemplates()
@@ -119,6 +235,7 @@ public partial class HardwareItemDetailView : UserControl
             context.SaveChanges();
             RemoveStatusLabel.Text = $"Removed: {t.TemplateNumber}";
             LoadLinkedTemplates();
+            if (t.Id == _editingTemplateId) ResetAddForm();
         }
     }
 

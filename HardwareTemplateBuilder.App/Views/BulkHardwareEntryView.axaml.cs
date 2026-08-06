@@ -97,7 +97,10 @@ public partial class BulkHardwareEntryView : UserControl
         using var ctx = DatabaseInitializer.CreateContext();
         _manufacturer = new ManufacturerRepository(ctx).GetById(_manufacturerId);
         _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
-        _descComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
+        // Leaf-only: an intermediate parent category isn't a meaningful hardware-item
+        // description on its own. _allDescriptions itself stays the full tree — needed for
+        // ID-based lookups, path-building, and the "browse full tree" picker below.
+        _descComboItems = DescriptionHelper.BuildLeafComboItems(_allDescriptions);
 
         HeaderLabel.Text = _manufacturer != null
             ? $"{_manufacturer.ManufacturerName} — Items"
@@ -500,7 +503,7 @@ public partial class BulkHardwareEntryView : UserControl
                 SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == picked.Value));
             }
         };
-        newDescBtn.Click += (_, _) =>
+        newDescBtn.Click += async (_, _) =>
         {
             var name = descCombo.Text?.Trim();
             if (string.IsNullOrEmpty(name))
@@ -508,8 +511,19 @@ public partial class BulkHardwareEntryView : UserControl
                 return;
             }
 
+            var window = TopLevel.GetTopLevel(this) as Window;
+            if (window == null) return;
+
+            // Let the user choose where in the hierarchy this new description belongs,
+            // instead of always creating it as a top-level node.
+            var parentPicker = new DescriptionPickerWindow(_allDescriptions, allowTopLevel: true);
+            var parentPick = await parentPicker.ShowDialog<int?>(window);
+            if (!parentPick.HasValue) return; // cancelled
+
+            int? parentId = parentPick.Value == DescriptionPickerWindow.TopLevelId ? null : parentPick.Value;
+
             using var ctx = DatabaseInitializer.CreateContext();
-            var newDesc = new DescriptionRepository(ctx).Add(new Description { DescriptionText = name });
+            var newDesc = new DescriptionRepository(ctx).Add(new Description { DescriptionText = name, ParentId = parentId });
             RefreshDescriptions();
             SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == newDesc.Id));
         };
@@ -713,7 +727,7 @@ public partial class BulkHardwareEntryView : UserControl
     {
         using var ctx = DatabaseInitializer.CreateContext();
         _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
-        _descComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
+        _descComboItems = DescriptionHelper.BuildLeafComboItems(_allDescriptions);
     }
 
     private async Task<int?> OpenDescriptionPickerAsync()
@@ -724,7 +738,9 @@ public partial class BulkHardwareEntryView : UserControl
             return null;
         }
 
-        var picker = new DescriptionPickerWindow(_allDescriptions);
+        // Full tree is shown for navigation context, but only a lowest-level (leaf) item
+        // can actually be picked as a hardware item's description.
+        var picker = new DescriptionPickerWindow(_allDescriptions, leafOnly: true);
         return await picker.ShowDialog<int?>(window);
     }
 

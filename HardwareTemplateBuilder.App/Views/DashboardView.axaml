@@ -28,7 +28,6 @@
                 <Button Classes="dashboard" Name="BtnDescriptions"    Content="Descriptions"/>
                 <Button Classes="dashboard" Name="BtnProjectManagers" Content="Project Managers"/>
                 <Button Classes="dashboard" Name="BtnUserProfiles"    Content="User Profiles"/>
-                <Button Classes="dashboard" Name="BtnDoorMaterials"   Content="Door Materials"/>
             </WrapPanel>
 
             <!-- System -->

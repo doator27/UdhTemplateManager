@@ -61,7 +61,6 @@ public partial class MainWindow : Window
         _router.Register("Descriptions",     () => { var v = new DescriptionsView();     v.NavigationRequested += NavigateTo; return v; });
         _router.Register("ProjectManagers",  () => { var v = new ProjectManagersView();  v.NavigationRequested += NavigateTo; return v; });
         _router.Register("UserProfiles",     () => { var v = new UserProfilesView();     v.NavigationRequested += NavigateTo; return v; });
-        _router.Register("DoorMaterials",    () => { var v = new DoorMaterialsView();    v.NavigationRequested += NavigateTo; return v; });
         _router.Register("AppSettings",      () => { var v = new AppSettingsView();      v.NavigationRequested += NavigateTo; return v; });
         _router.Register("BatchGenerate",        () => { var v = new BatchGenerateView();        v.NavigationRequested += NavigateTo; return v; });
         _router.Register("RefreshTemplates",     () => { var v = new RefreshTemplatesView();     v.NavigationRequested += NavigateTo; return v; });
@@ -110,7 +109,6 @@ public partial class MainWindow : Window
         MenuManufacturers.Click += (_, _) => NavigateTo("Manufacturers");
         MenuDescriptions.Click += (_, _) => NavigateTo("Descriptions");
         MenuAppSettings.Click += (_, _) => NavigateTo("AppSettings");
-        MenuDoorMaterials.Click += (_, _) => NavigateTo("DoorMaterials");
         MenuProjectManagers.Click += (_, _) => NavigateTo("ProjectManagers");
         MenuUserProfiles.Click += (_, _) => NavigateTo("UserProfiles");
     }

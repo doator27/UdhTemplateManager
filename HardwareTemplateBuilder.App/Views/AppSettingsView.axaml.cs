@@ -35,21 +35,12 @@ public partial class AppSettingsView : UserControl
         CurrentDbPathLabel.Text  = DatabaseInitializer.GetDatabasePath();
         PointerFilePathLabel.Text = DatabaseLocationService.GetActivePointerFilePath();
 
-        // Load SMTP settings
-        SmtpHostBox.Text       = _repo.GetValue("SmtpHost");
-        SmtpPortBox.Text       = _repo.GetValue("SmtpPort");
-        SmtpUsernameBox.Text   = _repo.GetValue("SmtpUsername");
-        SmtpPasswordBox.Text   = _repo.GetValue("SmtpPassword");
-        AlertEmailToBox.Text   = _repo.GetValue("AlertEmailTo");
-        AlertEmailFromBox.Text = _repo.GetValue("AlertEmailFrom");
-
         SaveButton.Click            += (_, _) => Save();
         BrowseButton.Click          += async (_, _) => await BrowseStorageFolderAsync();
         DbConnectBrowseButton.Click += async (_, _) => await BrowseConnectFileAsync();
         DbConnectButton.Click       += (_, _) => ConnectDatabase();
         DbMoveBrowseButton.Click    += async (_, _) => await BrowseDbTargetFolderAsync();
         MoveDbButton.Click          += (_, _) => MoveDatabase();
-        SaveSmtpButton.Click        += (_, _) => SaveSmtp();
     }
 
     private async Task BrowseConnectFileAsync()
@@ -127,18 +118,6 @@ public partial class AppSettingsView : UserControl
         var path = StorageLocationBox.Text?.Trim() ?? string.Empty;
         _repo!.SetValue("TemplateStorageLocation", path);
         StatusLabel.Text = "Saved.";
-    }
-
-    private void SaveSmtp()
-    {
-        _repo!.SetValue("SmtpHost",       SmtpHostBox.Text?.Trim()       ?? string.Empty);
-        _repo!.SetValue("SmtpPort",       SmtpPortBox.Text?.Trim()       ?? "587");
-        _repo!.SetValue("SmtpUsername",   SmtpUsernameBox.Text?.Trim()   ?? string.Empty);
-        _repo!.SetValue("SmtpPassword",   SmtpPasswordBox.Text?.Trim()   ?? string.Empty);
-        _repo!.SetValue("AlertEmailTo",   AlertEmailToBox.Text?.Trim()   ?? string.Empty);
-        _repo!.SetValue("AlertEmailFrom", AlertEmailFromBox.Text?.Trim() ?? string.Empty);
-        SmtpStatusLabel.Foreground = AppColors.Success;
-        SmtpStatusLabel.Text = "SMTP settings saved.";
     }
 
     private void MoveDatabase()

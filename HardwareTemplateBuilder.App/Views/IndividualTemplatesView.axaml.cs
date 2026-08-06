@@ -11,6 +11,7 @@ using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
 using HardwareTemplateBuilder.Core.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace HardwareTemplateBuilder.App.Views;
 
@@ -19,6 +20,7 @@ public partial class IndividualTemplatesView : UserControl
 {
     private List<Manufacturer> _manufacturers = new();
     private List<DescriptionComboItem> _descComboItems = new();
+    private List<DescriptionComboItem> _leafDescComboItems = new();
     private List<DoorMaterial> _doorMaterials = new();
     private readonly PageRangeParser _pageRangeParser = new();
     private int _selectedId;
@@ -37,8 +39,14 @@ public partial class IndividualTemplatesView : UserControl
     {
         using (var context = DatabaseInitializer.CreateContext())
         {
+            var allDescriptions = new DescriptionRepository(context).GetAll();
+
             _manufacturers = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-            _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
+            // Full tree for the add/edit form — an existing template may already reference a
+            // non-leaf description, and the form needs to be able to display/keep that as-is.
+            _descComboItems = DescriptionHelper.BuildComboItems(allDescriptions);
+            // Leaf-only for the search filter.
+            _leafDescComboItems = DescriptionHelper.BuildLeafComboItems(allDescriptions);
             _doorMaterials = new DoorMaterialRepository(context).GetAll().ToList();
         }
 
@@ -49,17 +57,16 @@ public partial class IndividualTemplatesView : UserControl
         DoorMaterialCombo.ItemsSource = _doorMaterials;
         DoorMaterialCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
 
-        // Filter combo: "(Any)" sentinel + all door materials.
-        var anyMaterial = new List<DoorMaterial> { new DoorMaterial { Id = 0, Material = "(Any)" } };
-        anyMaterial.AddRange(_doorMaterials);
-        DoorMaterialFilterCombo.ItemsSource = anyMaterial;
-        DoorMaterialFilterCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
-        DoorMaterialFilterCombo.SelectedIndex = 0;
+        MfrList.ItemsSource = _manufacturers;
+        MfrList.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
 
-        LoadList();
-        FilterBox.TextChanged += (_, _) => LoadList();
-        DoorMaterialFilterCombo.SelectionChanged += (_, _) => LoadList();
-        RecordList.SelectionChanged += (_, _) => OnSelectionChanged();
+        MfrList.SelectionChanged += (_, _) => { RefreshDescList(); RefreshTemplateNumberList(); };
+        DescList.SelectionChanged += (_, _) => RefreshTemplateNumberList();
+        TemplateNumberList.SelectionChanged += (_, _) => OnSelectionChanged();
+
+        RefreshDescList();
+        RefreshTemplateNumberList();
+
         SaveButton.Click += (_, _) => Save();
         NewButton.Click += (_, _) => ClearForm();
         BrowseLocalLinkButton.Click += async (_, _) => await BrowseLocalLink();
@@ -70,6 +77,61 @@ public partial class IndividualTemplatesView : UserControl
                 DeleteSelected();
         };
     }
+
+    /// <summary>
+    /// Repopulates the search Description list to show only leaf descriptions that have at
+    /// least one template under any of the currently selected manufacturers (all leaf
+    /// descriptions if none are selected).
+    /// </summary>
+    private void RefreshDescList()
+    {
+        var mfrIds = SelectedIds(MfrList, (Manufacturer m) => m.Id);
+
+        List<DescriptionComboItem> items;
+        if (mfrIds.Count == 0)
+        {
+            items = _leafDescComboItems;
+        }
+        else
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var descIds = ctx.IndividualTemplates
+                .Where(t => mfrIds.Contains(t.ManufacturerId))
+                .Select(t => t.DescriptionId)
+                .Distinct()
+                .ToHashSet();
+            items = _leafDescComboItems.Where(d => descIds.Contains(d.Id)).ToList();
+        }
+
+        DescList.ItemsSource = items;
+        DescList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+    }
+
+    /// <summary>
+    /// Repopulates the Template Number list with every template matching the currently selected
+    /// Manufacturers and Descriptions — a match is any template whose manufacturer is among the
+    /// selected manufacturers (if any are selected) AND whose description is among the selected
+    /// descriptions (if any are selected). With nothing selected in either list, every template
+    /// is shown, narrowing only as selections are made.
+    /// </summary>
+    private void RefreshTemplateNumberList()
+    {
+        var mfrIds  = SelectedIds(MfrList, (Manufacturer m) => m.Id);
+        var descIds = SelectedIds(DescList, (DescriptionComboItem d) => d.Id);
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var query = ctx.IndividualTemplates.AsQueryable();
+        if (mfrIds.Count > 0) query = query.Where(t => mfrIds.Contains(t.ManufacturerId));
+        if (descIds.Count > 0) query = query.Where(t => descIds.Contains(t.DescriptionId));
+
+        var results = query.OrderBy(t => t.TemplateNumber).ToList();
+        TemplateNumberList.ItemsSource = results;
+        TemplateNumberList.DisplayMemberBinding = new Avalonia.Data.Binding("TemplateNumber");
+    }
+
+    /// <summary>Returns the IDs of the currently selected items in a multi-select ListBox.</summary>
+    private static HashSet<int> SelectedIds<T>(ListBox listBox, Func<T, int> idSelector) =>
+        listBox.SelectedItems?.Cast<T>().Select(idSelector).ToHashSet() ?? new HashSet<int>();
 
     private async System.Threading.Tasks.Task BrowseLocalLink()
     {
@@ -85,29 +147,13 @@ public partial class IndividualTemplatesView : UserControl
             LocalLinkBox.Text = files[0].Path.LocalPath;
     }
 
-    private void LoadList()
-    {
-        var filter = FilterBox.Text?.ToLower() ?? "";
-        var matFilter = DoorMaterialFilterCombo.SelectedItem as DoorMaterial;
-        var matId = matFilter?.Id ?? 0;
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        var items = ctx.IndividualTemplates
-            .Where(t => string.IsNullOrEmpty(filter) || t.TemplateNumber.ToLower().Contains(filter))
-            .Where(t => matId == 0 || t.DoorMaterialId == matId)
-            .OrderBy(t => t.TemplateNumber)
-            .ToList();
-        RecordList.ItemsSource = items;
-        RecordList.DisplayMemberBinding = new Avalonia.Data.Binding("TemplateNumber");
-    }
-
     private void OnSelectionChanged()
     {
-        if (RecordList.SelectedItem is IndividualTemplate t)
+        if (TemplateNumberList.SelectedItem is IndividualTemplate t)
         {
             _selectedId = t.Id;
             ManufacturerCombo.SelectedItem = _manufacturers.FirstOrDefault(m => m.Id == t.ManufacturerId);
-            DescriptionCombo.SelectedItem = _descComboItems.FirstOrDefault(d => d.Id == t.DescriptionId);
+            DescriptionCombo.SelectedItem = _descComboItems.FirstOrDefault(dc => dc.Id == t.DescriptionId);
             TemplateNumberBox.Text = t.TemplateNumber;
             NumPagesBox.Text = t.NumPages.ToString();
             PagesToPrintBox.Text = t.PagesToPrint;
@@ -190,7 +236,7 @@ public partial class IndividualTemplatesView : UserControl
             }
         }
 
-        LoadList();
+        RefreshTemplateNumberList();
 
         if (!string.IsNullOrWhiteSpace(entity.OnlineLink))
         {
@@ -244,7 +290,7 @@ public partial class IndividualTemplatesView : UserControl
         using var ctx = DatabaseInitializer.CreateContext();
         new IndividualTemplateRepository(ctx).Delete(_selectedId);
         ClearForm();
-        LoadList();
+        RefreshTemplateNumberList();
     }
 
     private void ClearForm()
@@ -261,6 +307,6 @@ public partial class IndividualTemplatesView : UserControl
         OnlineLinkBox.Text = "";
         LocalLinkBox.Text = "";
         StatusLabel.Text = "";
-        RecordList.SelectedItem = null;
+        TemplateNumberList.SelectedItem = null;
     }
 }

@@ -11,7 +11,8 @@
             <Button Name="SelectButton" Content="Select" Width="80" Margin="0,0,8,0"/>
             <Button Name="CancelButton" Content="Cancel" Width="80"/>
         </StackPanel>
-        <TextBlock DockPanel.Dock="Top" Text="Double-click or select and click Select:" Margin="0,0,0,6"/>
+        <TextBlock DockPanel.Dock="Top" Name="InstructionLabel" Text="Double-click or select and click Select:" Margin="0,0,0,6"/>
+        <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Foreground="#FF6B6B" TextWrapping="Wrap" Margin="0,6,0,0"/>
         <TreeView Name="DescTree">
             <TreeView.ItemTemplate>
                 <TreeDataTemplate ItemsSource="{Binding Children}">

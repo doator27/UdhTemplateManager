@@ -19,11 +19,11 @@
                 <MenuItem Header="_Exit" Name="MenuFileExit" />
             </MenuItem>
             <MenuItem Header="_Jobs">
-                <MenuItem Header="_All Jobs"          Name="MenuJobs" />
-                <MenuItem Header="_Batch Generate..." Name="MenuBatchGenerate" />
+                <MenuItem Header="_All Jobs" Name="MenuJobs" />
             </MenuItem>
             <MenuItem Header="_Template Lookup" Name="MenuTemplateLookup" />
             <MenuItem Header="_Maintenance">
+                <MenuItem Header="_Batch Generate..."        Name="MenuBatchGenerate" />
                 <MenuItem Header="_Refresh Templates"        Name="MenuRefreshTemplates" />
                 <MenuItem Header="_Deduplicate Hardware..."  Name="MenuDeduplicateHardware" />
                 <MenuItem Header="_Backup Database..."       Name="MenuBackupDatabase" />
@@ -37,7 +37,6 @@
                 <MenuItem Header="_Customers" Name="MenuCustomers" />
                 <MenuItem Header="_Manufacturers" Name="MenuManufacturers" />
                 <MenuItem Header="_Descriptions" Name="MenuDescriptions" />
-                <MenuItem Header="_Door Materials" Name="MenuDoorMaterials" />
                 <MenuItem Header="_Project Managers" Name="MenuProjectManagers" />
                 <MenuItem Header="_User Profiles" Name="MenuUserProfiles" />
             </MenuItem>

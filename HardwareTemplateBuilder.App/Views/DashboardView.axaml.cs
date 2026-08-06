@@ -34,7 +34,6 @@ public partial class DashboardView : UserControl
         BtnDescriptions.Click      += (_, _) => NavigationRequested?.Invoke("Descriptions");
         BtnProjectManagers.Click   += (_, _) => NavigationRequested?.Invoke("ProjectManagers");
         BtnUserProfiles.Click      += (_, _) => NavigationRequested?.Invoke("UserProfiles");
-        BtnDoorMaterials.Click     += (_, _) => NavigationRequested?.Invoke("DoorMaterials");
         BtnAppSettings.Click       += (_, _) => NavigationRequested?.Invoke("AppSettings");
         BtnRefreshTemplates.Click  += (_, _) => NavigationRequested?.Invoke("RefreshTemplates");
     }

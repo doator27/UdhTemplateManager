@@ -4,6 +4,6 @@
              RequestedThemeVariant="Light">
     <Application.Styles>
         <FluentTheme />
-<StyleInclude Source="avares://HardwareTemplateBuilder.Lookup/Styles/Win98Theme.axaml" />
+        <StyleInclude Source="avares://HardwareTemplateBuilder.Lookup/Styles/Win98Theme.axaml" />
     </Application.Styles>
 </Application>

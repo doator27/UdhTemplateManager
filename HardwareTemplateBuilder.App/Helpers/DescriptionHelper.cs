@@ -61,4 +61,48 @@ public static class DescriptionHelper
 
         return result;
     }
+
+    /// <summary>
+    /// Same as <see cref="BuildComboItems"/>, but only includes leaf nodes (descriptions with
+    /// no children) — intermediate parent categories are walked for path-building purposes but
+    /// excluded from the result, since they're not meaningful hardware-item descriptions on
+    /// their own.
+    /// </summary>
+    public static List<DescriptionComboItem> BuildLeafComboItems(IEnumerable<Description> allDescriptions)
+    {
+        var all    = allDescriptions.ToList();
+        var result = new List<DescriptionComboItem>();
+
+        void Traverse(Description node, string prefix)
+        {
+            var path = string.IsNullOrEmpty(prefix)
+                ? node.DescriptionText
+                : $"{prefix} / {node.DescriptionText}";
+
+            var children = all
+                .Where(d => d.ParentId == node.Id)
+                .OrderBy(d => d.SortOrder)
+                .ThenBy(d => d.DescriptionText)
+                .ToList();
+
+            if (children.Count == 0)
+            {
+                result.Add(new DescriptionComboItem { Id = node.Id, DisplayText = path });
+                return;
+            }
+
+            foreach (var child in children)
+                Traverse(child, path);
+        }
+
+        var roots = all
+            .Where(d => d.ParentId == null)
+            .OrderBy(d => d.SortOrder)
+            .ThenBy(d => d.DescriptionText);
+
+        foreach (var root in roots)
+            Traverse(root, string.Empty);
+
+        return result;
+    }
 }
