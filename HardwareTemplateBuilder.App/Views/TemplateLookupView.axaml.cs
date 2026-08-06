@@ -180,7 +180,7 @@ public partial class TemplateLookupView : UserControl
 
             var expectedPath = Path.Combine(
                 saveLocationForCheck,
-                $"{SanitizeFileName(item.ModelNumber)}_templates.pdf");
+                QuickMergeService.BuildOutputFileName(item));
 
             if (File.Exists(expectedPath))
             {
@@ -249,113 +249,28 @@ public partial class TemplateLookupView : UserControl
     }
 
     /// <summary>
-    /// Loads templates, sorts them, acquires/processes each PDF, merges, stamps page
-    /// numbers, and saves to the active user's save location.
-    /// Heavy work is pushed onto the thread pool; status updates are posted to the UI thread.
+    /// Resolves the save location, then delegates to the shared <see cref="QuickMergeService"/>
+    /// pipeline (loads templates, sorts, acquires/processes each PDF, merges) — the same
+    /// pipeline used by the standalone Lookup app's "Open Templates" button.
     /// </summary>
     private async Task<string> GeneratePdfAsync(HardwareItem item, CancellationToken ct)
     {
-        // Load all data needed for generation on the calling thread (fast DB query).
-        List<IndividualTemplate> templates;
         string saveLocation;
-
         using (var context = DatabaseInitializer.CreateContext())
         {
-            templates = context.HardwareItemTemplates
-                .Include(hit => hit.IndividualTemplate)
-                    .ThenInclude(t => t.Manufacturer)
-                .Include(hit => hit.IndividualTemplate)
-                    .ThenInclude(t => t.Description)
-                .Where(hit => hit.HardwareItemId == item.Id)
-                .Select(hit => hit.IndividualTemplate)
-                .ToList();
-
             saveLocation = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
             if (string.IsNullOrWhiteSpace(saveLocation))
                 saveLocation = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         }
 
-        if (templates.Count == 0)
-            throw new InvalidOperationException(
-                "This hardware item has no linked templates. Link templates via the Hardware Items screen.");
+        using var mergeContext = DatabaseInitializer.CreateContext();
+        var socketsHandler = new System.Net.Http.SocketsHttpHandler();
+        socketsHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+        var httpClient = new HttpClient(socketsHandler);
 
-        // Sort by description sort order.
-        Dictionary<int, Description> allDescriptions;
-        using (var ctx = DatabaseInitializer.CreateContext())
-            allDescriptions = ctx.Descriptions.ToDictionary(d => d.Id);
-
-        var sortedTemplates = new TemplateSorter(
-            new WeightTemplateSortStrategy()).Sort(templates, allDescriptions);
-
-        // Run heavy PDF work on a thread-pool thread to keep the UI responsive.
-        return await Task.Run(async () =>
-        {
-            var workDir = Path.Combine(
-                Path.GetTempPath(), $"htb_{item.Id}_{Guid.NewGuid():N}");
-            Directory.CreateDirectory(workDir);
-
-            var socketsHandler = new System.Net.Http.SocketsHttpHandler();
-            socketsHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
-            var acquirer  = new FileAcquirer(new HttpClient(socketsHandler));
-            var parser    = new PageRangeParser();
-            var extractor = new PageExtractor();
-            var rotator   = new PageRotator();
-            var merger    = new PdfMerger();
-
-
-            var processedPdfs = new List<string>();
-
-            foreach (var template in sortedTemplates)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                PostStatus($"Acquiring {template.TemplateNumber}...");
-                var acquired = await acquirer.AcquireAsync(template, workDir);
-
-                PostStatus($"Processing {template.TemplateNumber}...");
-                var pageNumbers = parser.Parse(template.PagesToPrint);
-                var extracted = Path.Combine(workDir, $"ex_{template.Id}.pdf");
-                extractor.Extract(acquired, pageNumbers, extracted);
-
-                string processed = extracted;
-                if (!string.IsNullOrWhiteSpace(template.PagesToRotate))
-                {
-                    var rotateOrig = parser.Parse(template.PagesToRotate);
-
-                    // Map original page numbers to 1-based indices in the extracted PDF.
-                    var indexMap = pageNumbers
-                        .Select((p, i) => (Orig: p, Idx: i + 1))
-                        .ToDictionary(x => x.Orig, x => x.Idx);
-
-                    var rotateIdx = rotateOrig
-                        .Where(p => indexMap.ContainsKey(p))
-                        .Select(p => indexMap[p])
-                        .ToList();
-
-                    if (rotateIdx.Count > 0)
-                    {
-                        processed = Path.Combine(workDir, $"rot_{template.Id}.pdf");
-                        rotator.Rotate(extracted, rotateIdx, template.RotationDirection, processed);
-                    }
-                }
-
-                processedPdfs.Add(processed);
-            }
-
-            ct.ThrowIfCancellationRequested();
-
-            PostStatus("Merging PDFs...");
-            var merged = Path.Combine(workDir, "merged.pdf");
-            merger.Merge(processedPdfs, merged);
-
-            Directory.CreateDirectory(saveLocation);
-            var safeName = SanitizeFileName(item.ModelNumber);
-            var outputPath = Path.Combine(saveLocation, $"{safeName}_templates.pdf");
-            // Individual template downloads are not numbered — copy merged PDF directly.
-            File.Copy(merged, outputPath, overwrite: true);
-
-            return outputPath;
-        }, ct);
+        var progress = new Progress<string>(PostStatus);
+        var service = new QuickMergeService(mergeContext, httpClient);
+        return await service.GenerateAsync(item, saveLocation, "htb", progress, ct);
     }
 
     // ---------- Helpers ----------
@@ -363,11 +278,4 @@ public partial class TemplateLookupView : UserControl
     /// <summary>Posts a status message to the UI thread from any thread.</summary>
     private void PostStatus(string message) =>
         Dispatcher.UIThread.Post(() => StatusLabel.Text = message);
-
-    /// <summary>Replaces characters that are invalid in file names with underscores.</summary>
-    private static string SanitizeFileName(string name)
-    {
-        var invalid = new HashSet<char>(Path.GetInvalidFileNameChars()) { ':', '/', '\\' };
-        return new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
-    }
 }

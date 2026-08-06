@@ -12,6 +12,7 @@ using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
+using HardwareTemplateBuilder.Core.Services;
 using HardwareTemplateBuilder.Core.Services.Pdf;
 using Microsoft.EntityFrameworkCore;
 

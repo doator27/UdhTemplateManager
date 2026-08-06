@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="HardwareTemplateBuilder.App.Views.BackupDatabaseView"
-             Background="#2C2F38">
+             x:Class="HardwareTemplateBuilder.App.Views.BackupDatabaseView">
 
     <StackPanel Margin="12" Spacing="12">
         <!-- Header -->
@@ -17,10 +16,7 @@
                    Margin="0,0,0,8" />
 
         <!-- Current database path -->
-        <Border Background="White"
-                BorderBrush="#454952"
-                BorderThickness="1"
-                Padding="8"
+        <Border Classes="panel"
                 Margin="0,0,0,8">
             <StackPanel Spacing="4">
                 <TextBlock Text="Current Database Location:"
@@ -39,10 +35,7 @@
         </Border>
 
         <!-- Backup location -->
-        <Border Background="White"
-                BorderBrush="#454952"
-                BorderThickness="1"
-                Padding="8">
+        <Border Classes="panel">
             <StackPanel Spacing="6">
                 <TextBlock Text="Backup Location:"
                            FontWeight="Bold"
@@ -74,7 +67,7 @@
                     Content="Create Backup"
                     FontWeight="Bold" />
             <Button Name="BackButton"
-                    Content="? Back" />
+                    Content="← Back" />
         </StackPanel>
 
         <!-- Status message -->
@@ -87,10 +80,7 @@
         <!-- Progress indicator (hidden by default) -->
         <Border Name="ProgressPanel"
                 IsVisible="False"
-                Background="White"
-                BorderBrush="#454952"
-                BorderThickness="1"
-                Padding="12"
+                Classes="panel"
                 Margin="0,8,0,0">
             <StackPanel Spacing="6">
                 <TextBlock Name="ProgressLabel"
@@ -104,10 +94,7 @@
 
         <!-- Recent backups list -->
         <Border Name="RecentBackupsPanel"
-                Background="White"
-                BorderBrush="#454952"
-                BorderThickness="1"
-                Padding="8"
+                Classes="panel"
                 Margin="0,16,0,0">
             <StackPanel Spacing="6">
                 <TextBlock Text="Recent Backups:"

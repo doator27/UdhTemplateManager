@@ -300,15 +300,31 @@ public partial class BulkManufacturerSessionView : UserControl
                     // Link the template if specified and not already linked.
                     if (!string.IsNullOrWhiteSpace(group.TemplateNumber))
                     {
-                        var template = ctx.IndividualTemplates.FirstOrDefault(t =>
+                        // Bulk-add doesn't capture door material, so a Manufacturer+TemplateNumber
+                        // match could be ambiguous if multiple door-material variants share the
+                        // same number — surface that instead of silently linking an arbitrary one.
+                        var matches = ctx.IndividualTemplates.Where(t =>
                             t.ManufacturerId  == mfr.ManufacturerId &&
-                            t.TemplateNumber  == group.TemplateNumber);
+                            t.TemplateNumber  == group.TemplateNumber).ToList();
 
-                        if (template != null)
+                        if (matches.Count > 1)
                         {
+                            templateNotFound.Add($"{mfr.ManufacturerName} / {group.ModelNumber}: template '{group.TemplateNumber}' matches {matches.Count} door-material variants — link it manually on the Individual Templates page.");
+                        }
+                        else if (matches.Count == 1)
+                        {
+                            var template = matches[0];
+
+                            // Matches HardwareItemTemplateRepository.FindDuplicate's real key
+                            // (HardwareItemId + IndividualTemplateId + JobId). This path always
+                            // creates a global link (JobId left null), so the "already linked"
+                            // check must also require JobId == null — otherwise an existing
+                            // job-scoped link for the same pair would cause the global link to be
+                            // silently skipped even though it doesn't actually exist yet.
                             bool linked = ctx.HardwareItemTemplates.Any(hit =>
                                 hit.HardwareItemId       == item.Id &&
-                                hit.IndividualTemplateId == template.Id);
+                                hit.IndividualTemplateId == template.Id &&
+                                hit.JobId                == null);
                             if (!linked)
                             {
                                 ctx.HardwareItemTemplates.Add(new HardwareItemTemplate

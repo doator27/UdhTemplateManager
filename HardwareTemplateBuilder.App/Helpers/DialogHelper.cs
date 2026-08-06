@@ -25,7 +25,6 @@ public static class DialogHelper
             MinHeight = 150,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = true,
-            Background = Avalonia.Media.Brushes.Silver,
         };
 
         var okButton = new Button { Content = "OK", Width = 80, Margin = new Avalonia.Thickness(5) };
@@ -79,7 +78,6 @@ public static class DialogHelper
             MinHeight = 200,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = true,
-            Background = Avalonia.Media.Brushes.Silver,
         };
 
         var okButton = new Button { Content = "OK", Width = 80, Margin = new Avalonia.Thickness(5) };
@@ -108,7 +106,6 @@ public static class DialogHelper
                         TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                         FontFamily = new Avalonia.Media.FontFamily("Courier New, Consolas, monospace"),
                         FontSize = 12,
-                        Foreground = Avalonia.Media.Brushes.Black,
                     }
                 }
             }
@@ -135,7 +132,6 @@ public static class DialogHelper
             MinHeight = 150,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = true,
-            Background = Avalonia.Media.Brushes.Silver,
         };
 
         var result = false;

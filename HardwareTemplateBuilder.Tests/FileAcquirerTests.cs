@@ -25,8 +25,13 @@ public class FileAcquirerTests : IDisposable
 
     // ---------- Helpers ----------
 
-    /// <summary>Creates a dummy PDF-like file with the given content bytes.</summary>
-    private string CreateDummyFile(string name, string content = "dummy-pdf-content")
+    /// <summary>
+    /// Creates a dummy PDF-like file with the given content bytes. Prefixed with the real
+    /// "%PDF" magic bytes so it passes <see cref="FileAcquirer"/>'s content-type validation,
+    /// which rejects anything that isn't actually a PDF (guards against corrupt downloads
+    /// silently saved as HTML).
+    /// </summary>
+    private string CreateDummyFile(string name, string content = "%PDF-1.4\ndummy-pdf-content")
     {
         var path = Path.Combine(_tempDir, name);
         File.WriteAllText(path, content);
@@ -79,7 +84,7 @@ public class FileAcquirerTests : IDisposable
     public async Task AcquireAsync_LocalLinkMissing_FallsBackToOnlineLink()
     {
         var jobSubfolder = Path.Combine(_tempDir, "job2");
-        const string fakeContent = "downloaded-pdf-bytes";
+        const string fakeContent = "%PDF-1.4\ndownloaded-pdf-bytes";
 
         var handler = new FakeHttpHandler(fakeContent);
         var template = MakeTemplate(

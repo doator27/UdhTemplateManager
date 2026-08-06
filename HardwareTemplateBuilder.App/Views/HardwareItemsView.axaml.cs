@@ -3,6 +3,7 @@ using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
+using HardwareTemplateBuilder.Core.Services;
 using System.Collections.Generic;
 using System.Linq;
 

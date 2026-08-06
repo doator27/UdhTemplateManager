@@ -1,10 +1,13 @@
-using HardwareTemplateBuilder.Core.Models;
 using System.Collections.Generic;
 using System.Linq;
+using HardwareTemplateBuilder.Core.Models;
 
-namespace HardwareTemplateBuilder.Lookup.Helpers;
+namespace HardwareTemplateBuilder.Core.Services;
 
-/// <summary>Item used to populate description combo boxes with full ancestor paths.</summary>
+/// <summary>
+/// Item used to populate description combo/list boxes. Displays the full ancestor path
+/// so that nodes with the same name but different parents are unambiguous.
+/// </summary>
 public class DescriptionComboItem
 {
     /// <summary>Gets or sets the <see cref="Description"/> primary key.</summary>
@@ -15,7 +18,11 @@ public class DescriptionComboItem
 }
 
 /// <summary>
-/// Flattens the description hierarchy into a depth-first sorted list for combo box display.
+/// Helper for flattening the description hierarchy into a depth-first sorted list suitable
+/// for combo/list box display. Shared by <c>HardwareTemplateBuilder.App</c> and
+/// <c>HardwareTemplateBuilder.Lookup</c> — both projects reference this Core project, so this
+/// is written once here rather than duplicated per project (the Lookup app cannot reference
+/// the App project directly).
 /// </summary>
 public static class DescriptionHelper
 {
@@ -23,7 +30,7 @@ public static class DescriptionHelper
     /// Flattens <paramref name="allDescriptions"/> into a depth-first list ordered by
     /// <c>SortOrder</c> (then alpha) within each sibling group. Each item's
     /// <see cref="DescriptionComboItem.DisplayText"/> shows the full ancestor path
-    /// separated by " / ".
+    /// separated by " / " (e.g., "Exit Device / Trim").
     /// </summary>
     public static List<DescriptionComboItem> BuildComboItems(IEnumerable<Description> allDescriptions)
     {
@@ -35,18 +42,24 @@ public static class DescriptionHelper
             var path = string.IsNullOrEmpty(prefix)
                 ? node.DescriptionText
                 : $"{prefix} / {node.DescriptionText}";
+
             result.Add(new DescriptionComboItem { Id = node.Id, DisplayText = path });
-            foreach (var child in all
+
+            var children = all
                 .Where(d => d.ParentId == node.Id)
                 .OrderBy(d => d.SortOrder)
-                .ThenBy(d => d.DescriptionText))
+                .ThenBy(d => d.DescriptionText);
+
+            foreach (var child in children)
                 Traverse(child, path);
         }
 
-        foreach (var root in all
+        var roots = all
             .Where(d => d.ParentId == null)
             .OrderBy(d => d.SortOrder)
-            .ThenBy(d => d.DescriptionText))
+            .ThenBy(d => d.DescriptionText);
+
+        foreach (var root in roots)
             Traverse(root, string.Empty);
 
         return result;
