@@ -87,7 +87,7 @@ public partial class RefreshTemplatesView : UserControl
                     Dispatcher.UIThread.Post(() =>
                     {
                         ProgressText.Text =
-                            $"Downloading {p.Current} of {p.Total}: {p.TemplateName}";
+                            $"Downloading {p.Current} of {p.Total}: [ID {p.TemplateId}] {p.TemplateName}";
                     }));
 
                 return await service.RefreshAsync(saveLocation, progress, ct);

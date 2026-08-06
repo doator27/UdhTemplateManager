@@ -52,6 +52,7 @@ public partial class BulkManufacturerSessionView : UserControl
         CancelNewMfrButton.Click    += (_, _) => { NewMfrPanel.IsVisible = false; NewMfrBox.Text = ""; };
         SaveNewMfrButton.Click      += (_, _) => SaveNewManufacturer();
         AddAllButton.Click          += async (_, _) => await AddAllToJobAsync();
+        ItemsToFixButton.Click      += async (_, _) => await ShowItemsToFixAsync();
 
         LoadDraft();
         RebuildSessionPanel();
@@ -89,6 +90,7 @@ public partial class BulkManufacturerSessionView : UserControl
     private void RebuildSessionPanel()
     {
         SessionPanel.Children.Clear();
+        RefreshItemsToFixButton();
 
         if (_draft.Manufacturers.Count == 0)
         {
@@ -177,6 +179,13 @@ public partial class BulkManufacturerSessionView : UserControl
             g.DescriptionId.HasValue && !string.IsNullOrWhiteSpace(g.ModelNumber)));
     }
 
+    private void RefreshItemsToFixButton()
+    {
+        var fixCount = _draft.Manufacturers.Sum(m => m.Groups.Count(g => !string.IsNullOrEmpty(g.LastError)));
+        ItemsToFixButton.IsEnabled = fixCount > 0;
+        ItemsToFixButton.Content = fixCount > 0 ? $"Items to Fix ({fixCount})" : "Items to Fix";
+    }
+
     // ── Add manufacturer to session ───────────────────────────────────────────
 
     private void AddManufacturerToSession()
@@ -232,7 +241,10 @@ public partial class BulkManufacturerSessionView : UserControl
         }
 
         int totalAdded = 0;
-        var skipped = new List<string>();
+        var missingDescription = new List<string>();
+        var templateNotFound   = new List<string>();
+        var itemErrors         = new List<string>();
+        var groupsToRemove     = new List<(BulkSessionMfr Mfr, BulkSessionGroup Group)>();
 
         using var ctx = DatabaseInitializer.CreateContext();
 
@@ -240,108 +252,197 @@ public partial class BulkManufacturerSessionView : UserControl
         {
             foreach (var group in mfr.Groups)
             {
+                var label = string.IsNullOrWhiteSpace(group.ModelNumber) ? "(blank model number)" : group.ModelNumber;
+
                 if (!group.DescriptionId.HasValue || string.IsNullOrWhiteSpace(group.ModelNumber))
+                {
+                    group.LastError = "No description selected — pick a description for this row and re-add it.";
+                    missingDescription.Add($"{mfr.ManufacturerName} / {label}: {group.LastError}");
                     continue;
-
-                // Find or create the HardwareItem. Matches on Manufacturer+Description+ModelNumber
-                // only (mirrors HardwareItemRepository.FindDuplicate), regardless of IsActive, so a
-                // previously-deactivated item is reused rather than duplicated as a new active row.
-                var item = ctx.HardwareItems.FirstOrDefault(h =>
-                    h.ManufacturerId == mfr.ManufacturerId &&
-                    h.DescriptionId  == group.DescriptionId.Value &&
-                    h.ModelNumber    == group.ModelNumber);
-
-                if (item == null)
-                {
-                    item = new HardwareItem
-                    {
-                        ManufacturerId = mfr.ManufacturerId,
-                        DescriptionId  = group.DescriptionId.Value,
-                        ModelNumber    = group.ModelNumber,
-                        Remarks        = group.HardwareItemRemarks
-                    };
-                    ctx.HardwareItems.Add(item);
-                    ctx.SaveChanges();
-                }
-                else if (!string.IsNullOrWhiteSpace(group.HardwareItemRemarks) && 
-                         item.Remarks != group.HardwareItemRemarks)
-                {
-                    // Update remarks if provided and different from existing
-                    item.Remarks = group.HardwareItemRemarks;
-                    ctx.SaveChanges();
                 }
 
-                // Link the template if specified and not already linked.
-                if (!string.IsNullOrWhiteSpace(group.TemplateNumber))
+                // Each item is committed in its own transaction so a failure partway through
+                // (e.g. an unexpected constraint violation) rolls back cleanly and only that
+                // item is skipped, instead of aborting the whole session or leaving partial rows.
+                using var tx = ctx.Database.BeginTransaction();
+                try
                 {
-                    var template = ctx.IndividualTemplates.FirstOrDefault(t =>
-                        t.ManufacturerId  == mfr.ManufacturerId &&
-                        t.TemplateNumber  == group.TemplateNumber);
+                    int groupAdded = 0;
 
-                    if (template != null)
+                    // Find or create the HardwareItem. Matches on Manufacturer+Description+ModelNumber
+                    // only (mirrors HardwareItemRepository.FindDuplicate), regardless of IsActive, so a
+                    // previously-deactivated item is reused rather than duplicated as a new active row.
+                    var item = ctx.HardwareItems.FirstOrDefault(h =>
+                        h.ManufacturerId == mfr.ManufacturerId &&
+                        h.DescriptionId  == group.DescriptionId.Value &&
+                        h.ModelNumber    == group.ModelNumber);
+
+                    if (item == null)
                     {
-                        bool linked = ctx.HardwareItemTemplates.Any(hit =>
-                            hit.HardwareItemId       == item.Id &&
-                            hit.IndividualTemplateId == template.Id);
-                        if (!linked)
+                        item = new HardwareItem
                         {
-                            ctx.HardwareItemTemplates.Add(new HardwareItemTemplate
+                            ManufacturerId = mfr.ManufacturerId,
+                            DescriptionId  = group.DescriptionId.Value,
+                            ModelNumber    = group.ModelNumber,
+                            Remarks        = group.HardwareItemRemarks
+                        };
+                        ctx.HardwareItems.Add(item);
+                        ctx.SaveChanges();
+                    }
+                    else if (!string.IsNullOrWhiteSpace(group.HardwareItemRemarks) &&
+                             item.Remarks != group.HardwareItemRemarks)
+                    {
+                        // Update remarks if provided and different from existing
+                        item.Remarks = group.HardwareItemRemarks;
+                        ctx.SaveChanges();
+                    }
+
+                    // Link the template if specified and not already linked.
+                    if (!string.IsNullOrWhiteSpace(group.TemplateNumber))
+                    {
+                        var template = ctx.IndividualTemplates.FirstOrDefault(t =>
+                            t.ManufacturerId  == mfr.ManufacturerId &&
+                            t.TemplateNumber  == group.TemplateNumber);
+
+                        if (template != null)
+                        {
+                            bool linked = ctx.HardwareItemTemplates.Any(hit =>
+                                hit.HardwareItemId       == item.Id &&
+                                hit.IndividualTemplateId == template.Id);
+                            if (!linked)
                             {
-                                HardwareItemId       = item.Id,
-                                IndividualTemplateId = template.Id
-                            });
-                            ctx.SaveChanges();
+                                ctx.HardwareItemTemplates.Add(new HardwareItemTemplate
+                                {
+                                    HardwareItemId       = item.Id,
+                                    IndividualTemplateId = template.Id
+                                });
+                                ctx.SaveChanges();
+                            }
+                        }
+                        else
+                        {
+                            templateNotFound.Add($"{mfr.ManufacturerName} / {group.ModelNumber}: template '{group.TemplateNumber}' not found");
                         }
                     }
-                    else
+
+                    // Create one JobHardware row per callout (or one row with no label if no callouts).
+                    var callouts = group.Callouts.Count > 0
+                        ? group.Callouts
+                        : new List<BulkSessionCallout> { new BulkSessionCallout() };
+
+                    foreach (var callout in callouts)
                     {
-                        skipped.Add($"{mfr.ManufacturerName} / {group.ModelNumber}: template '{group.TemplateNumber}' not found");
+                        var calloutLabel = string.IsNullOrWhiteSpace(callout.Label) ? null : callout.Label.Trim();
+                        var already = ctx.JobHardware.Any(jh =>
+                            jh.JobId          == _jobId &&
+                            jh.HardwareItemId == item.Id &&
+                            jh.CustomDescription == calloutLabel);
+                        if (already) continue;
+
+                        ctx.JobHardware.Add(new JobHardware
+                        {
+                            JobId             = _jobId,
+                            HardwareItemId    = item.Id,
+                            CustomDescription = calloutLabel,
+                            CalloutRemarks    = string.IsNullOrWhiteSpace(callout.CalloutRemarks)
+                                                   ? null : callout.CalloutRemarks.Trim()
+                        });
+                        ctx.SaveChanges();
+                        groupAdded++;
                     }
+
+                    tx.Commit();
+                    totalAdded += groupAdded;
+
+                    // Fully committed — nothing left to retry, so drop it from the draft.
+                    group.LastError = null;
+                    groupsToRemove.Add((mfr, group));
                 }
-
-                // Create one JobHardware row per callout (or one row with no label if no callouts).
-                var callouts = group.Callouts.Count > 0
-                    ? group.Callouts
-                    : new List<BulkSessionCallout> { new BulkSessionCallout() };
-
-                foreach (var callout in callouts)
+                catch (Exception ex)
                 {
-                    var label = string.IsNullOrWhiteSpace(callout.Label) ? null : callout.Label.Trim();
-                    var already = ctx.JobHardware.Any(jh =>
-                        jh.JobId          == _jobId &&
-                        jh.HardwareItemId == item.Id &&
-                        jh.CustomDescription == label);
-                    if (already) continue;
-
-                    ctx.JobHardware.Add(new JobHardware
-                    {
-                        JobId             = _jobId,
-                        HardwareItemId    = item.Id,
-                        CustomDescription = label,
-                        CalloutRemarks    = string.IsNullOrWhiteSpace(callout.CalloutRemarks)
-                                               ? null : callout.CalloutRemarks.Trim()
-                    });
-                    ctx.SaveChanges();
-                    totalAdded++;
+                    tx.Rollback();
+                    ctx.ChangeTracker.Clear();
+                    group.LastError =
+                        $"{ex.Message} — check the description, model number, and template, then try again.";
+                    itemErrors.Add($"{mfr.ManufacturerName} / {label}: {group.LastError}");
                 }
             }
         }
 
-        // Clear the draft once committed.
-        new BulkAddDraftRepository(ctx).DeleteByJob(_jobId);
-        _draft = new BulkSessionDraft();
+        // Remove only the items that were fully committed; anything still needing a fix
+        // (missing description, or an error) stays in the draft for "Items to Fix".
+        foreach (var (mfr, group) in groupsToRemove)
+            mfr.Groups.Remove(group);
+        _draft.Manufacturers.RemoveAll(m => m.Groups.Count == 0);
+
+        if (_draft.Manufacturers.Count == 0)
+            new BulkAddDraftRepository(ctx).DeleteByJob(_jobId);
+        else
+            SaveDraft();
+
         RebuildSessionPanel();
 
         var msg = $"Added {totalAdded} line item(s) to the job.";
-        if (skipped.Count > 0)
-            msg += $"\n\nNote — {skipped.Count} template(s) not found (link manually):\n" +
-                   string.Join("\n", skipped.Select(s => $"  • {s}"));
+
+        void AppendSection(string title, List<string> lines)
+        {
+            if (lines.Count == 0) return;
+            msg += $"\n\n{title} ({lines.Count}):\n" + string.Join("\n", lines.Select(s => $"  • {s}"));
+        }
+
+        AppendSection("Skipped — missing description", missingDescription);
+        AppendSection("Note — template not found (link manually)", templateNotFound);
+        AppendSection("Skipped — error", itemErrors);
+
+        bool hasItemsToFix = missingDescription.Count > 0 || itemErrors.Count > 0;
+        if (hasItemsToFix)
+            msg += "\n\nSkipped items remain in this session — click \"Items to Fix\" to review and correct them.";
 
         if (win != null)
             await DialogHelper.ShowInfoAsync(win, msg, "Session Complete");
         else
             StatusLabel.Text = msg;
 
-        NavigationRequested?.Invoke($"JobDetail:{_jobId}");
+        // Stay on this screen if there's anything left to fix so the user can act on it
+        // immediately; otherwise the session is fully committed, so return to the job.
+        if (!hasItemsToFix)
+            NavigationRequested?.Invoke($"JobDetail:{_jobId}");
+    }
+
+    /// <summary>
+    /// Shows the list of hardware items skipped during the last "Add All to Job" run
+    /// (missing description or an unexpected error), letting the user jump straight to the
+    /// relevant manufacturer's entry screen to fix and re-add one.
+    /// </summary>
+    private async Task ShowItemsToFixAsync()
+    {
+        var win = TopLevel.GetTopLevel(this) as Window;
+        if (win == null) return;
+
+        var rows = _draft.Manufacturers
+            .SelectMany(m => m.Groups
+                .Where(g => !string.IsNullOrEmpty(g.LastError))
+                .Select(g => new FixItemRow
+                {
+                    ManufacturerId   = m.ManufacturerId,
+                    ManufacturerName = m.ManufacturerName,
+                    ModelNumber      = string.IsNullOrWhiteSpace(g.ModelNumber) ? "(blank model number)" : g.ModelNumber,
+                    Reason           = g.LastError!
+                }))
+            .ToList();
+
+        if (rows.Count == 0)
+        {
+            await DialogHelper.ShowInfoAsync(win, "No items currently need fixing.", "Items to Fix");
+            return;
+        }
+
+        var dialog = new ItemsToFixDialog(rows);
+        var manufacturerId = await dialog.ShowDialog<int?>(win);
+        if (manufacturerId.HasValue)
+        {
+            SaveDraft();
+            NavigationRequested?.Invoke($"BulkHardwareEntry:{_jobId}:{manufacturerId.Value}");
+        }
     }
 }

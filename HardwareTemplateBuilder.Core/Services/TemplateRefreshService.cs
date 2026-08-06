@@ -24,6 +24,9 @@ public class RefreshProgress
 
     /// <summary>Gets a display name for the template being processed.</summary>
     public string TemplateName { get; init; } = string.Empty;
+
+    /// <summary>Gets the ID (IndividualTemplates table row) of the template being processed.</summary>
+    public int TemplateId { get; init; }
 }
 
 /// <summary>
@@ -126,7 +129,8 @@ public class TemplateRefreshService
             {
                 Current      = i + 1,
                 Total        = total,
-                TemplateName = fileName
+                TemplateName = fileName,
+                TemplateId   = template.Id
             });
 
             try

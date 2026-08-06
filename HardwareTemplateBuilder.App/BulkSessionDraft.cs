@@ -45,6 +45,13 @@ public sealed class BulkSessionGroup
 
     /// <summary>Gets or sets the per-callout rows. At least one entry is expected.</summary>
     public List<BulkSessionCallout> Callouts { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the reason this item was skipped on the last "Add All to Job" run
+    /// (null if it has never been tried, or was successfully committed). Persisted so the
+    /// "Items to Fix" list survives navigation away from the session screen.
+    /// </summary>
+    public string? LastError { get; set; }
 }
 
 /// <summary>One callout row: a custom label plus an optional per-callout remark.</summary>

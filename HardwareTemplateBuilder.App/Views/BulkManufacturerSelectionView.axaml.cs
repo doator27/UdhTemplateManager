@@ -80,18 +80,26 @@ public partial class BulkManufacturerSelectionView : UserControl
 
     private void AddSelected()
     {
-        if (AllMfrList.SelectedItem is not Manufacturer m) return;
-        if (_selected.Any(s => s.Id == m.Id)) return;
-        AddSorted(m);
-        _filtered.Remove(m);
+        var items = AllMfrList.SelectedItems?.Cast<Manufacturer>().ToList() ?? new List<Manufacturer>();
+        if (items.Count == 0) return;
+
+        foreach (var m in items)
+        {
+            if (_selected.Any(s => s.Id == m.Id)) continue;
+            AddSorted(m);
+            _filtered.Remove(m);
+        }
         RefreshContinue();
         SaveDraft();
     }
 
     private void RemoveSelected()
     {
-        if (SelectedMfrList.SelectedItem is not Manufacturer m) return;
-        _selected.Remove(m);
+        var items = SelectedMfrList.SelectedItems?.Cast<Manufacturer>().ToList() ?? new List<Manufacturer>();
+        if (items.Count == 0) return;
+
+        foreach (var m in items)
+            _selected.Remove(m);
         ApplySearch();     // re-adds to filtered list
         RefreshContinue();
         SaveDraft();
