@@ -7,6 +7,18 @@
             <TextBlock Text="Individual Template Lookup" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
 
+        <!-- Search bar -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right" 
+                    Name="ClearSearchButton"
+                    Content="Clear"
+                    Width="60"
+                    Margin="4,0,0,0"/>
+            <TextBox Name="SearchBox" 
+                     Watermark="Search by manufacturer, description, or model number..."
+                     VerticalContentAlignment="Center"/>
+        </DockPanel>
+
         <!-- Progress + status (docked bottom) -->
         <ProgressBar DockPanel.Dock="Bottom" Name="GenerateProgress"
                      IsIndeterminate="True" IsVisible="False"

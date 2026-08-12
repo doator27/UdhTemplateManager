@@ -98,10 +98,9 @@ public partial class BulkHardwareEntryView : UserControl
         using var ctx = DatabaseInitializer.CreateContext();
         _manufacturer = new ManufacturerRepository(ctx).GetById(_manufacturerId);
         _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
-        // Leaf-only: an intermediate parent category isn't a meaningful hardware-item
-        // description on its own. _allDescriptions itself stays the full tree — needed for
-        // ID-based lookups, path-building, and the "browse full tree" picker below.
-        _descComboItems = DescriptionHelper.BuildLeafComboItems(_allDescriptions);
+        // Full hierarchy, including intermediate parent categories, so the user can pick
+        // any node from the description tree in the combo/picker below.
+        _descComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
 
         HeaderLabel.Text = _manufacturer != null
             ? $"{_manufacturer.ManufacturerName} — Items"
@@ -151,9 +150,10 @@ public partial class BulkHardwareEntryView : UserControl
         var entry = new ItemEntry();
         _items.Add(entry);
 
-        // Editable ComboBox seeded with descriptions already used by this manufacturer's items.
-        // The user may also type any text not in the list — the full-tree fallback list below
-        // then shows matching descriptions from the global hierarchy.
+        // Editable ComboBox seeded with descriptions that currently have hardware items for
+        // this manufacturer. The user may also type any text not in the list — the full-tree
+        // fallback list below then shows matching descriptions from the global hierarchy, and
+        // the "Tree" button opens a picker over the full hierarchy.
         var descCombo = new ComboBox
         {
             IsEditable = true,
@@ -728,7 +728,7 @@ public partial class BulkHardwareEntryView : UserControl
     {
         using var ctx = DatabaseInitializer.CreateContext();
         _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
-        _descComboItems = DescriptionHelper.BuildLeafComboItems(_allDescriptions);
+        _descComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
     }
 
     private async Task<int?> OpenDescriptionPickerAsync()
@@ -739,16 +739,16 @@ public partial class BulkHardwareEntryView : UserControl
             return null;
         }
 
-        // Full tree is shown for navigation context, but only a lowest-level (leaf) item
-        // can actually be picked as a hardware item's description.
-        var picker = new DescriptionPickerWindow(_allDescriptions, leafOnly: true);
+        // Full tree is shown for navigation context; any node (including parent
+        // categories) can be picked as a hardware item's description.
+        var picker = new DescriptionPickerWindow(_allDescriptions, leafOnly: false);
         return await picker.ShowDialog<int?>(window);
     }
 
     /// <summary>
-    /// Returns the subset of <see cref="_descComboItems"/> whose descriptions are already used
-    /// by hardware items belonging to <paramref name="manufacturerId"/>. These are offered as
-    /// quick-select options in the per-item description ComboBox.
+    /// Returns the subset of <see cref="_descComboItems"/> whose descriptions currently have
+    /// active hardware items belonging to <paramref name="manufacturerId"/>. These are offered
+    /// as quick-select options in the per-item description ComboBox.
     /// </summary>
     private List<DescriptionComboItem> GetDescriptionsForManufacturer(int manufacturerId)
     {

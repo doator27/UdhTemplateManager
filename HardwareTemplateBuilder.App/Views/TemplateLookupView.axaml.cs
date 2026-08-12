@@ -28,6 +28,7 @@ public partial class TemplateLookupView : UserControl
     private List<Manufacturer> _manufacturers = new();
     private List<DescriptionComboItem> _leafDescComboItems = new();
     private CancellationTokenSource? _cts;
+    private string _currentSearchText = string.Empty;
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event Action<string>? NavigationRequested;
@@ -61,6 +62,8 @@ public partial class TemplateLookupView : UserControl
         DescList.SelectionChanged += (_, _) => RefreshModelList();
         ModelList.SelectionChanged += (_, _) => OnModelSelected();
         GenerateButton.Click += async (_, e) => await OnGenerateClickedAsync(e);
+        SearchBox.TextChanged += (_, _) => OnSearchTextChanged();
+        ClearSearchButton.Click += (_, _) => ClearSearch();
 
         // Show every description/model on first load; selections narrow both from there.
         RefreshDescList();
@@ -68,6 +71,21 @@ public partial class TemplateLookupView : UserControl
     }
 
     // ---------- Search ----------
+
+    private void OnSearchTextChanged()
+    {
+        _currentSearchText = SearchBox.Text?.Trim() ?? string.Empty;
+        RefreshDescList();
+        RefreshModelList();
+    }
+
+    private void ClearSearch()
+    {
+        SearchBox.Text = string.Empty;
+        _currentSearchText = string.Empty;
+        RefreshDescList();
+        RefreshModelList();
+    }
 
     /// <summary>
     /// Repopulates the Description list to show only leaf descriptions that have at least one
@@ -92,6 +110,11 @@ public partial class TemplateLookupView : UserControl
                 .Distinct()
                 .ToHashSet();
             items = _leafDescComboItems.Where(d => descIds.Contains(d.Id)).ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(_currentSearchText))
+        {
+            items = items.Where(d => d.DisplayText.Contains(_currentSearchText, StringComparison.OrdinalIgnoreCase)).ToList();
         }
 
         DescList.ItemsSource = items;
@@ -119,6 +142,14 @@ public partial class TemplateLookupView : UserControl
 
         if (mfrIds.Count > 0) query = query.Where(h => mfrIds.Contains(h.ManufacturerId));
         if (descIds.Count > 0) query = query.Where(h => descIds.Contains(h.DescriptionId));
+
+        if (!string.IsNullOrWhiteSpace(_currentSearchText))
+        {
+            query = query.Where(h => 
+                h.Manufacturer!.ManufacturerName.Contains(_currentSearchText) ||
+                h.Description!.DescriptionText.Contains(_currentSearchText) ||
+                h.ModelNumber.Contains(_currentSearchText));
+        }
 
         var results = query
             .OrderByDescending(h => h.Frequency)
