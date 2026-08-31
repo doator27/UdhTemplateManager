@@ -100,6 +100,7 @@ public partial class JobDetailView : UserControl
         GenerateForManufacturerButton.Click       += async (_, _) => await OnGenerateCoverSheetForManufacturerAsync();
         OpenCurrentPackageButton.Click     += (_, _) => OpenCurrentPackage();
         BrowseOldVersionsButton.Click      += (_, _) => BrowseOldVersions();
+        OpenJobFolderButton.Click          += (_, _) => OpenJobFolder();
 
         // Drag-and-drop reorder on linked hardware list
         LinkedHardwareList.AddHandler(PointerPressedEvent, OnLinkedListPointerPressed, RoutingStrategies.Tunnel);
@@ -510,9 +511,7 @@ public partial class JobDetailView : UserControl
         {
             var job   = ctx.Jobs.Find(_jobId);
             jobNumber = job?.JobNumber ?? string.Empty;
-            saveDir   = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
-            if (string.IsNullOrWhiteSpace(saveDir))
-                saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            saveDir   = ResolvePrimaryJobDir(ctx, job);
         }
 
         var jobDir = Path.Combine(saveDir, jobNumber);
@@ -543,6 +542,39 @@ public partial class JobDetailView : UserControl
     }
 
     /// <summary>
+    /// Opens this job's root output folder in the OS file explorer, creating it first if it
+    /// does not yet exist (e.g. before any package has been generated).
+    /// </summary>
+    private void OpenJobFolder()
+    {
+        string saveDir;
+        string jobNumber;
+        using (var ctx = DatabaseInitializer.CreateContext())
+        {
+            var job   = ctx.Jobs.Find(_jobId);
+            jobNumber = job?.JobNumber ?? string.Empty;
+            saveDir   = ResolvePrimaryJobDir(ctx, job);
+        }
+
+        if (string.IsNullOrEmpty(jobNumber))
+        {
+            PackageStatusLabel.Text = "Could not determine the job folder: job not found.";
+            return;
+        }
+
+        var jobDir = Path.Combine(saveDir, jobNumber);
+        try
+        {
+            Directory.CreateDirectory(jobDir);
+            Process.Start(new ProcessStartInfo(jobDir) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            PackageStatusLabel.Text = $"Could not open folder: {ex.Message}";
+        }
+    }
+
+    /// <summary>
     /// Opens the "Old versions" folder for this job in the OS file explorer, if it exists.
     /// </summary>
     private void BrowseOldVersions()
@@ -553,9 +585,7 @@ public partial class JobDetailView : UserControl
         {
             var job     = ctx.Jobs.Find(_jobId);
             jobNumber   = job?.JobNumber ?? string.Empty;
-            saveDir = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
-            if (string.IsNullOrWhiteSpace(saveDir))
-                saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            saveDir = ResolvePrimaryJobDir(ctx, job);
         }
 
         var oldVersionsDir = Path.Combine(saveDir, jobNumber, "Old versions");
@@ -577,6 +607,24 @@ public partial class JobDetailView : UserControl
 
     // --- Attachments ---
 
+    /// <summary>
+    /// Resolves the App Settings shared storage dir (with My Documents fallback), the job's
+    /// resolved primary/secondary save roots, and the user profile behind them, all in one call.
+    /// </summary>
+    private static JobStorageLocation ResolveJobLocation(AppDbContext ctx, Job? job)
+    {
+        var appSettingsDir = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
+        if (string.IsNullOrWhiteSpace(appSettingsDir))
+            appSettingsDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+        var profile = job != null ? ctx.UserProfiles.Find(job.UserProfileId) : null;
+        return JobStorageLocationResolver.Resolve(appSettingsDir, profile);
+    }
+
+    /// <summary>Resolves just the primary (custom, if set, else App Settings) job save root.</summary>
+    private static string ResolvePrimaryJobDir(AppDbContext ctx, Job? job) =>
+        ResolveJobLocation(ctx, job).PrimaryRoot;
+
     private void LoadAttachments()
     {
         using var ctx = DatabaseInitializer.CreateContext();
@@ -591,14 +639,27 @@ public partial class JobDetailView : UserControl
     private string? GetAttachmentsFolder()
     {
         using var ctx = DatabaseInitializer.CreateContext();
-        var job     = ctx.Jobs.Find(_jobId);
+        var job = ctx.Jobs.Find(_jobId);
         if (job == null) return null;
-        var saveDir = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
-        if (string.IsNullOrWhiteSpace(saveDir))
-            saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        var saveDir = ResolvePrimaryJobDir(ctx, job);
         var folder = Path.Combine(saveDir, job.JobNumber, "Attachments");
         Directory.CreateDirectory(folder);
         return folder;
+    }
+
+    /// <summary>
+    /// Resolves the job's secondary (shared App Settings) Attachments subfolder path, or null
+    /// when the user has no distinct custom job save location configured.
+    /// </summary>
+    private string? GetSecondaryAttachmentsFolder()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var job = ctx.Jobs.Find(_jobId);
+        if (job == null) return null;
+        var location = ResolveJobLocation(ctx, job);
+        return location.SecondaryRoot == null
+            ? null
+            : Path.Combine(location.SecondaryRoot, job.JobNumber, "Attachments");
     }
 
     private async Task AddAttachmentAsync(string fileType)
@@ -671,6 +732,10 @@ public partial class JobDetailView : UserControl
 
                 File.Copy(sourcePath, destPath);
 
+                var secondaryAttachmentsFolder = GetSecondaryAttachmentsFolder();
+                if (secondaryAttachmentsFolder != null)
+                    DirectoryMirrorHelper.CopyFile(destPath, secondaryAttachmentsFolder);
+
                 repo.Add(new JobAttachment
                 {
                     JobId      = _jobId,
@@ -740,6 +805,11 @@ public partial class JobDetailView : UserControl
         // Delete the copied file if it still exists.
         try { if (File.Exists(a.StoredPath)) File.Delete(a.StoredPath); } catch { }
 
+        // Also remove the mirrored copy from the secondary (App Settings) location, if any.
+        var secondaryAttachmentsFolder = GetSecondaryAttachmentsFolder();
+        if (secondaryAttachmentsFolder != null)
+            DirectoryMirrorHelper.DeleteFile(a.FileName, secondaryAttachmentsFolder);
+
         AttachmentStatusLabel.Foreground = AppColors.Success;
         AttachmentStatusLabel.Text = $"Removed: {a.FileName}";
         LoadAttachments();
@@ -792,9 +862,11 @@ public partial class JobDetailView : UserControl
                     .First(j => j.Id == _jobId);
 
                 var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
-                var saveDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
-                if (string.IsNullOrWhiteSpace(saveDir))
-                    saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                var appSettingsDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
+                if (string.IsNullOrWhiteSpace(appSettingsDir))
+                    appSettingsDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                var jobLocation = JobStorageLocationResolver.Resolve(appSettingsDir, profile);
+                var saveDir = jobLocation.PrimaryRoot;
 
                 var allItemIds = filteredHardware.Select(jh => jh.HardwareItemId).Distinct().ToList();
                 var hardwareDict = context.HardwareItems
@@ -854,6 +926,13 @@ public partial class JobDetailView : UserControl
                 var outPath = Path.Combine(jobDir, $"Cover Sheet - {safeName}.pdf");
 
                 new CoverSheetBuilder().Build(coverData, outPath);
+
+                if (jobLocation.SecondaryRoot != null)
+                {
+                    var secondaryJobDir = Path.Combine(jobLocation.SecondaryRoot, job.JobNumber);
+                    DirectoryMirrorHelper.CopyFile(outPath, secondaryJobDir);
+                }
+
                 return outPath;
             });
         }

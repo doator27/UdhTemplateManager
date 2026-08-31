@@ -20,6 +20,16 @@ public class UserProfile
     public string DefaultTemplateSaveLocation { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets this user's custom root folder for saving job output (packages, cover
+    /// sheets, attachments, old-version backups, and history). When set, it is used as the
+    /// primary job save location and a copy of everything is still written to the shared
+    /// App Settings <c>TemplateStorageLocation</c>. Null/empty means "use the App Settings
+    /// location only", matching prior behavior. Templates (not jobs) always use the App
+    /// Settings location regardless of this setting.
+    /// </summary>
+    public string? CustomJobSaveLocation { get; set; }
+
+    /// <summary>
     /// Gets or sets the stable machine identifier this profile is bound to.
     /// Null until the profile has been used on at least one machine.
     /// </summary>

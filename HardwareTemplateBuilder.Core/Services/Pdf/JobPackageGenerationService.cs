@@ -128,9 +128,14 @@ public class JobPackageGenerationService
             .AsReadOnly();
 
         var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
-        var saveDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
-        if (string.IsNullOrWhiteSpace(saveDir))
-            saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        var appSettingsDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
+        if (string.IsNullOrWhiteSpace(appSettingsDir))
+            appSettingsDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+        // Templates always use the shared App Settings location. Job output (this method's
+        // concern) may instead go to the user's custom job save location, if one is set.
+        var jobLocation = JobStorageLocationResolver.Resolve(appSettingsDir, profile);
+        var saveDir = jobLocation.PrimaryRoot;
 
         var allDescriptions = context.Descriptions.ToDictionary(d => d.Id);
 
@@ -193,7 +198,7 @@ public class JobPackageGenerationService
                 progress?.Report($"Downloading {t.TemplateNumber} ({i + 1}/{allUniqueTemplates.Count})...");
                 try
                 {
-                    await refreshService.RefreshSingleAsync(t.Id, saveDir, cancellationToken);
+                    await refreshService.RefreshSingleAsync(t.Id, appSettingsDir, cancellationToken);
                 }
                 catch
                 {
@@ -229,6 +234,14 @@ public class JobPackageGenerationService
         {
             var item = context.HardwareItems.Find(itemId);
             if (item != null) freqService.IncrementFrequency(item);
+        }
+
+        // Keep a full copy of the job folder in the shared App Settings location when the user
+        // has a distinct custom job save location configured (best-effort; never throws).
+        if (jobLocation.SecondaryRoot != null)
+        {
+            var secondaryJobDir = Path.Combine(jobLocation.SecondaryRoot, job.JobNumber);
+            DirectoryMirrorHelper.CopyDirectoryContents(jobDir, secondaryJobDir);
         }
 
         return new JobPackageGenerationResult

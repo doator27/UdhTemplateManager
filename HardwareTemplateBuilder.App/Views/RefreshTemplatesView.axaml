@@ -29,6 +29,7 @@
                     <Button Name="StartButton"  Content="Start Refresh" Margin="0,0,8,0"/>
                     <Button Name="CancelButton" Content="Cancel" IsEnabled="False"/>
                 </StackPanel>
+                <TextBlock Name="EstimateLabel" Foreground="#A7ADB8" Margin="0,8,0,0"/>
             </StackPanel>
         </Border>
 
@@ -40,12 +41,26 @@
                          IsIndeterminate="True"
                          Height="14" Margin="0,0,0,4"/>
             <TextBlock Name="ProgressText" Foreground="#A7ADB8"/>
+            <TextBlock Name="ElapsedText" Foreground="#A7ADB8" Margin="0,4,0,0"/>
         </StackPanel>
 
         <!-- Results area (fills remaining space; hidden until refresh completes) -->
         <ScrollViewer Name="ResultsPanel" IsVisible="False">
             <StackPanel Margin="0,4,0,0">
                 <TextBlock Name="SummaryLabel" FontWeight="Bold" Margin="0,0,0,8"/>
+                <TextBlock Name="TimingSummaryLabel" Foreground="#A7ADB8" Margin="0,0,0,8"/>
+
+                <StackPanel Name="SlowDownloadsPanel" IsVisible="False" Margin="0,0,0,8">
+                    <TextBlock Name="SlowDownloadsLabel"
+                               Foreground="#F2C94C" FontWeight="Bold"
+                               Margin="0,0,0,4"/>
+                    <ListBox Name="SlowDownloadsList" MaxHeight="200" Margin="0,0,0,8"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Name="TimingReportPathLabel" Foreground="#A7ADB8" TextWrapping="Wrap"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <Button Name="OpenTimingReportButton" Content="Open Timing Report" IsVisible="False" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
 
                 <!-- Failure list (hidden when there are no failures) -->
                 <StackPanel Name="FailuresPanel" IsVisible="False">

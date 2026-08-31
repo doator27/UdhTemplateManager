@@ -63,7 +63,8 @@
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                             <Button Name="GeneratePackageButton"    Content="Generate Package"    Margin="0,0,8,0"/>
                             <Button Name="OpenCurrentPackageButton" Content="Open Current Package" Margin="0,0,8,0"/>
-                            <Button Name="BrowseOldVersionsButton"  Content="Browse Old Versions"/>
+                            <Button Name="BrowseOldVersionsButton"  Content="Browse Old Versions" Margin="0,0,8,0"/>
+                            <Button Name="OpenJobFolderButton"      Content="Open Job Folder"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8" Spacing="6">
                             <ComboBox Name="ManufacturerFilterComboBox" Width="220" PlaceholderText="Select manufacturer…"/>

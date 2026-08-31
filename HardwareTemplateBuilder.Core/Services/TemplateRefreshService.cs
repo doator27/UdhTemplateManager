@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -27,6 +28,21 @@ public class RefreshProgress
 
     /// <summary>Gets the ID (IndividualTemplates table row) of the template being processed.</summary>
     public int TemplateId { get; init; }
+}
+
+/// <summary>
+/// Records how long a single template took to download successfully.
+/// </summary>
+public class TemplateTiming
+{
+    /// <summary>Gets the ID of the template that was downloaded.</summary>
+    public int TemplateId { get; init; }
+
+    /// <summary>Gets a human-readable name for the template.</summary>
+    public string TemplateName { get; init; } = string.Empty;
+
+    /// <summary>Gets how long the download took, in seconds.</summary>
+    public double ElapsedSeconds { get; init; }
 }
 
 /// <summary>
@@ -60,6 +76,12 @@ public class RefreshResult
 
     /// <summary>Gets the list of failures, one per template that could not be downloaded.</summary>
     public IReadOnlyList<RefreshFailure> Failures { get; init; } = Array.Empty<RefreshFailure>();
+
+    /// <summary>Gets the total wall-clock time the refresh operation took, in seconds.</summary>
+    public double TotalElapsedSeconds { get; init; }
+
+    /// <summary>Gets the per-template download timings for every template that succeeded.</summary>
+    public IReadOnlyList<TemplateTiming> Timings { get; init; } = Array.Empty<TemplateTiming>();
 }
 
 /// <summary>
@@ -116,7 +138,9 @@ public class TemplateRefreshService
 
         int successCount = 0;
         var failures = new List<RefreshFailure>();
+        var timings = new List<TemplateTiming>();
         int total = templates.Count;
+        var overallStopwatch = Stopwatch.StartNew();
 
         for (int i = 0; i < templates.Count; i++)
         {
@@ -133,6 +157,7 @@ public class TemplateRefreshService
                 TemplateId   = template.Id
             });
 
+            var downloadStopwatch = Stopwatch.StartNew();
             try
             {
                 var destPath = BuildDestPath(saveLocation, template, allDescriptions, fileName);
@@ -142,7 +167,14 @@ public class TemplateRefreshService
                 // Persist the updated local path immediately so partial progress is not lost.
                 template.LocalLink = destPath;
                 await _context.SaveChangesAsync(cancellationToken);
+                downloadStopwatch.Stop();
                 successCount++;
+                timings.Add(new TemplateTiming
+                {
+                    TemplateId     = template.Id,
+                    TemplateName   = $"{template.Manufacturer?.ManufacturerName} {template.TemplateNumber}",
+                    ElapsedSeconds = downloadStopwatch.Elapsed.TotalSeconds
+                });
             }
             catch (OperationCanceledException)
             {
@@ -165,11 +197,15 @@ public class TemplateRefreshService
             }
         }
 
+        overallStopwatch.Stop();
+
         return new RefreshResult
         {
-            SuccessCount   = successCount,
-            TotalAttempted = total,
-            Failures       = failures.AsReadOnly()
+            SuccessCount        = successCount,
+            TotalAttempted      = total,
+            Failures            = failures.AsReadOnly(),
+            TotalElapsedSeconds = overallStopwatch.Elapsed.TotalSeconds,
+            Timings             = timings.AsReadOnly()
         };
     }
 
@@ -211,6 +247,32 @@ public class TemplateRefreshService
             throw;
         }
         return true;
+    }
+
+    /// <summary>
+    /// Identifies templates whose download time was more than one standard deviation above the
+    /// mean download time for the run, along with a human-readable reason.
+    /// </summary>
+    /// <param name="timings">Per-template timings collected from a completed refresh.</param>
+    /// <returns>
+    /// The mean, standard deviation, and the subset of <paramref name="timings"/> considered slow
+    /// outliers (empty if there are fewer than 2 timings, since a standard deviation is not
+    /// meaningful with only one data point).
+    /// </returns>
+    public static (double Mean, double StdDev, IReadOnlyList<TemplateTiming> Outliers) FindSlowOutliers(
+        IReadOnlyList<TemplateTiming> timings)
+    {
+        if (timings.Count < 2)
+            return (timings.Count == 1 ? timings[0].ElapsedSeconds : 0, 0, Array.Empty<TemplateTiming>());
+
+        var mean = timings.Average(t => t.ElapsedSeconds);
+        var variance = timings.Sum(t => Math.Pow(t.ElapsedSeconds - mean, 2)) / timings.Count;
+        var stdDev = Math.Sqrt(variance);
+
+        var threshold = mean + stdDev;
+        var outliers = timings.Where(t => t.ElapsedSeconds > threshold).ToList();
+
+        return (mean, stdDev, outliers.AsReadOnly());
     }
 
     // ---------- Private helpers ----------

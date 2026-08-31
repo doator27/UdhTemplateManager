@@ -19,8 +19,14 @@ namespace HardwareTemplateBuilder.App.Views;
 /// </summary>
 public partial class RefreshTemplatesView : UserControl
 {
+    private const string AvgSecondsPerTemplateKey = "RefreshHistoryAvgSecondsPerTemplate";
+    private const string HistoryTemplateCountKey   = "RefreshHistoryTemplateCount";
+
     private CancellationTokenSource? _cts;
     private string? _reportPath;
+    private string? _timingReportPath;
+    private DispatcherTimer? _elapsedTimer;
+    private Stopwatch? _elapsedStopwatch;
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event System.Action<string>? NavigationRequested;
@@ -37,6 +43,7 @@ public partial class RefreshTemplatesView : UserControl
         StartButton.Click  += async (_, _) => await OnStartRefreshAsync();
         CancelButton.Click += (_, _) => _cts?.Cancel();
         OpenReportButton.Click += (_, _) => OpenReport();
+        OpenTimingReportButton.Click += (_, _) => OpenTimingReport();
     }
 
     // ---------- Refresh ----------
@@ -72,6 +79,13 @@ public partial class RefreshTemplatesView : UserControl
         StatusLabel.Text    = string.Empty;
         ResultsPanel.IsVisible = false;
 
+        var estimateSeconds = EstimateDuration(templateCount);
+        EstimateLabel.Text = estimateSeconds.HasValue
+            ? $"Estimated time: ~{FormatDuration(estimateSeconds.Value)} (based on {templateCount} template(s))"
+            : string.Empty;
+
+        StartElapsedTimer();
+
         RefreshResult? result;
         try
         {
@@ -95,24 +109,109 @@ public partial class RefreshTemplatesView : UserControl
         }
         catch (OperationCanceledException)
         {
+            StopElapsedTimer();
             StatusLabel.Text = "Refresh cancelled.";
             SetRunningState(running: false);
             return;
         }
         catch (Exception ex)
         {
+            StopElapsedTimer();
             StatusLabel.Text = $"Unexpected error: {ex.Message}";
             SetRunningState(running: false);
             return;
         }
 
+        StopElapsedTimer();
         SetRunningState(running: false);
+
+        UpdateDurationHistory(result);
 
         _reportPath = result.Failures.Count > 0
             ? WriteFailureReport(saveLocation, result)
             : null;
 
+        _timingReportPath = WriteTimingReport(saveLocation, result);
+
         ShowResults(result);
+    }
+
+    // ---------- Timing / estimation ----------
+
+    /// <summary>Starts a UI timer that updates <see cref="ElapsedText"/> once per second.</summary>
+    private void StartElapsedTimer()
+    {
+        _elapsedStopwatch = Stopwatch.StartNew();
+        _elapsedTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _elapsedTimer.Tick += (_, _) =>
+            ElapsedText.Text = $"Elapsed: {FormatDuration(_elapsedStopwatch!.Elapsed.TotalSeconds)}";
+        _elapsedTimer.Start();
+    }
+
+    /// <summary>Stops the elapsed UI timer started by <see cref="StartElapsedTimer"/>.</summary>
+    private void StopElapsedTimer()
+    {
+        _elapsedTimer?.Stop();
+        _elapsedTimer = null;
+        _elapsedStopwatch?.Stop();
+    }
+
+    /// <summary>
+    /// Estimates how long a refresh of <paramref name="templateCount"/> template(s) will take,
+    /// based on the running average seconds-per-template recorded from prior refreshes.
+    /// Returns null if no history has been recorded yet.
+    /// </summary>
+    private double? EstimateDuration(int templateCount)
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var settingsRepo = new AppSettingRepository(ctx);
+        var avgRaw = settingsRepo.GetValue(AvgSecondsPerTemplateKey);
+
+        if (!double.TryParse(avgRaw, System.Globalization.CultureInfo.InvariantCulture, out var avgPerTemplate)
+            || avgPerTemplate <= 0)
+            return null;
+
+        return avgPerTemplate * templateCount;
+    }
+
+    /// <summary>
+    /// Updates the persisted running average seconds-per-template using this run's results,
+    /// weighted by the number of templates successfully downloaded so the estimate becomes more
+    /// accurate over time.
+    /// </summary>
+    private void UpdateDurationHistory(RefreshResult result)
+    {
+        if (result.SuccessCount == 0)
+            return;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var settingsRepo = new AppSettingRepository(ctx);
+
+        double.TryParse(settingsRepo.GetValue(AvgSecondsPerTemplateKey),
+            System.Globalization.CultureInfo.InvariantCulture, out var prevAvg);
+        int.TryParse(settingsRepo.GetValue(HistoryTemplateCountKey),
+            System.Globalization.CultureInfo.InvariantCulture, out var prevCount);
+
+        var thisRunAvg = result.TotalElapsedSeconds / result.SuccessCount;
+        var newCount = prevCount + result.SuccessCount;
+        var newAvg = prevCount <= 0
+            ? thisRunAvg
+            : ((prevAvg * prevCount) + (thisRunAvg * result.SuccessCount)) / newCount;
+
+        settingsRepo.SetValue(AvgSecondsPerTemplateKey, newAvg.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        settingsRepo.SetValue(HistoryTemplateCountKey, newCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        ctx.SaveChanges();
+    }
+
+    /// <summary>Formats a duration in seconds as a short, human-readable string.</summary>
+    private static string FormatDuration(double seconds)
+    {
+        var ts = TimeSpan.FromSeconds(seconds);
+        return ts.TotalHours >= 1
+            ? $"{(int)ts.TotalHours}h {ts.Minutes}m {ts.Seconds}s"
+            : ts.TotalMinutes >= 1
+                ? $"{ts.Minutes}m {ts.Seconds}s"
+                : $"{ts.Seconds}s";
     }
 
     // ---------- UI helpers ----------
@@ -137,6 +236,30 @@ public partial class RefreshTemplatesView : UserControl
         SummaryLabel.Text = result.TotalAttempted == 0
             ? "No templates with online links were found."
             : $"{result.SuccessCount} of {result.TotalAttempted} template(s) updated successfully.";
+
+        TimingSummaryLabel.Text = result.SuccessCount > 0
+            ? $"Total time: {FormatDuration(result.TotalElapsedSeconds)} " +
+              $"(average {FormatDuration(result.TotalElapsedSeconds / result.SuccessCount)} per template)."
+            : string.Empty;
+
+        var (mean, stdDev, outliers) = TemplateRefreshService.FindSlowOutliers(result.Timings);
+        if (outliers.Count > 0)
+        {
+            SlowDownloadsLabel.Text = $"{outliers.Count} download(s) took unusually long " +
+                $"(more than 1 standard deviation above the {FormatDuration(mean)} average):";
+            SlowDownloadsList.ItemsSource = outliers
+                .Select(o => $"[ID {o.TemplateId}] {o.TemplateName}: {FormatDuration(o.ElapsedSeconds)} " +
+                             $"(average {FormatDuration(mean)}, std dev {FormatDuration(stdDev)})")
+                .ToList();
+            SlowDownloadsPanel.IsVisible = true;
+
+            TimingReportPathLabel.Text  = _timingReportPath != null ? $"Timing report saved to: {_timingReportPath}" : string.Empty;
+            OpenTimingReportButton.IsVisible = _timingReportPath != null;
+        }
+        else
+        {
+            SlowDownloadsPanel.IsVisible = false;
+        }
 
         if (result.Failures.Count > 0)
         {
@@ -210,6 +333,66 @@ public partial class RefreshTemplatesView : UserControl
         catch (Exception ex)
         {
             StatusLabel.Text = $"Could not open the report: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Writes a timestamped text report listing every template whose download time was more than
+    /// one standard deviation above the run's average, along with a likely reason, so unusually
+    /// slow sources can be investigated. Returns null (and does nothing) if there are no outliers.
+    /// Best-effort: a write failure is reported in <see cref="StatusLabel"/> rather than throwing.
+    /// </summary>
+    private string? WriteTimingReport(string saveLocation, RefreshResult result)
+    {
+        var (mean, stdDev, outliers) = TemplateRefreshService.FindSlowOutliers(result.Timings);
+        if (outliers.Count == 0)
+            return null;
+
+        try
+        {
+            var reportPath = Path.Combine(saveLocation,
+                $"TemplateRefreshTiming_{DateTime.Now:yyyy-MM-dd_HHmmss}.txt");
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"Template Refresh Timing Report \u2014 {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Total refresh time: {FormatDuration(result.TotalElapsedSeconds)} " +
+                          $"for {result.SuccessCount} template(s).");
+            sb.AppendLine($"Average download time: {FormatDuration(mean)}, standard deviation: {FormatDuration(stdDev)}.");
+            sb.AppendLine($"{outliers.Count} download(s) exceeded {FormatDuration(mean + stdDev)} (mean + 1 std dev):");
+            sb.AppendLine();
+
+            foreach (var o in outliers)
+            {
+                var multiple = stdDev > 0 ? (o.ElapsedSeconds - mean) / stdDev : 0;
+                sb.AppendLine($"[ID {o.TemplateId}] {o.TemplateName}");
+                sb.AppendLine($"  Download time: {FormatDuration(o.ElapsedSeconds)} " +
+                              $"({multiple:F1} std dev above the {FormatDuration(mean)} average)");
+                sb.AppendLine($"  Likely reason: unusually slow or throttled response from the source server, " +
+                              $"a larger-than-average file, or transient network latency during this run.");
+                sb.AppendLine();
+            }
+
+            Directory.CreateDirectory(saveLocation);
+            File.WriteAllText(reportPath, sb.ToString());
+            return reportPath;
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = $"Refresh complete, but the timing report could not be written: {ex.Message}";
+            return null;
+        }
+    }
+
+    private void OpenTimingReport()
+    {
+        if (_timingReportPath == null) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo(_timingReportPath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = $"Could not open the timing report: {ex.Message}";
         }
     }
 }
