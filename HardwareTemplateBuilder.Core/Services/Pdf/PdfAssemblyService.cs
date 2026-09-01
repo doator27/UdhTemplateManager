@@ -395,7 +395,7 @@ public class PdfAssemblyService
         return new CoverSheetData
         {
             JobNumber          = request.Job.JobNumber,
-            JobName            = request.Job.JobName,
+            JobName            = !string.IsNullOrWhiteSpace(request.DisplayName) ? request.DisplayName! : request.Job.JobName,
             CustomerName       = request.Job.Customer?.CustomerName             ?? string.Empty,
             ProjectManagerName = request.Job.ProjectManager?.ProjectManagerName ?? string.Empty,
             DateCreated        = DateTime.Now,

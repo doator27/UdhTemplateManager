@@ -31,8 +31,24 @@ public partial class JobDetailView : UserControl
 {
     private readonly int _jobId;
     private JobHardwareRepository? _jobHardwareRepo;
+    private JobReleaseRepository? _jobReleaseRepo;
     private List<Manufacturer> _manufacturers = new();
     private List<DescriptionComboItem> _descComboItems = new();
+
+    /// <summary>The release currently selected in the release selector; null = base hardware list.</summary>
+    private int? _currentReleaseId;
+
+    /// <summary>Whether the release selector has been populated at least once for this view instance.</summary>
+    private bool _releasesInitialized;
+
+    /// <summary>Sentinel item shown in the release combo representing the base (no-release) hardware list.</summary>
+    private sealed class BaseReleaseItem
+    {
+        public string DisplayLabel => "(Base list)";
+        public override string ToString() => "(Base list)";
+    }
+
+    private readonly BaseReleaseItem _baseReleaseItem = new();
 
     /// <summary>The observable collection backing the linked hardware listbox, enabling drag-and-drop reorder.</summary>
     private readonly ObservableCollection<JobHardware> _linkedHardware = new();
@@ -65,31 +81,44 @@ public partial class JobDetailView : UserControl
     {
         var context = DatabaseInitializer.CreateContext();
         _jobHardwareRepo = new JobHardwareRepository(context);
+        _jobReleaseRepo  = new JobReleaseRepository(context);
         _manufacturers  = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
         _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
 
         // Show job header and completion status
         var job = context.Jobs.Find(_jobId);
-        JobTitleLabel.Text = job != null ? $"Job: {job.JobNumber} — {job.JobName}" : $"Job #{_jobId}";
         _isComplete = job?.IsComplete ?? false;
         UpdateCompleteButtons();
 
         LinkedHardwareList.ItemsSource = _linkedHardware;
         LinkedHardwareList.DisplayMemberBinding = new Avalonia.Data.Binding("FullDisplayLabel");
 
+        LoadReleases();
         LoadLinkedHardware();
+
+        // The header always shows the job's base name; the release label is only used
+        // when generating a package/cover sheet with that release selected.
+        JobTitleLabel.Text = job != null
+            ? $"Job: {job.JobNumber} — {job.JobName}"
+            : $"Job #{_jobId}";
 
         // Attachments
         AttachmentList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayLabel");
         LoadAttachments();
-        AddEmailButton.Click          += async (_, _) => await AddAttachmentAsync("Email");
-        AddPdfButton.Click            += async (_, _) => await AddAttachmentAsync("PDF");
+        AddFileButton.Click            += async (_, _) => await AddAttachmentAsync();
         OpenAttachmentButton.Click    += (_, _) => OpenAttachment();
         RemoveAttachmentButton.Click  += (_, _) => RemoveAttachment();
 
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
-        BulkAddButton.Click += (_, _) => NavigationRequested?.Invoke($"BulkManufacturerSelection:{_jobId}");
+        BulkAddButton.Click += (_, _) =>
+        {
+            BulkAddSession.ReleaseId = _currentReleaseId;
+            NavigationRequested?.Invoke($"BulkManufacturerSelection:{_jobId}");
+        };
         ImportHardwareButton.Click += async (_, _) => await ImportHardwareAsync();
+
+        NewReleaseButton.Click += async (_, _) => await CreateReleaseAsync();
+        ReleaseCombo.SelectionChanged += (_, _) => OnReleaseSelectionChanged();
 
         // Phase 20: Mark complete / Reactivate
         MarkCompleteButton.Click  += async (_, _) => await MarkCompleteAsync();
@@ -155,6 +184,122 @@ public partial class JobDetailView : UserControl
         return _linkedHardware[index];
     }
 
+    // --- Release management ---
+
+    private void LoadReleases()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var releases = new JobReleaseRepository(ctx).GetByJob(_jobId).ToList();
+
+        var items = new List<object> { _baseReleaseItem };
+        items.AddRange(releases);
+
+        ReleaseCombo.ItemsSource = items;
+        ReleaseCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayLabel") { FallbackValue = "(Base list)" };
+
+        if (!_releasesInitialized)
+        {
+            // First load for this view instance: restore the job's most-recently-used release.
+            _releasesInitialized = true;
+            var lastUsedId = ctx.Jobs.Where(j => j.Id == _jobId).Select(j => j.LastActiveReleaseId).FirstOrDefault();
+            var match = lastUsedId.HasValue ? releases.FirstOrDefault(r => r.Id == lastUsedId.Value) : null;
+            ReleaseCombo.SelectedItem = match != null ? (object)match : _baseReleaseItem;
+        }
+        else
+        {
+            // Subsequent reloads: keep whatever is currently selected, if it still exists.
+            var match = _currentReleaseId.HasValue ? releases.FirstOrDefault(r => r.Id == _currentReleaseId.Value) : null;
+            ReleaseCombo.SelectedItem = _currentReleaseId.HasValue
+                ? (match != null ? (object)match : _baseReleaseItem)
+                : _baseReleaseItem;
+        }
+    }
+
+    private void OnReleaseSelectionChanged()
+    {
+        _currentReleaseId = ReleaseCombo.SelectedItem is JobRelease release ? release.Id : null;
+        LoadLinkedHardware();
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var job = ctx.Jobs.Find(_jobId);
+        if (job != null)
+        {
+            // The header always shows the job's base name, regardless of which release
+            // is selected; the release label is only used at generation time.
+            JobTitleLabel.Text = $"Job: {job.JobNumber} — {job.JobName}";
+
+            // Remember this selection so the job reopens to the same release next time.
+            if (job.LastActiveReleaseId != _currentReleaseId)
+            {
+                job.LastActiveReleaseId = _currentReleaseId;
+                ctx.SaveChanges();
+            }
+        }
+    }
+
+    private async Task CreateReleaseAsync()
+    {
+        var window = TopLevel.GetTopLevel(this) as Window;
+        if (window == null) return;
+
+        var label = await DialogHelper.PromptAsync(window, "Enter a label for the new release (e.g. \"Addendum 1\"):", "New Release");
+        if (string.IsNullOrWhiteSpace(label)) return;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var releaseRepo = new JobReleaseRepository(ctx);
+        var existingReleases = releaseRepo.GetByJob(_jobId).ToList();
+
+        var newRelease = new JobRelease
+        {
+            JobId         = _jobId,
+            ReleaseNumber = releaseRepo.NextReleaseNumber(_jobId),
+            ReleaseLabel  = label.Trim()
+        };
+        releaseRepo.Add(newRelease);
+
+        // The header always shows the job's base name; do not overwrite Job.JobName or the
+        // header text with the release label — the release label is only used when a
+        // package/cover sheet is generated with that release selected.
+        var job = ctx.Jobs.Find(_jobId);
+
+        // Offer to copy hardware from the most recent existing release (or base list).
+        if (existingReleases.Count > 0 || ctx.JobHardware.Any(jh => jh.JobId == _jobId && jh.ReleaseId == null))
+        {
+            bool copy = await DialogHelper.ConfirmAsync(window,
+                "Would you like to copy the hardware list from the previous release into this new release?",
+                "Copy Hardware");
+
+            if (copy)
+            {
+                var sourceReleaseId = existingReleases.Count > 0
+                    ? existingReleases.OrderByDescending(r => r.ReleaseNumber).First().Id
+                    : (int?)null;
+
+                var sourceRows = ctx.JobHardware
+                    .Where(jh => jh.JobId == _jobId && jh.ReleaseId == sourceReleaseId)
+                    .ToList();
+
+                foreach (var row in sourceRows)
+                {
+                    ctx.JobHardware.Add(new JobHardware
+                    {
+                        JobId             = _jobId,
+                        HardwareItemId    = row.HardwareItemId,
+                        CustomDescription = row.CustomDescription,
+                        Remarks           = row.Remarks,
+                        CalloutRemarks    = row.CalloutRemarks,
+                        ReleaseId         = newRelease.Id
+                    });
+                }
+                ctx.SaveChanges();
+            }
+        }
+
+        _currentReleaseId = newRelease.Id;
+        LoadReleases();
+        LoadLinkedHardware();
+    }
+
     // --- Hardware management ---
 
     private void LoadLinkedHardware()
@@ -166,7 +311,7 @@ public partial class JobDetailView : UserControl
                 .ThenInclude(h => h.Manufacturer)
             .Include(jh => jh.HardwareItem)
                 .ThenInclude(h => h.Description)
-            .Where(jh => jh.JobId == _jobId && jh.ReleaseId == null)
+            .Where(jh => jh.JobId == _jobId && jh.ReleaseId == _currentReleaseId)
             .OrderBy(jh => jh.HardwareItem!.Manufacturer!.ManufacturerName)
             .ThenBy(jh => jh.HardwareItem!.Description!.DescriptionText)
             .ThenBy(jh => jh.HardwareItem!.ModelNumber)
@@ -287,6 +432,7 @@ public partial class JobDetailView : UserControl
 
         BulkAddSession.PendingRows = pendingRows;
         BulkAddSession.JobId       = _jobId;
+        BulkAddSession.ReleaseId   = _currentReleaseId;
         NavigationRequested?.Invoke($"TemplateResolutionWizard:{_jobId}");
     }
 
@@ -345,7 +491,7 @@ public partial class JobDetailView : UserControl
         using var context = DatabaseInitializer.CreateContext();
 
         var hardwareIds = context.JobHardware
-            .Where(jh => jh.JobId == _jobId)
+            .Where(jh => jh.JobId == _jobId && jh.ReleaseId == _currentReleaseId)
             .Select(jh => jh.HardwareItemId)
             .ToList();
 
@@ -445,7 +591,7 @@ public partial class JobDetailView : UserControl
         {
             var service = new JobPackageGenerationService(DatabaseInitializer.CreateContext, httpClient);
             var result = await Task.Run(
-                () => service.GenerateAsync(_jobId, orderedJobHardware, progress, ct), ct);
+                () => service.GenerateAsync(_jobId, orderedJobHardware, progress, ct, _currentReleaseId), ct);
             outputPath = result.OutputPath;
         }
         catch (OperationCanceledException)
@@ -662,13 +808,26 @@ public partial class JobDetailView : UserControl
             : Path.Combine(location.SecondaryRoot, job.JobNumber, "Attachments");
     }
 
-    private async Task AddAttachmentAsync(string fileType)
+    /// <summary>Determines the FileType tag stored for an attachment based on its extension.</summary>
+    private static string DetectAttachmentFileType(string filePath)
+    {
+        var ext = Path.GetExtension(filePath).TrimStart('.').ToUpperInvariant();
+        return ext switch
+        {
+            "EML" or "MSG" => "Email",
+            "PDF"           => "PDF",
+            ""              => "File",
+            _               => ext
+        };
+    }
+
+    private async Task AddAttachmentAsync()
     {
         try
         {
             AttachmentStatusLabel.Text = "";
             AttachmentStatusLabel.Foreground = AppColors.Danger;
-            
+
             var topLevel = TopLevel.GetTopLevel(this) as Window;
             if (topLevel == null)
             {
@@ -676,13 +835,11 @@ public partial class JobDetailView : UserControl
                 return;
             }
 
-            var filters = fileType == "Email"
-                ? new[] { new FilePickerFileType("Email / PDF") { Patterns = new[] { "*.eml", "*.msg", "*.pdf" } } }
-                : new[] { new FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } } };
+            var filters = new[] { new FilePickerFileType("Email / PDF / File") { Patterns = new[] { "*.eml", "*.msg", "*.pdf", "*.*" } } };
 
             var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title         = $"Select {fileType} file",
+                Title         = "Select file",
                 AllowMultiple = true,
                 FileTypeFilter = filters
             });
@@ -735,6 +892,8 @@ public partial class JobDetailView : UserControl
                 var secondaryAttachmentsFolder = GetSecondaryAttachmentsFolder();
                 if (secondaryAttachmentsFolder != null)
                     DirectoryMirrorHelper.CopyFile(destPath, secondaryAttachmentsFolder);
+
+                var fileType = DetectAttachmentFileType(destPath);
 
                 repo.Add(new JobAttachment
                 {
@@ -861,6 +1020,11 @@ public partial class JobDetailView : UserControl
                     .Include(j => j.ProjectManager)
                     .First(j => j.Id == _jobId);
 
+                var release = _currentReleaseId.HasValue
+                    ? context.JobReleases.FirstOrDefault(r => r.Id == _currentReleaseId.Value)
+                    : null;
+                var displayName = release?.ReleaseLabel ?? job.JobName;
+
                 var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
                 var appSettingsDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
                 if (string.IsNullOrWhiteSpace(appSettingsDir))
@@ -912,7 +1076,7 @@ public partial class JobDetailView : UserControl
                 var coverData = new CoverSheetData
                 {
                     JobNumber          = job.JobNumber,
-                    JobName            = job.JobName,
+                    JobName            = displayName,
                     CustomerName       = job.Customer?.CustomerName             ?? string.Empty,
                     ProjectManagerName = job.ProjectManager?.ProjectManagerName ?? string.Empty,
                     DateCreated        = DateTime.Now,

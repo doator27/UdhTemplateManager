@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using HardwareTemplateBuilder.App;
 using HardwareTemplateBuilder.App.Helpers;
@@ -98,7 +99,7 @@ public partial class JobsView : UserControl
             LoadJobList();
         };
         JobList.SelectionChanged += (_, _) => OnJobSelected();
-        SaveButton.Click += (_, _) => Save();
+        SaveButton.Click += async (_, _) => await SaveAsync();
         NewButton.Click += (_, _) => ClearForm();
         DeleteButton.Click += async (_, _) =>
         {
@@ -298,7 +299,7 @@ public partial class JobsView : UserControl
         LoadJobList();
     }
 
-    private void Save()
+    private async Task SaveAsync()
     {
         var jobNumber = JobNumberBox.Text?.Trim();
         var jobName = JobNameBox.Text?.Trim();
@@ -312,6 +313,28 @@ public partial class JobsView : UserControl
 
         if (_selectedJobId == 0)
         {
+            using (var checkCtx = DatabaseInitializer.CreateContext())
+            {
+                var duplicate = checkCtx.Jobs.FirstOrDefault(j => j.JobNumber == jobNumber);
+                if (duplicate != null)
+                {
+                    var window = TopLevel.GetTopLevel(this) as Window;
+                    bool createRelease = window != null && await DialogHelper.ConfirmAsync(window,
+                        $"A job with number '{jobNumber}' already exists (\"{duplicate.JobName}\"). " +
+                        "Would you like to create a new Release under that job instead of creating a duplicate job?",
+                        "Duplicate Job Number");
+
+                    if (createRelease)
+                    {
+                        StatusLabel.Text = "Opening existing job to add a release…";
+                        _selectedJobId = duplicate.Id;
+                        LoadJobList(duplicate.Id);
+                        NavigationRequested?.Invoke($"JobDetail:{duplicate.Id}");
+                        return;
+                    }
+                }
+            }
+
             using var ctx = DatabaseInitializer.CreateContext();
             var newJob = new JobRepository(ctx).Add(new Job
             {

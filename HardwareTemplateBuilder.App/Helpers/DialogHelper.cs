@@ -172,4 +172,66 @@ public static class DialogHelper
         await dialog.ShowDialog(owner);
         return result;
     }
+
+    /// <summary>
+    /// Shows a dialog with a text box and OK/Cancel buttons; returns the entered text,
+    /// or null if the user cancelled.
+    /// </summary>
+    /// <param name="owner">The parent window.</param>
+    /// <param name="message">The prompt message to display above the text box.</param>
+    /// <param name="title">The dialog title.</param>
+    /// <param name="defaultValue">Optional initial text to populate the text box with.</param>
+    /// <returns>The entered text, or null if cancelled.</returns>
+    public static async Task<string?> PromptAsync(Window owner, string message, string title = "Input", string? defaultValue = null)
+    {
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 380,
+            Height = 200,
+            MinWidth = 300,
+            MinHeight = 170,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = true,
+        };
+
+        string? result = null;
+
+        var textBox = new TextBox { Text = defaultValue ?? string.Empty, Margin = new Avalonia.Thickness(0, 8, 0, 8) };
+
+        var okButton     = new Button { Content = "OK",     Width = 80, Margin = new Avalonia.Thickness(5), IsDefault = true };
+        var cancelButton = new Button { Content = "Cancel", Width = 80, Margin = new Avalonia.Thickness(5), IsCancel = true };
+
+        okButton.Click     += (_, _) => { result = textBox.Text; dialog.Close(); };
+        cancelButton.Click += (_, _) => { result = null; dialog.Close(); };
+
+        dialog.Content = new Avalonia.Controls.DockPanel
+        {
+            Margin = new Avalonia.Thickness(16),
+            Children =
+            {
+                new StackPanel
+                {
+                    [Avalonia.Controls.DockPanel.DockProperty] = Avalonia.Controls.Dock.Bottom,
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    Margin = new Avalonia.Thickness(0, 8, 0, 0),
+                    Children = { okButton, cancelButton }
+                },
+                new StackPanel
+                {
+                    Children =
+                    {
+                        new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+                        textBox
+                    }
+                }
+            }
+        };
+
+        dialog.Opened += (_, _) => textBox.Focus();
+
+        await dialog.ShowDialog(owner);
+        return result;
+    }
 }

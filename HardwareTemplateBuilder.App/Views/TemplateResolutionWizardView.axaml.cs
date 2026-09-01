@@ -438,7 +438,8 @@ public partial class TemplateResolutionWizardView : UserControl
                 bool isDuplicate = ctx.JobHardware.Any(jh =>
                     jh.JobId             == _jobId &&
                     jh.HardwareItemId    == hwItemId &&
-                    jh.CustomDescription == customLabel);
+                    jh.CustomDescription == customLabel &&
+                    jh.ReleaseId         == BulkAddSession.ReleaseId);
 
                 if (isDuplicate)
                 {
@@ -451,7 +452,8 @@ public partial class TemplateResolutionWizardView : UserControl
                     JobId             = _jobId,
                     HardwareItemId    = hwItemId,
                     CustomDescription = customLabel,
-                    CalloutRemarks    = remarks
+                    CalloutRemarks    = remarks,
+                    ReleaseId         = BulkAddSession.ReleaseId
                 });
             }
         }

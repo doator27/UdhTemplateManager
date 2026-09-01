@@ -176,20 +176,6 @@ public partial class BackupDatabaseView : UserControl
 
                 // Reload recent backups list
                 LoadRecentBackups();
-
-                // Ask if the user wants to open the backup folder
-                var window = TopLevel.GetTopLevel(this) as Window;
-                if (window != null)
-                {
-                    bool openFolder = await DialogHelper.ConfirmAsync(window,
-                        "Backup created successfully!\n\nWould you like to open the backup folder?",
-                        "Backup Complete");
-
-                    if (openFolder)
-                    {
-                        OpenBackupLocation();
-                    }
-                }
             }
             else
             {

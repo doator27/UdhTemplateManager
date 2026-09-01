@@ -93,6 +93,13 @@ public static class BulkAddSession
     public static int JobId { get; set; }
 
     /// <summary>
+    /// Gets or sets the <see cref="JobRelease"/> ID that newly-added hardware should be scoped to.
+    /// Null means the base (no-release) hardware list. Set from the currently selected release on
+    /// <see cref="HardwareTemplateBuilder.App.Views.JobDetailView"/> before entering the bulk-add flow.
+    /// </summary>
+    public static int? ReleaseId { get; set; }
+
+    /// <summary>
     /// Gets or sets the ordered list of manufacturers selected for the current bulk-add session.
     /// Populated by <c>BulkManufacturerSelectionView</c> and consumed by the hub and item entry views.
     /// </summary>

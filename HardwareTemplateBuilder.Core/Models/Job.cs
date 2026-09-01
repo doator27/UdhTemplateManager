@@ -70,4 +70,14 @@ public class Job
 
     /// <summary>Gets or sets the named releases (addenda) created for this job.</summary>
     public ICollection<JobRelease> Releases { get; set; } = new List<JobRelease>();
+
+    /// <summary>
+    /// Gets or sets the foreign key to the most recently viewed/used <see cref="JobRelease"/> for
+    /// this job. Null means the base (no-release) hardware list was last used, or no release has
+    /// been selected yet. Used to restore the release selector when the job is reopened.
+    /// </summary>
+    public int? LastActiveReleaseId { get; set; }
+
+    /// <summary>Gets or sets the last active release (null = base list).</summary>
+    public JobRelease? LastActiveRelease { get; set; }
 }

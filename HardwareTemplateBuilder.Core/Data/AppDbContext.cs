@@ -244,6 +244,13 @@ public class AppDbContext : DbContext
             .HasForeignKey(jh => jh.ReleaseId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Job → LastActiveRelease (optional FK; set null when the referenced release is deleted)
+        modelBuilder.Entity<Job>()
+            .HasOne(j => j.LastActiveRelease)
+            .WithMany()
+            .HasForeignKey(j => j.LastActiveReleaseId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // BulkAddDraft → Job (one draft per job; cascade on job delete)
         modelBuilder.Entity<BulkAddDraft>()
             .HasOne(d => d.Job)

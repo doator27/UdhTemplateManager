@@ -63,6 +63,7 @@ public partial class IndividualTemplatesView : UserControl
         MfrList.SelectionChanged += (_, _) => { RefreshDescList(); RefreshTemplateNumberList(); };
         DescList.SelectionChanged += (_, _) => RefreshTemplateNumberList();
         TemplateNumberList.SelectionChanged += (_, _) => OnSelectionChanged();
+        TemplateNumberSearchBox.TextChanged += (_, _) => RefreshTemplateNumberList();
 
         RefreshDescList();
         RefreshTemplateNumberList();
@@ -123,6 +124,10 @@ public partial class IndividualTemplatesView : UserControl
         var query = ctx.IndividualTemplates.AsQueryable();
         if (mfrIds.Count > 0) query = query.Where(t => mfrIds.Contains(t.ManufacturerId));
         if (descIds.Count > 0) query = query.Where(t => descIds.Contains(t.DescriptionId));
+
+        var searchText = TemplateNumberSearchBox.Text?.Trim();
+        if (!string.IsNullOrEmpty(searchText))
+            query = query.Where(t => t.TemplateNumber.Contains(searchText));
 
         var results = query.OrderBy(t => t.TemplateNumber).ToList();
         TemplateNumberList.ItemsSource = results;

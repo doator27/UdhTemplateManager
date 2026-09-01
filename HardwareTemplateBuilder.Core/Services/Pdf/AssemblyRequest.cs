@@ -62,6 +62,13 @@ public class AssemblyRequest
     /// printed on the cover sheet as "Templates by: {name}".
     /// </summary>
     public string PreparedByName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the display name for the cover sheet's "Job Name" field. Defaults to
+    /// <c>Job.JobName</c> when not set explicitly; pass the active release's label instead
+    /// when generating a package for a specific release so the cover sheet reflects it.
+    /// </summary>
+    public string? DisplayName { get; init; }
 }
 
 /// <summary>

@@ -352,7 +352,8 @@ public partial class BulkManufacturerSessionView : UserControl
                         var already = ctx.JobHardware.Any(jh =>
                             jh.JobId          == _jobId &&
                             jh.HardwareItemId == item.Id &&
-                            jh.CustomDescription == calloutLabel);
+                            jh.CustomDescription == calloutLabel &&
+                            jh.ReleaseId      == BulkAddSession.ReleaseId);
                         if (already) continue;
 
                         ctx.JobHardware.Add(new JobHardware
@@ -361,7 +362,8 @@ public partial class BulkManufacturerSessionView : UserControl
                             HardwareItemId    = item.Id,
                             CustomDescription = calloutLabel,
                             CalloutRemarks    = string.IsNullOrWhiteSpace(callout.CalloutRemarks)
-                                                   ? null : callout.CalloutRemarks.Trim()
+                                                   ? null : callout.CalloutRemarks.Trim(),
+                            ReleaseId         = BulkAddSession.ReleaseId
                         });
                         ctx.SaveChanges();
                         groupAdded++;

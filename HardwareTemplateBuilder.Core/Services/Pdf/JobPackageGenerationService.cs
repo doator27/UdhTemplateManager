@@ -83,7 +83,8 @@ public class JobPackageGenerationService
         int jobId,
         IReadOnlyList<(int HardwareItemId, string? CustomDescription, string? CalloutRemarks)>? orderedHardware = null,
         IProgress<string>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? releaseId = null)
     {
         using var context = _contextFactory();
 
@@ -92,7 +93,12 @@ public class JobPackageGenerationService
             .Include(j => j.ProjectManager)
             .First(j => j.Id == jobId);
 
-        var orderedItems = orderedHardware ?? LoadCanonicalOrder(context, jobId);
+        var release = releaseId.HasValue
+            ? context.JobReleases.FirstOrDefault(r => r.Id == releaseId.Value)
+            : null;
+        var displayName = release?.ReleaseLabel ?? job.JobName;
+
+        var orderedItems = orderedHardware ?? LoadCanonicalOrder(context, jobId, releaseId);
 
         var allItemIds = orderedItems.Select(x => x.HardwareItemId).Distinct().ToList();
         var hardwareDict = context.HardwareItems
@@ -145,7 +151,8 @@ public class JobPackageGenerationService
             Hardware        = hardware,
             OutputDirectory = saveDir,
             AllDescriptions = allDescriptions,
-            PreparedByName  = profile?.UserName ?? string.Empty
+            PreparedByName  = profile?.UserName ?? string.Empty,
+            DisplayName     = displayName
         };
 
         // Back up the entire job folder contents before regenerating.
@@ -212,7 +219,7 @@ public class JobPackageGenerationService
 
         // Append a history entry to job_history.txt in the job folder.
         var historyPath = Path.Combine(saveDir, job.JobNumber, "job_history.txt");
-        AppendHistoryEntry(historyPath, job, hardware, result, profile?.UserName ?? "Unknown");
+        AppendHistoryEntry(historyPath, job, displayName, hardware, result, profile?.UserName ?? "Unknown");
 
         var snapshotRepo = new JobTemplateSnapshotRepository(context);
         foreach (var info in result.TemplateSnapshots)
@@ -248,7 +255,7 @@ public class JobPackageGenerationService
         {
             JobId         = jobId,
             JobNumber     = job.JobNumber,
-            JobName       = job.JobName,
+            JobName       = displayName,
             OutputPath    = result.OutputPath,
             TemplateCount = result.TemplateSnapshots.Count
         };
@@ -259,13 +266,13 @@ public class JobPackageGenerationService
     /// falls back to on every fresh load: Manufacturer → Description → ModelNumber.
     /// </summary>
     private static List<(int HardwareItemId, string? CustomDescription, string? CalloutRemarks)> LoadCanonicalOrder(
-        AppDbContext context, int jobId) =>
+        AppDbContext context, int jobId, int? releaseId = null) =>
         context.JobHardware
             .Include(jh => jh.HardwareItem)
                 .ThenInclude(h => h.Manufacturer)
             .Include(jh => jh.HardwareItem)
                 .ThenInclude(h => h.Description)
-            .Where(jh => jh.JobId == jobId && jh.ReleaseId == null)
+            .Where(jh => jh.JobId == jobId && jh.ReleaseId == releaseId)
             .OrderBy(jh => jh.HardwareItem!.Manufacturer!.ManufacturerName)
             .ThenBy(jh => jh.HardwareItem!.Description!.DescriptionText)
             .ThenBy(jh => jh.HardwareItem!.ModelNumber)
@@ -295,6 +302,7 @@ public class JobPackageGenerationService
     private static void AppendHistoryEntry(
         string historyPath,
         Job job,
+        string displayName,
         IReadOnlyList<HardwareWithTemplates> hardware,
         AssemblyResult result,
         string preparedBy)
@@ -303,7 +311,7 @@ public class JobPackageGenerationService
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"=== {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
-            sb.AppendLine($"Job:         {job.JobNumber} — {job.JobName}");
+            sb.AppendLine($"Job:         {job.JobNumber} — {displayName}");
             sb.AppendLine($"Prepared by: {preparedBy}");
             sb.AppendLine($"Hardware Items ({hardware.Count}):");
 
