@@ -32,16 +32,15 @@ public static class DatabaseInitializer
     /// Returns the active database file path.
     /// <para>
     /// When a shared master location has been configured (see
-    /// <see cref="DatabaseLocationService"/>), the app always works against this machine's
-    /// private local working copy (see <see cref="DatabaseSyncService"/>), which is synced
-    /// from/to the master on startup/shutdown. Otherwise, the default local path is used
-    /// directly (single-user / no shared location configured).
+    /// <see cref="DatabaseLocationService"/>), every machine connects directly to that shared
+    /// file — there is no per-machine local working copy. Concurrent writers are serialized via
+    /// <c>busy_timeout</c> (see <see cref="SqlitePragmaInterceptor"/>) and the in-process FIFO
+    /// gate in <see cref="AppDbContext"/>. Otherwise, the default local path is used directly
+    /// (single-user / no shared location configured).
     /// </para>
     /// </summary>
     public static string GetDatabasePath() =>
-        DatabaseLocationService.GetConfiguredPath() != null
-            ? DatabaseSyncService.GetLocalWorkingCopyPath()
-            : GetDefaultPath();
+        DatabaseLocationService.GetConfiguredPath() ?? GetDefaultPath();
 
     /// <summary>
     /// Builds a SQLite connection string for <paramref name="dbPath"/>.

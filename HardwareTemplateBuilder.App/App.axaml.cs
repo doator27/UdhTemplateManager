@@ -28,30 +28,14 @@ public partial class App : Application
             var mainWindow = new MainWindow();
             desktop.MainWindow = mainWindow;
 
-            var shuttingDown = false;
-            desktop.ShutdownRequested += async (_, e) =>
-            {
-                if (shuttingDown) return;
-
-                // Defer shutdown once so any sync already queued by a recent SaveChanges (see
-                // AppDbContext) finishes, then push a final, guaranteed-complete copy to master.
-                e.Cancel = true;
-                shuttingDown = true;
-                await DatabaseSyncService.WaitForIdleAsync();
-                DatabaseSyncService.SyncToMaster();
-                desktop.Shutdown();
-            };
-
             mainWindow.Opened += async (_, _) =>
             {
                 // Step 1: Resolve database file location (may show DatabaseSetupDialog).
                 await ResolveDatabaseLocationAsync(mainWindow);
 
-                // Step 1b: Pull the latest master database down to this machine's local
-                // working copy so all reads/writes this session start from the current data.
-                DatabaseSyncService.SyncFromMaster();
-
-                // Step 2: Apply migrations / create schema at the now-confirmed location.
+                // Step 2: Apply migrations / create schema at the now-confirmed location. All
+                // machines connect directly to this shared file — there is no local working
+                // copy to sync from/to anymore.
                 DatabaseInitializer.Initialize();
 
                 // Step 3: Auto-select the profile bound to this machine, or show picker.

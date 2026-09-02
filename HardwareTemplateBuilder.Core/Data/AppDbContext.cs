@@ -271,49 +271,61 @@ public class AppDbContext : DbContext
             .IsUnique();
     }
 
+    /// <summary>
+    /// Serializes all <see cref="SaveChanges(bool)"/>/<see cref="SaveChangesAsync"/> calls made
+    /// by this process into FIFO order. All users now write directly to the shared master
+    /// SQLite file (see <see cref="DatabaseInitializer"/>), so within a single process only one
+    /// save may be in flight at a time; combined with SQLite's own <c>busy_timeout</c> (see
+    /// <see cref="SqlitePragmaInterceptor"/>), concurrent writers across machines queue at the
+    /// file-lock level instead of racing.
+    /// </summary>
+    private static readonly SemaphoreSlim _saveGate = new(1, 1);
+
     /// <inheritdoc/>
-    /// <remarks>
-    /// After any successful local write, queues a background sync that pushes the change up
-    /// to the shared master database and then pulls a fresh copy back down (see
-    /// <see cref="DatabaseSyncService"/>), rather than waiting for app shutdown.
-    /// </remarks>
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        for (var attempt = 0; ; attempt++)
+        _saveGate.Wait();
+        try
         {
-            try
+            for (var attempt = 0; ; attempt++)
             {
-                var result = base.SaveChanges(acceptAllChangesOnSuccess);
-                DatabaseSyncService.QueueSync();
-                return result;
+                try
+                {
+                    return base.SaveChanges(acceptAllChangesOnSuccess);
+                }
+                catch (DbUpdateException ex) when (attempt == 0 && IsReadOnlyError(ex))
+                {
+                    RecoverFromReadOnly();
+                }
             }
-            catch (DbUpdateException ex) when (attempt == 0 && IsReadOnlyError(ex))
-            {
-                RecoverFromReadOnly();
-            }
+        }
+        finally
+        {
+            _saveGate.Release();
         }
     }
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// After any successful local write, queues a background sync that pushes the change up
-    /// to the shared master database and then pulls a fresh copy back down (see
-    /// <see cref="DatabaseSyncService"/>), rather than waiting for app shutdown.
-    /// </remarks>
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        for (var attempt = 0; ; attempt++)
+        await _saveGate.WaitAsync(cancellationToken);
+        try
         {
-            try
+            for (var attempt = 0; ; attempt++)
             {
-                var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-                DatabaseSyncService.QueueSync();
-                return result;
+                try
+                {
+                    return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+                }
+                catch (DbUpdateException ex) when (attempt == 0 && IsReadOnlyError(ex))
+                {
+                    RecoverFromReadOnly();
+                }
             }
-            catch (DbUpdateException ex) when (attempt == 0 && IsReadOnlyError(ex))
-            {
-                RecoverFromReadOnly();
-            }
+        }
+        finally
+        {
+            _saveGate.Release();
         }
     }
 

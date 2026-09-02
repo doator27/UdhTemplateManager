@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using HardwareTemplateBuilder.App.Helpers;
 
 namespace HardwareTemplateBuilder.App;
 
@@ -18,13 +19,23 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        CrashLogger.RegisterGlobalHandlers();
+
         if (OperatingSystem.IsWindows())
         {
             SetCurrentProcessExplicitAppUserModelID("HardwareTemplateBuilder.App");
             CreateStartMenuShortcutIfNeeded();
         }
 
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        try
+        {
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log(ex, isTerminating: true);
+            throw;
+        }
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.

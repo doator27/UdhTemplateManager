@@ -251,9 +251,8 @@ public class JobPackageGenerationService
             DirectoryMirrorHelper.CopyDirectoryContents(jobDir, secondaryJobDir);
         }
 
-        // Note: master/local database sync is now triggered automatically by every
-        // AppDbContext.SaveChanges call (see DatabaseSyncService), so no explicit sync is
-        // needed here.
+        // Note: all users connect directly to the shared master database (see AppDbContext),
+        // so no explicit sync step is needed here.
 
         return new JobPackageGenerationResult
         {
