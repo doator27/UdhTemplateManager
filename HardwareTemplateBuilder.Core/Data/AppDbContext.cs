@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using HardwareTemplateBuilder.Core.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace HardwareTemplateBuilder.Core.Data;
@@ -278,9 +279,19 @@ public class AppDbContext : DbContext
     /// </remarks>
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        var result = base.SaveChanges(acceptAllChangesOnSuccess);
-        DatabaseSyncService.QueueSync();
-        return result;
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                var result = base.SaveChanges(acceptAllChangesOnSuccess);
+                DatabaseSyncService.QueueSync();
+                return result;
+            }
+            catch (DbUpdateException ex) when (attempt == 0 && IsReadOnlyError(ex))
+            {
+                RecoverFromReadOnly();
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -291,8 +302,40 @@ public class AppDbContext : DbContext
     /// </remarks>
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-        DatabaseSyncService.QueueSync();
-        return result;
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+                DatabaseSyncService.QueueSync();
+                return result;
+            }
+            catch (DbUpdateException ex) when (attempt == 0 && IsReadOnlyError(ex))
+            {
+                RecoverFromReadOnly();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns true if <paramref name="ex"/> wraps a SQLite "attempt to write a readonly
+    /// database" error (SQLITE_READONLY, primary result code 8).
+    /// </summary>
+    private static bool IsReadOnlyError(DbUpdateException ex) =>
+        ex.InnerException is SqliteException sqliteEx && (sqliteEx.SqliteErrorCode & 0xFF) == 8;
+
+    /// <summary>
+    /// Recovers from a stale read-only SQLite connection: a connection opened while the database
+    /// file (or its -journal sidecar) was momentarily read-only stays stuck in that state for the
+    /// rest of the process, even after the underlying file permission is fixed, because
+    /// Microsoft.Data.Sqlite pools and reuses native connection handles. Clearing the pool forces
+    /// the next connection to truly reopen the file, and re-running the writable fix-up covers
+    /// the case where the file only just became writable.
+    /// </summary>
+    private void RecoverFromReadOnly()
+    {
+        var dbPath = new SqliteConnectionStringBuilder(Database.GetConnectionString()).DataSource;
+        SqliteConnection.ClearAllPools();
+        DatabaseInitializer.EnsureWritable(dbPath);
     }
 }

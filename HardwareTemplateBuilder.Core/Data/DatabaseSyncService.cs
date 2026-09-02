@@ -29,15 +29,20 @@ public static class DatabaseSyncService
     private static bool _running;
 
     /// <summary>
-    /// Queues a push-then-pull sync (local changes → master, then a fresh copy of master back
-    /// down to local so autoincrement IDs and any other users' concurrent changes stay
-    /// consistent). Call this after any successful local write (see
-    /// <see cref="AppDbContext.SaveChanges"/>).
+    /// Queues a push of local changes up to the shared master database. Call this after any
+    /// successful local write (see <see cref="AppDbContext.SaveChanges"/>).
     /// <para>
-    /// Multiple calls while a sync is already in flight are coalesced into a single extra pass
+    /// Multiple calls while a push is already in flight are coalesced into a single extra pass
     /// once the current one finishes, so callers never need to await this directly. If the
     /// master is temporarily locked by another user's sync, the push is retried with backoff
     /// before giving up for this pass (a later save will trigger another attempt).
+    /// </para>
+    /// <para>
+    /// This intentionally does <b>not</b> pull a fresh copy back down to the local working
+    /// file afterwards — the local file is likely still open/in-use by the active session's
+    /// <see cref="AppDbContext"/> instances, and overwriting it out from under them corrupts
+    /// in-flight reads and crashes the app. The local copy is refreshed from master safely on
+    /// the next app startup (see <see cref="SyncFromMaster"/> in App startup).
     /// </para>
     /// </summary>
     public static void QueueSync()
@@ -80,11 +85,6 @@ public static class DatabaseSyncService
             try
             {
                 await PushToMasterWithRetryAsync();
-
-                // Master now reflects this change (and possibly other users' concurrent
-                // changes) — pull a fresh copy back down so local autoincrement IDs and any
-                // rows added elsewhere stay consistent with the master's canonical state.
-                SyncFromMaster();
             }
             catch
             {
@@ -202,6 +202,8 @@ public static class DatabaseSyncService
             try
             {
                 File.Copy(sourcePath, destinationPath, overwrite: true);
+                ClearReadOnlyAttribute(destinationPath);
+                CopySidecarIfExists(sourcePath, destinationPath, "-journal");
                 CopySidecarIfExists(sourcePath, destinationPath, "-wal");
                 CopySidecarIfExists(sourcePath, destinationPath, "-shm");
                 return;
@@ -218,6 +220,24 @@ public static class DatabaseSyncService
         var sourceSidecar = sourcePath + suffix;
         if (!File.Exists(sourceSidecar))
             return;
-        File.Copy(sourceSidecar, destinationPath + suffix, overwrite: true);
+        var destinationSidecar = destinationPath + suffix;
+        File.Copy(sourceSidecar, destinationSidecar, overwrite: true);
+        ClearReadOnlyAttribute(destinationSidecar);
+    }
+
+    /// <summary>
+    /// Ensures <paramref name="path"/> is writable by clearing the ReadOnly attribute if set.
+    /// <see cref="File.Copy(string, string, bool)"/> preserves the source file's attributes,
+    /// so a read-only master (or a sidecar file marked read-only by a network share/antivirus)
+    /// would otherwise make the destination copy read-only too, causing SQLite writes against
+    /// the local working copy to fail with "attempt to write a readonly database".
+    /// </summary>
+    private static void ClearReadOnlyAttribute(string path)
+    {
+        if (!File.Exists(path))
+            return;
+        var attrs = File.GetAttributes(path);
+        if ((attrs & FileAttributes.ReadOnly) != 0)
+            File.SetAttributes(path, attrs & ~FileAttributes.ReadOnly);
     }
 }

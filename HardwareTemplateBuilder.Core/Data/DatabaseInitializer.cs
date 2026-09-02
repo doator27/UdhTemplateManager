@@ -57,11 +57,46 @@ public static class DatabaseInitializer
     /// </summary>
     public static AppDbContext CreateContext()
     {
+        var dbPath = GetDatabasePath();
+        EnsureWritable(dbPath);
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlite(BuildConnectionString(GetDatabasePath()))
+            .UseSqlite(BuildConnectionString(dbPath))
             .AddInterceptors(new SqlitePragmaInterceptor())
             .Options;
         return new AppDbContext(options);
+    }
+
+    /// <summary>
+    /// Ensures <paramref name="dbPath"/>, its containing folder, and its -journal/-wal/-shm
+    /// sidecar files (if present) are not marked read-only.
+    /// <para>
+    /// This app uses SQLite's DELETE journal mode, which creates a transient
+    /// <c>&lt;db&gt;-journal</c> file next to the database for every write transaction. If a
+    /// previous crash, antivirus scan, backup tool, or <see cref="File.Copy(string, string, bool)"/>
+    /// (which preserves attributes) leaves that sidecar — or the .db file itself — marked
+    /// read-only, every subsequent write fails with "attempt to write a readonly database" even
+    /// though the folder itself is writable.
+    /// </para>
+    /// </summary>
+    internal static void EnsureWritable(string dbPath)
+    {
+        var folder = Path.GetDirectoryName(dbPath);
+        if (!string.IsNullOrEmpty(folder))
+            ClearReadOnlyAttribute(folder);
+
+        ClearReadOnlyAttribute(dbPath);
+        ClearReadOnlyAttribute(dbPath + "-journal");
+        ClearReadOnlyAttribute(dbPath + "-wal");
+        ClearReadOnlyAttribute(dbPath + "-shm");
+    }
+
+    private static void ClearReadOnlyAttribute(string path)
+    {
+        if (!File.Exists(path) && !Directory.Exists(path))
+            return;
+        var attrs = File.GetAttributes(path);
+        if ((attrs & FileAttributes.ReadOnly) != 0)
+            File.SetAttributes(path, attrs & ~FileAttributes.ReadOnly);
     }
 
     /// <summary>
@@ -85,6 +120,7 @@ public static class DatabaseInitializer
     /// <param name="dbPath">Full path to a SQLite <c>.db</c> file (need not exist yet).</param>
     public static void InitializeAtPath(string dbPath)
     {
+        EnsureWritable(dbPath);
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlite(BuildConnectionString(dbPath))
             .AddInterceptors(new SqlitePragmaInterceptor())
