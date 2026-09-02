@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using HardwareTemplateBuilder.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -266,5 +268,31 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<IgnoredTemplateDuplicate>()
             .HasIndex(i => new { i.SharedLink, i.LinkType })
             .IsUnique();
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// After any successful local write, queues a background sync that pushes the change up
+    /// to the shared master database and then pulls a fresh copy back down (see
+    /// <see cref="DatabaseSyncService"/>), rather than waiting for app shutdown.
+    /// </remarks>
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        var result = base.SaveChanges(acceptAllChangesOnSuccess);
+        DatabaseSyncService.QueueSync();
+        return result;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// After any successful local write, queues a background sync that pushes the change up
+    /// to the shared master database and then pulls a fresh copy back down (see
+    /// <see cref="DatabaseSyncService"/>), rather than waiting for app shutdown.
+    /// </remarks>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        DatabaseSyncService.QueueSync();
+        return result;
     }
 }

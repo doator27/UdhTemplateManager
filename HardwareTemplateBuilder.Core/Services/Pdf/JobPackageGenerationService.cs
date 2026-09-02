@@ -251,6 +251,10 @@ public class JobPackageGenerationService
             DirectoryMirrorHelper.CopyDirectoryContents(jobDir, secondaryJobDir);
         }
 
+        // Note: master/local database sync is now triggered automatically by every
+        // AppDbContext.SaveChanges call (see DatabaseSyncService), so no explicit sync is
+        // needed here.
+
         return new JobPackageGenerationResult
         {
             JobId         = jobId,
