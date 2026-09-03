@@ -9,7 +9,7 @@ namespace HardwareTemplateBuilder.Core.Data;
 /// EF Core connection interceptor that applies per-connection SQLite PRAGMAs
 /// immediately after each connection is opened.
 /// <list type="bullet">
-///   <item><c>busy_timeout=5000</c> — waits up to 5 seconds before returning a lock error,
+///   <item><c>busy_timeout=10000</c> — waits up to 10 seconds before returning a lock error,
 ///   allowing concurrent users to queue rather than fail immediately.</item>
 /// </list>
 /// Journal mode (DELETE — safe for shared network drives) is set once at startup via
@@ -38,7 +38,7 @@ public sealed class SqlitePragmaInterceptor : DbConnectionInterceptor
     private static void ApplyPragmas(DbConnection connection)
     {
         using var cmd = connection.CreateCommand();
-        cmd.CommandText = "PRAGMA busy_timeout=5000;";
+        cmd.CommandText = "PRAGMA busy_timeout=10000;";
         cmd.ExecuteNonQuery();
     }
 }

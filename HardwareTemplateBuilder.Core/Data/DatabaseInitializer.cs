@@ -140,10 +140,10 @@ public static class DatabaseInitializer
         if (conn.State != System.Data.ConnectionState.Open)
             conn.Open();
 
-        // Patch: 5-second busy timeout so operations queue rather than fail immediately.
+        // Patch: 10-second busy timeout so operations queue rather than fail immediately.
         using (var busyCmd = conn.CreateCommand())
         {
-            busyCmd.CommandText = "PRAGMA busy_timeout=5000;";
+            busyCmd.CommandText = "PRAGMA busy_timeout=10000;";
             busyCmd.ExecuteNonQuery();
         }
 

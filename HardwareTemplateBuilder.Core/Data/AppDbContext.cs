@@ -276,10 +276,17 @@ public class AppDbContext : DbContext
     /// by this process into FIFO order. All users now write directly to the shared master
     /// SQLite file (see <see cref="DatabaseInitializer"/>), so within a single process only one
     /// save may be in flight at a time; combined with SQLite's own <c>busy_timeout</c> (see
-    /// <see cref="SqlitePragmaInterceptor"/>), concurrent writers across machines queue at the
-    /// file-lock level instead of racing.
+    /// <see cref="SqlitePragmaInterceptor"/>) and the app-level retry-with-back-off for
+    /// <c>SQLITE_BUSY</c>/<c>SQLITE_LOCKED</c> below, concurrent writers across machines queue at
+    /// the file-lock level instead of racing or failing outright.
     /// </summary>
     private static readonly SemaphoreSlim _saveGate = new(1, 1);
+
+    /// <summary>Maximum number of retries for a transient SQLITE_BUSY/SQLITE_LOCKED error.</summary>
+    private const int MaxBusyRetries = 5;
+
+    /// <summary>Base delay, in milliseconds, between SQLITE_BUSY/SQLITE_LOCKED retries (exponential back-off).</summary>
+    private const int BusyRetryBaseDelayMs = 200;
 
     /// <inheritdoc/>
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -296,6 +303,10 @@ public class AppDbContext : DbContext
                 catch (DbUpdateException ex) when (attempt == 0 && IsReadOnlyError(ex))
                 {
                     RecoverFromReadOnly();
+                }
+                catch (DbUpdateException ex) when (attempt < MaxBusyRetries && IsBusyOrLockedError(ex))
+                {
+                    Thread.Sleep(BusyRetryBaseDelayMs * (int)Math.Pow(2, attempt));
                 }
             }
         }
@@ -321,6 +332,10 @@ public class AppDbContext : DbContext
                 {
                     RecoverFromReadOnly();
                 }
+                catch (DbUpdateException ex) when (attempt < MaxBusyRetries && IsBusyOrLockedError(ex))
+                {
+                    await Task.Delay(BusyRetryBaseDelayMs * (int)Math.Pow(2, attempt), cancellationToken);
+                }
             }
         }
         finally
@@ -335,6 +350,13 @@ public class AppDbContext : DbContext
     /// </summary>
     private static bool IsReadOnlyError(DbUpdateException ex) =>
         ex.InnerException is SqliteException sqliteEx && (sqliteEx.SqliteErrorCode & 0xFF) == 8;
+
+    /// <summary>
+    /// Returns true if <paramref name="ex"/> wraps a SQLite SQLITE_BUSY (5) or SQLITE_LOCKED (6)
+    /// error, indicating transient lock contention from another concurrent user/process.
+    /// </summary>
+    private static bool IsBusyOrLockedError(DbUpdateException ex) =>
+        ex.InnerException is SqliteException sqliteEx && (sqliteEx.SqliteErrorCode & 0xFF) is 5 or 6;
 
     /// <summary>
     /// Recovers from a stale read-only SQLite connection: a connection opened while the database

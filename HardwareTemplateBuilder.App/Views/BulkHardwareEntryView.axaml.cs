@@ -235,10 +235,30 @@ public partial class BulkHardwareEntryView : UserControl
             Padding = new Avalonia.Thickness(6, 2)
         };
 
+        var openTemplatesBtn = new Button
+        {
+            Content = "Templates",
+            FontSize = 10,
+            Padding = new Avalonia.Thickness(6, 2),
+            Margin = new Avalonia.Thickness(0, 0, 4, 0)
+        };
+        openTemplatesBtn.Click += (_, _) => OpenTemplatesForItem(entry);
+
+        var itemContextMenu = new ContextMenu();
+        var openTemplatesMenuItem = new MenuItem { Header = "Open Templates for This Item" };
+        openTemplatesMenuItem.Click += (_, _) => OpenTemplatesForItem(entry);
+        itemContextMenu.Items.Add(openTemplatesMenuItem);
+
+        var expandedContextMenu = new ContextMenu();
+        var openTemplatesMenuItem2 = new MenuItem { Header = "Open Templates for This Item" };
+        openTemplatesMenuItem2.Click += (_, _) => OpenTemplatesForItem(entry);
+        expandedContextMenu.Items.Add(openTemplatesMenuItem2);
+
         var topRow = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("250,160,*,70,Auto"),
-            Margin = new Avalonia.Thickness(0, 0, 0, 8)
+            ColumnDefinitions = new ColumnDefinitions("250,160,*,70,Auto,Auto"),
+            Margin = new Avalonia.Thickness(0, 0, 0, 8),
+            ContextMenu = expandedContextMenu
         };
         topRow.Children.Add(descStack);
         Grid.SetColumn(modelStack, 1);
@@ -247,7 +267,9 @@ public partial class BulkHardwareEntryView : UserControl
         topRow.Children.Add(itemRemarksBox);
         Grid.SetColumn(matchLabel, 3);
         topRow.Children.Add(matchLabel);
-        Grid.SetColumn(removeItemBtn, 4);
+        Grid.SetColumn(openTemplatesBtn, 4);
+        topRow.Children.Add(openTemplatesBtn);
+        Grid.SetColumn(removeItemBtn, 5);
         topRow.Children.Add(removeItemBtn);
 
         var labelsPanel = new StackPanel { Spacing = 4, Margin = new Avalonia.Thickness(0, 4, 0, 0) };
@@ -295,16 +317,27 @@ public partial class BulkHardwareEntryView : UserControl
             VerticalAlignment = VerticalAlignment.Center
         };
 
+        var compactTemplatesBtn = new Button
+        {
+            Content = "Templates",
+            FontSize = 10,
+            Padding = new Avalonia.Thickness(6, 2),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        compactTemplatesBtn.Click += (_, _) => OpenTemplatesForItem(entry);
+
         var compactRow = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("200,150,*,70"),
+            ColumnDefinitions = new ColumnDefinitions("200,150,*,70,Auto"),
             Cursor = new Cursor(StandardCursorType.Hand),
-            Background = Brushes.Transparent
+            Background = Brushes.Transparent,
+            ContextMenu = itemContextMenu
         };
         Grid.SetColumn(compactDescText,   0); compactRow.Children.Add(compactDescText);
         Grid.SetColumn(compactModelText,  1); compactRow.Children.Add(compactModelText);
         Grid.SetColumn(compactRemarksText, 2); compactRow.Children.Add(compactRemarksText);
         Grid.SetColumn(compactMatchText,  3); compactRow.Children.Add(compactMatchText);
+        Grid.SetColumn(compactTemplatesBtn, 4); compactRow.Children.Add(compactTemplatesBtn);
 
         entry.UpdateCompact = () =>
         {
@@ -661,6 +694,71 @@ public partial class BulkHardwareEntryView : UserControl
                 btn.IsVisible = item.Labels.Count > 1;
             }
         }
+    }
+
+    /// <summary>
+    /// Opens the PDF template(s) linked to the hardware item matched on this row.
+    /// Prefers the locally cached file (<see cref="IndividualTemplate.LocalLink"/>); falls back
+    /// to the online link if no local copy is available. Reports status if nothing can be opened.
+    /// </summary>
+    private void OpenTemplatesForItem(ItemEntry entry)
+    {
+        if (entry.MatchedItem == null)
+        {
+            StatusLabel.Text = "Match this line to an existing hardware item before opening its templates.";
+            return;
+        }
+
+        using var context = DatabaseInitializer.CreateContext();
+        var linked = context.HardwareItemTemplates
+            .Include(hit => hit.IndividualTemplate)
+            .Where(hit => hit.HardwareItemId == entry.MatchedItem.Id)
+            .Select(hit => hit.IndividualTemplate)
+            .Where(t => t != null)
+            .ToList();
+
+        if (linked.Count == 0)
+        {
+            StatusLabel.Text = "No templates are linked to this hardware item yet.";
+            return;
+        }
+
+        var opened = 0;
+        foreach (var template in linked)
+        {
+            if (TryOpenTemplate(template!))
+            {
+                opened++;
+            }
+        }
+
+        StatusLabel.Text = opened == 0
+            ? "Could not open any linked templates (no local file or online link available)."
+            : $"Opened {opened} of {linked.Count} linked template(s).";
+    }
+
+    private bool TryOpenTemplate(IndividualTemplate template)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(template.LocalLink) && File.Exists(template.LocalLink))
+            {
+                Process.Start(new ProcessStartInfo(template.LocalLink) { UseShellExecute = true });
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(template.OnlineLink))
+            {
+                Process.Start(new ProcessStartInfo(template.OnlineLink) { UseShellExecute = true });
+                return true;
+            }
+        }
+        catch
+        {
+            // Fall through to return false below.
+        }
+
+        return false;
     }
 
     private void SaveDraft()
