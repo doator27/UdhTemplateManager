@@ -5,7 +5,14 @@ namespace HardwareTemplateBuilder.Core.Data;
 
 /// <summary>
 /// Reads and writes the <c>db_location.txt</c> pointer file that stores the path to the
-/// shared SQLite database.
+/// shared "master" SQLite database used by <see cref="MasterSyncService"/>.
+/// <para>
+/// The app always works against a local, per-machine copy of the database
+/// (<see cref="DatabaseInitializer.GetDefaultPath"/>). On startup, if a master location is
+/// configured here and reachable, new/changed local rows are merged into it and the local
+/// copy is refreshed from a clean copy of the master. If the master is unreachable, the app
+/// continues working offline against the local copy and retries next launch.
+/// </para>
 /// <para>
 /// Priority order when reading:
 /// <list type="number">

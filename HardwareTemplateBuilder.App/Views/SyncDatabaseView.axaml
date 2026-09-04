@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 x:Class="HardwareTemplateBuilder.App.Views.SyncDatabaseView">
+	<DockPanel Margin="8">
+
+		<DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+			<TextBlock Text="Sync Database" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+		</DockPanel>
+
+		<!-- Status line (docked bottom so it is always visible) -->
+		<TextBlock DockPanel.Dock="Bottom"
+				   Name="StatusLabel"
+				   TextWrapping="Wrap"
+				   Margin="0,4,0,0"/>
+
+		<Border DockPanel.Dock="Top"
+				BorderBrush="#454952" BorderThickness="1"
+				Padding="8" Margin="0,0,0,8">
+			<StackPanel>
+				<TextBlock TextWrapping="Wrap" Margin="0,0,0,8">
+					Merges any new or changed hardware/template data from this machine into the
+					shared master database, then refreshes this machine's local copy with a clean
+					copy of master &#8212; without restarting the app. If the master database is
+					unreachable, this is skipped and you can try again later.
+				</TextBlock>
+				<TextBlock Name="MasterPathLabel" Foreground="#A7ADB8" Margin="0,0,0,8" TextWrapping="Wrap"/>
+				<StackPanel Orientation="Horizontal">
+					<Button Name="SyncNowButton" Content="Sync Now" Margin="0,0,8,0"/>
+					<ProgressBar Name="SyncProgress"
+								 IsIndeterminate="True"
+								 IsVisible="False"
+								 Width="160" Height="14" VerticalAlignment="Center"/>
+				</StackPanel>
+			</StackPanel>
+		</Border>
+
+	</DockPanel>
+</UserControl>

@@ -66,6 +66,7 @@ public partial class MainWindow : Window
         _router.Register("RefreshTemplates",     () => { var v = new RefreshTemplatesView();     v.NavigationRequested += NavigateTo; return v; });
         _router.Register("DeduplicateHardware", () => { var v = new DeduplicateHardwareView(); v.NavigationRequested += NavigateTo; return v; });
         _router.Register("BackupDatabase",      () => { var v = new BackupDatabaseView();      v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("SyncDatabase",        () => { var v = new SyncDatabaseView();        v.NavigationRequested += NavigateTo; return v; });
     }
 
     /// <summary>Wires all menu item click events to their corresponding navigation targets.</summary>
@@ -103,6 +104,7 @@ public partial class MainWindow : Window
         MenuRefreshTemplates.Click     += (_, _) => NavigateTo("RefreshTemplates");
         MenuDeduplicateHardware.Click  += (_, _) => NavigateTo("DeduplicateHardware");
         MenuBackupDatabase.Click       += (_, _) => NavigateTo("BackupDatabase");
+        MenuSyncDatabase.Click         += (_, _) => NavigateTo("SyncDatabase");
         MenuHardwareItems.Click += (_, _) => NavigateTo("HardwareItems");
         MenuTemplates.Click += (_, _) => NavigateTo("Templates");
         MenuCustomers.Click += (_, _) => NavigateTo("Customers");

@@ -8,13 +8,16 @@ using HardwareTemplateBuilder.Core.Data;
 namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
-/// Modal dialog shown when no database location has been configured for this machine, or
-/// when the previously configured path is no longer reachable.
+/// Modal dialog used to configure the shared "master" database location that the local,
+/// per-machine working copy syncs with on startup (see
+/// <see cref="HardwareTemplateBuilder.Core.Data.MasterSyncService"/>).
 /// <para>
-/// The user must either create a new shared database or connect to an existing one.
+/// The user must either create a new master database or connect to an existing one.
 /// Once a valid path is confirmed, it is written to <see cref="DatabaseLocationService"/>
-/// and the dialog closes. When <paramref name="required"/> is <c>true</c> (startup) the
-/// dialog cannot be dismissed without making a valid selection.
+/// and the dialog closes. When <paramref name="required"/> is <c>true</c> the dialog cannot
+/// be dismissed without making a valid selection; this is no longer required at startup since
+/// the app always has a usable local working copy, but remains available for explicit
+/// first-time setup flows.
 /// </para>
 /// </summary>
 public partial class DatabaseSetupDialog : Window

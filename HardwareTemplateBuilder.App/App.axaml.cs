@@ -30,13 +30,19 @@ public partial class App : Application
 
             mainWindow.Opened += async (_, _) =>
             {
-                // Step 1: Resolve database file location (may show DatabaseSetupDialog).
+                // Step 1: (Reserved) master database location resolution hook.
                 await ResolveDatabaseLocationAsync(mainWindow);
 
-                // Step 2: Apply migrations / create schema at the now-confirmed location. All
-                // machines connect directly to this shared file — there is no local working
-                // copy to sync from/to anymore.
+                // Step 2: Apply migrations / create schema for the local, per-machine working
+                // copy of the database.
                 DatabaseInitializer.Initialize();
+
+                // Step 2b: Sync the local working copy with the master database, if configured
+                // and reachable — new/changed local rows are merged into master, then the local
+                // file is refreshed with a clean copy of master. If the master is unreachable,
+                // this is a no-op and the app continues working offline against the local copy.
+                await Task.Run(() =>
+                    MasterSyncService.Sync(DatabaseInitializer.GetMasterPath(), DatabaseInitializer.GetDatabasePath()));
 
                 // Step 3: Auto-select the profile bound to this machine, or show picker.
                 var machineId = MachineIdentityService.GetMachineId();
@@ -64,36 +70,14 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Ensures a valid, reachable database path is configured before the app tries to use it.
-    /// <list type="bullet">
-    ///   <item>No pointer file + default DB exists → proceeds immediately.</item>
-    ///   <item>No pointer file + no default DB → shows <see cref="DatabaseSetupDialog"/> (required).</item>
-    ///   <item>Pointer file exists + file reachable → proceeds immediately.</item>
-    ///   <item>Pointer file exists + file unreachable → shows <see cref="DatabaseSetupDialog"/>
-    ///     with an error banner explaining the previous path (required).</item>
-    /// </list>
+    /// Reports whether a master database path is configured; no longer blocks startup when the
+    /// master is unreachable — the app always has a usable local working copy
+    /// (<see cref="DatabaseInitializer.GetDatabasePath"/>) and syncs with master best-effort via
+    /// <see cref="MasterSyncService"/>. Users can still open <see cref="DatabaseSetupDialog"/>
+    /// from the File menu to configure or change the master location at any time.
     /// </summary>
-    private static async Task ResolveDatabaseLocationAsync(Window owner)
-    {
-        while (true)
-        {
-            var configuredPath = DatabaseLocationService.GetConfiguredPath();
+    private static Task ResolveDatabaseLocationAsync(Window owner) => Task.CompletedTask;
 
-            if (configuredPath == null)
-            {
-                // No custom location set — default AppData path is always valid on first run.
-                return;
-            }
-
-            if (File.Exists(configuredPath))
-                return; // Configured path is reachable.
-
-            // Pointer file exists but the file is gone (network share offline, path moved, etc.).
-            var reconnectDialog = new DatabaseSetupDialog(unreachablePath: configuredPath, required: true);
-            await reconnectDialog.ShowDialog(owner);
-            // Dialog may write a new path; loop to re-check.
-        }
-    }
 
     /// <summary>
     /// Checks <c>AppSettings["LastRefreshTimestamp"]</c> and runs a full template refresh in

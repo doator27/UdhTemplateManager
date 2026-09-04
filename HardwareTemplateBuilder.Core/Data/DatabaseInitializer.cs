@@ -29,18 +29,24 @@ public static class DatabaseInitializer
     }
 
     /// <summary>
-    /// Returns the active database file path.
+    /// Returns the active (local, per-machine) database file path.
     /// <para>
-    /// When a shared master location has been configured (see
-    /// <see cref="DatabaseLocationService"/>), every machine connects directly to that shared
-    /// file — there is no per-machine local working copy. Concurrent writers are serialized via
-    /// <c>busy_timeout</c> (see <see cref="SqlitePragmaInterceptor"/>) and the in-process FIFO
-    /// gate in <see cref="AppDbContext"/>. Otherwise, the default local path is used directly
-    /// (single-user / no shared location configured).
+    /// The app always works against this local, per-machine copy of the database
+    /// (<see cref="GetDefaultPath"/>). If a master location has been configured (see
+    /// <see cref="DatabaseLocationService"/>), it is synced with this local copy on startup via
+    /// <see cref="MasterSyncService"/> — new/changed local rows are merged into the master, then
+    /// a clean copy of the master is written back over this local file. When the master is
+    /// unreachable, the app simply continues working against the existing local copy.
     /// </para>
     /// </summary>
-    public static string GetDatabasePath() =>
-        DatabaseLocationService.GetConfiguredPath() ?? GetDefaultPath();
+    public static string GetDatabasePath() => GetDefaultPath();
+
+    /// <summary>
+    /// Returns the configured master database path (network share / shared location), or
+    /// <c>null</c> if none has been configured. Used by <see cref="MasterSyncService"/> to
+    /// merge and sync with the local working copy on startup.
+    /// </summary>
+    public static string? GetMasterPath() => DatabaseLocationService.GetConfiguredPath();
 
     /// <summary>
     /// Builds a SQLite connection string for <paramref name="dbPath"/>.
