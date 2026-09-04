@@ -62,6 +62,7 @@ public partial class App : Application
 
                 // Step 4: Update the status bar and kick off background refresh.
                 mainWindow.SetActiveUser(SessionService.ActiveUserProfile?.UserName ?? "Unknown");
+                mainWindow.RefreshActiveUserInCurrentView();
                 _ = RunStartupRefreshAsync();
             };
         }

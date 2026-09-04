@@ -119,6 +119,13 @@ public partial class BatchGenerateView : UserControl
         CreatorFilterCombo.SelectedIndex = selectIndex;
     }
 
+    /// <summary>
+    /// Re-syncs the creator filter combo to <see cref="SessionService.ActiveUserProfile"/>.
+    /// Called by the host window once the active user is resolved, since that resolution
+    /// happens asynchronously and may complete after this view has already loaded.
+    /// </summary>
+    public void RefreshActiveUserSelection() => LoadUserProfiles();
+
     private void LoadJobList()
     {
         var includeInactive = IncludeInactiveCheck.IsChecked == true;

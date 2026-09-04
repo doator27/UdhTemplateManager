@@ -49,4 +49,43 @@ public class HardwareItemRepository : RepositoryBase<HardwareItem>, IHardwareIte
 
         return query.OrderByDescending(h => h.Frequency).ToList();
     }
+
+    /// <inheritdoc/>
+    public int CopyItemsToManufacturer(int sourceManufacturerId, int targetManufacturerId)
+    {
+        if (sourceManufacturerId == targetManufacturerId)
+            return 0;
+
+        var sourceItems = _context.HardwareItems
+            .Where(h => h.ManufacturerId == sourceManufacturerId)
+            .ToList();
+
+        var existingTargetItems = _context.HardwareItems
+            .Where(h => h.ManufacturerId == targetManufacturerId)
+            .Select(h => new { h.DescriptionId, h.ModelNumber })
+            .ToHashSet();
+
+        var copiedCount = 0;
+        foreach (var sourceItem in sourceItems)
+        {
+            if (existingTargetItems.Any(e => e.DescriptionId == sourceItem.DescriptionId && e.ModelNumber == sourceItem.ModelNumber))
+                continue;
+
+            _context.HardwareItems.Add(new HardwareItem
+            {
+                ManufacturerId = targetManufacturerId,
+                DescriptionId = sourceItem.DescriptionId,
+                ModelNumber = sourceItem.ModelNumber,
+                Remarks = sourceItem.Remarks,
+                IsActive = sourceItem.IsActive,
+                Frequency = 0,
+            });
+            copiedCount++;
+        }
+
+        if (copiedCount > 0)
+            _context.SaveChanges();
+
+        return copiedCount;
+    }
 }

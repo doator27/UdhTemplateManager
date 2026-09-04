@@ -32,4 +32,16 @@ public interface IHardwareItemRepository : IRepository<HardwareItem>
     /// <param name="activeOnly">If true, only returns active items; if false, returns all items.</param>
     /// <returns>Matching hardware items ordered by frequency descending.</returns>
     IEnumerable<HardwareItem> Search(string? manufacturerName, int? descriptionId, string? modelNumber, bool activeOnly);
+
+    /// <summary>
+    /// Copies all hardware items from the source manufacturer to the target manufacturer.
+    /// The original items remain unchanged (still owned by the source manufacturer), so the
+    /// same item effectively exists under both manufacturer names after the copy.
+    /// Items that already exist for the target manufacturer (same description and model number)
+    /// are skipped to avoid duplicates.
+    /// </summary>
+    /// <param name="sourceManufacturerId">The manufacturer to copy items from.</param>
+    /// <param name="targetManufacturerId">The manufacturer to copy items to.</param>
+    /// <returns>The number of items that were copied.</returns>
+    int CopyItemsToManufacturer(int sourceManufacturerId, int targetManufacturerId);
 }

@@ -222,4 +222,23 @@ public partial class MainWindow : Window
     {
         StatusText.Text = $"Ready  —  {userName}";
     }
+
+    /// <summary>
+    /// Re-syncs the currently displayed view's "creator/user" combo box to
+    /// <see cref="SessionService.ActiveUserProfile"/>. Needed because the initial view is
+    /// navigated to synchronously at startup, before the active user profile is resolved
+    /// asynchronously in <c>App.axaml.cs</c>.
+    /// </summary>
+    public void RefreshActiveUserInCurrentView()
+    {
+        switch (ContentArea.Content)
+        {
+            case JobsView jobsView:
+                jobsView.RefreshActiveUserSelection();
+                break;
+            case BatchGenerateView batchView:
+                batchView.RefreshActiveUserSelection();
+                break;
+        }
+    }
 }
