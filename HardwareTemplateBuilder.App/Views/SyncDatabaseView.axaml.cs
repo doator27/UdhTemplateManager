@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 
 namespace HardwareTemplateBuilder.App.Views;
@@ -32,11 +33,13 @@ public partial class SyncDatabaseView : UserControl
 
         SyncNowButton.IsEnabled = !string.IsNullOrWhiteSpace(masterPath);
         SyncNowButton.Click += async (_, _) => await OnSyncNowAsync();
+        RebuildMasterButton.Click += async (_, _) => await OnRebuildMasterAsync();
     }
 
     private async Task OnSyncNowAsync()
     {
         SetRunningState(running: true);
+        RebuildMasterButton.IsVisible = false;
         StatusLabel.Foreground = Avalonia.Media.Brushes.Gray;
         StatusLabel.Text = "Syncing with master database...";
 
@@ -76,18 +79,72 @@ public partial class SyncDatabaseView : UserControl
                     "The master database could not be reached (offline, or another machine is " +
                     "currently syncing). Your local database is unchanged \u2014 try again shortly.";
                 break;
+            case MasterSyncResult.MasterIntegrityCheckFailed:
+                StatusLabel.Foreground = Avalonia.Media.Brushes.IndianRed;
+                StatusLabel.Text =
+                    "The master database failed an integrity check. To avoid overwriting anyone " +
+                    "else's data, sync was skipped and nothing was changed. Restore the master " +
+                    "from a backup, or use \"Rebuild Master From This Machine\" below if you're " +
+                    "sure this machine's local copy is the one to keep.";
+                RebuildMasterButton.IsVisible = true;
+                break;
             case MasterSyncResult.Failed:
             default:
                 StatusLabel.Foreground = Avalonia.Media.Brushes.IndianRed;
-                StatusLabel.Text =
-                    "Sync failed. Your local database is unchanged \u2014 try again shortly.";
+                StatusLabel.Text = string.IsNullOrWhiteSpace(MasterSyncService.LastError)
+                    ? "Sync failed. Your local database is unchanged \u2014 try again shortly."
+                    : "Sync failed. Your local database is unchanged \u2014 try again shortly.\n" +
+                      $"Details: {MasterSyncService.LastError}";
                 break;
+        }
+    }
+
+    private async Task OnRebuildMasterAsync()
+    {
+        var window = (Window?)VisualRoot;
+        if (window == null)
+            return;
+
+        var confirmed = await DialogHelper.ConfirmAsync(
+            window,
+            "This will permanently overwrite the shared master database with this machine's " +
+            "local copy. Any data added by other users since the master became unusable will " +
+            "be lost. Continue?",
+            "Rebuild Master Database");
+        if (!confirmed)
+            return;
+
+        SetRunningState(running: true);
+        StatusLabel.Foreground = Avalonia.Media.Brushes.Gray;
+        StatusLabel.Text = "Rebuilding master database from this machine's local copy...";
+
+        var masterPath = DatabaseInitializer.GetMasterPath();
+        var localPath  = DatabaseInitializer.GetDatabasePath();
+
+        await Task.Run(() => MasterSyncService.RebuildMasterFromLocal(masterPath, localPath));
+
+        SetRunningState(running: false);
+        RebuildMasterButton.IsVisible = false;
+
+        if (string.IsNullOrWhiteSpace(MasterSyncService.LastError))
+        {
+            StatusLabel.Foreground = Avalonia.Media.Brushes.MediumSeaGreen;
+            StatusLabel.Text =
+                "Master database rebuilt from this machine's local copy. Have other users run " +
+                "Sync Now to re-share their local data.";
+        }
+        else
+        {
+            StatusLabel.Foreground = Avalonia.Media.Brushes.IndianRed;
+            StatusLabel.Text = $"Rebuild failed. Details: {MasterSyncService.LastError}";
+            RebuildMasterButton.IsVisible = true;
         }
     }
 
     private void SetRunningState(bool running)
     {
         SyncNowButton.IsEnabled = !running && !string.IsNullOrWhiteSpace(DatabaseInitializer.GetMasterPath());
+        RebuildMasterButton.IsEnabled = !running;
         SyncProgress.IsVisible  = running;
     }
 }

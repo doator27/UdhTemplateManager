@@ -26,6 +26,8 @@
 				<TextBlock Name="MasterPathLabel" Foreground="#A7ADB8" Margin="0,0,0,8" TextWrapping="Wrap"/>
 				<StackPanel Orientation="Horizontal">
 					<Button Name="SyncNowButton" Content="Sync Now" Margin="0,0,8,0"/>
+					<Button Name="RebuildMasterButton" Content="Rebuild Master From This Machine"
+							IsVisible="False" Margin="0,0,8,0"/>
 					<ProgressBar Name="SyncProgress"
 								 IsIndeterminate="True"
 								 IsVisible="False"

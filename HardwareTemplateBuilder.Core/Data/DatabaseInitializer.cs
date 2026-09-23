@@ -153,6 +153,18 @@ public static class DatabaseInitializer
             busyCmd.ExecuteNonQuery();
         }
 
+        // Patch: force DELETE journal mode. WAL mode relies on shared-memory (-shm) locking
+        // that is unreliable over network shares (SMB/mapped drives) \u2014 a database left in WAL
+        // mode from an older app version, or opened once with journal_mode=WAL, will
+        // intermittently fail SQLite's quick_check (see MasterSyncService.IsIntegrityOk) even
+        // though it isn't actually corrupted, causing the master to be needlessly "repaired"
+        // from a local copy on every sync. DELETE mode is safe for shared network drives.
+        using (var journalCmd = conn.CreateCommand())
+        {
+            journalCmd.CommandText = "PRAGMA journal_mode=DELETE;";
+            journalCmd.ExecuteNonQuery();
+        }
+
         // Patch: CalloutRemarks
         if (!ColumnExists(conn, "JobHardware", "CalloutRemarks"))
         {
