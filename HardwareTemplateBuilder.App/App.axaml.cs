@@ -30,40 +30,58 @@ public partial class App : Application
 
             mainWindow.Opened += async (_, _) =>
             {
-                // Step 1: (Reserved) master database location resolution hook.
-                await ResolveDatabaseLocationAsync(mainWindow);
-
-                // Step 2: Apply migrations / create schema for the local, per-machine working
-                // copy of the database.
-                DatabaseInitializer.Initialize();
-
-                // Step 2b: Sync the local working copy with the master database, if configured
-                // and reachable — new/changed local rows are merged into master, then the local
-                // file is refreshed with a clean copy of master. If the master is unreachable,
-                // this is a no-op and the app continues working offline against the local copy.
-                await Task.Run(() =>
-                    MasterSyncService.Sync(DatabaseInitializer.GetMasterPath(), DatabaseInitializer.GetDatabasePath()));
-
-                // Step 3: Auto-select the profile bound to this machine, or show picker.
-                var machineId = MachineIdentityService.GetMachineId();
-
-                using (var ctx = DatabaseInitializer.CreateContext())
+                try
                 {
-                    var bound = ctx.UserProfiles.FirstOrDefault(u => u.MachineId == machineId);
-                    if (bound != null)
-                        SessionService.ActiveUserProfile = bound;
-                }
+                    // Step 1: (Reserved) master database location resolution hook.
+                    await ResolveDatabaseLocationAsync(mainWindow);
 
-                if (SessionService.ActiveUserProfile == null)
+                    // Step 2: Apply migrations / create schema for the local, per-machine working
+                    // copy of the database.
+                    await Task.Run(DatabaseInitializer.Initialize);
+
+                    // Step 2b: Sync the local working copy with the master database, if configured
+                    // and reachable — new/changed local rows are merged into master, then the local
+                    // file is refreshed with a clean copy of master. If the master is unreachable,
+                    // this is a no-op and the app continues working offline against the local copy.
+                    await Task.Run(() =>
+                        MasterSyncService.Sync(DatabaseInitializer.GetMasterPath(), DatabaseInitializer.GetDatabasePath()));
+
+                    // Step 3: Auto-select the profile bound to this machine, or show picker.
+                    var machineId = MachineIdentityService.GetMachineId();
+
+                    using (var ctx = DatabaseInitializer.CreateContext())
+                    {
+                        var bound = ctx.UserProfiles.FirstOrDefault(u => u.MachineId == machineId);
+                        if (bound != null)
+                            SessionService.ActiveUserProfile = bound;
+                    }
+
+                    if (SessionService.ActiveUserProfile == null)
+                    {
+                        var picker = new ProfilePickerDialog(machineId);
+                        await picker.ShowDialog(mainWindow);
+                    }
+
+                    // Step 4: Update the status bar and kick off background refresh.
+                    mainWindow.SetActiveUser(SessionService.ActiveUserProfile?.UserName ?? "Unknown");
+                    mainWindow.RefreshActiveUserInCurrentView();
+                    _ = RunStartupRefreshAsync();
+                }
+                catch (Exception ex)
                 {
-                    var picker = new ProfilePickerDialog(machineId);
-                    await picker.ShowDialog(mainWindow);
+                    // Any unhandled exception here previously left the main window open but
+                    // completely blank/unresponsive-looking forever (async void has nowhere to
+                    // propagate to except a background dispatcher continuation), which is
+                    // indistinguishable from the app "locking up" during launch. Log it and tell
+                    // the user plainly instead of failing silently.
+                    Helpers.CrashLogger.Log(ex, isTerminating: false);
+                    await Helpers.DialogHelper.ShowInfoAsync(
+                        mainWindow,
+                        "Hardware Template Builder ran into a problem while starting up and could not finish " +
+                        "loading. The error has been recorded in CrashReports.txt next to the application. " +
+                        $"Details: {ex.Message}",
+                        "Startup error");
                 }
-
-                // Step 4: Update the status bar and kick off background refresh.
-                mainWindow.SetActiveUser(SessionService.ActiveUserProfile?.UserName ?? "Unknown");
-                mainWindow.RefreshActiveUserInCurrentView();
-                _ = RunStartupRefreshAsync();
             };
         }
 

@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.IO;
@@ -105,15 +106,135 @@ public static class DatabaseInitializer
     }
 
     /// <summary>
+    /// Deletes the local (per-machine) database's stale -journal/-wal/-shm sidecar files, which
+    /// is the usual cause of a persistent "database is locked"/"attempt to write a readonly
+    /// database" failure on the local copy (e.g. a leftover -journal file from a process that
+    /// crashed or was force-closed mid-write). Never touches the .db file itself, so it cannot
+    /// lose data at rest \u2014 at worst, an in-flight transaction from another process on this same
+    /// machine could be interrupted and would simply retry. Never throws; returns a message
+    /// describing what was removed (or that there was nothing to clear).
+    /// </summary>
+    public static string ClearLocalLock()
+    {
+        var (removed, error) = ClearJournalSidecars(GetDatabasePath());
+        if (error != null)
+            return error;
+
+        return removed.Count == 0
+            ? "No leftover lock/journal files were found on the local database."
+            : $"Removed: {string.Join(", ", removed)}. Try again now.";
+    }
+
+    /// <summary>
+    /// Deletes any leftover -journal/-wal/-shm sidecar files next to <paramref name="dbPath"/>.
+    /// Shared by <see cref="ClearLocalLock"/> (local database) and
+    /// <see cref="MasterSyncService"/> (master database, once it holds the advisory sync lock).
+    /// Never touches the .db file itself, so it cannot lose data at rest. Returns the list of
+    /// files actually removed, and a non-null error message if a deletion failed part-way
+    /// through (best-effort — earlier removals in the same call still took effect).
+    /// </summary>
+    internal static (System.Collections.Generic.List<string> Removed, string? Error) ClearJournalSidecars(string dbPath)
+    {
+        var removed = new System.Collections.Generic.List<string>();
+
+        foreach (var suffix in new[] { "-journal", "-wal", "-shm" })
+        {
+            var path = dbPath + suffix;
+            try
+            {
+                if (File.Exists(path))
+                {
+                    ClearReadOnlyAttribute(path);
+                    File.Delete(path);
+                    removed.Add(Path.GetFileName(path));
+                }
+            }
+            catch (Exception ex)
+            {
+                return (removed, $"Could not remove '{Path.GetFileName(path)}': {ex.Message}");
+            }
+        }
+
+        return (removed, null);
+    }
+
+    /// <summary>
     /// Ensures the database at the active path exists, all pending migrations are applied,
     /// and any schema changes that may have been missed by the migration system are patched.
     /// Call this on application startup after the database location has been resolved.
     /// </summary>
     public static void Initialize()
     {
-        using var context = CreateContext();
-        context.Database.Migrate();
-        EnsureSchemaPatches(context);
+        // Startup can race with another instance of this app (or a lingering process from a
+        // previous crash) still holding a write lock on the local database. Without a retry
+        // here, a transient SQLITE_BUSY/SQLITE_LOCKED during migration/schema-patching is an
+        // unhandled exception that aborts app startup entirely (see App.OnFrameworkInitializationCompleted),
+        // leaving the main window open but empty. Every patch below is idempotent, so retrying
+        // the whole sequence is always safe.
+        try
+        {
+            RetryHelper.ExecuteWithRetry(() =>
+            {
+                using var context = CreateContext();
+                context.Database.Migrate();
+                EnsureSchemaPatches(context);
+            }, maxRetries: 5, baseDelayMs: 500);
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode is 5 or 6)
+        {
+            // The retry budget above (~15s of backoff, each attempt also waiting up to the
+            // 10s busy_timeout set in EnsureSchemaPatches) was exhausted without the lock
+            // clearing. That points to a non-transient lock rather than brief contention —
+            // most commonly a stale -journal/-wal/-shm sidecar file left behind by a process
+            // that crashed or was force-closed mid-write (see ClearLocalLock). Log the
+            // diagnostic detail, attempt exactly one automatic cleanup + retry, and only
+            // propagate the failure if that also doesn't resolve it.
+            LogSchemaPatchFailure(ex, "initial retry budget exhausted; attempting stale-lock cleanup");
+
+            var cleanupResult = ClearLocalLock();
+            LogSchemaPatchFailure(ex, $"ClearLocalLock result: {cleanupResult}");
+
+            try
+            {
+                RetryHelper.ExecuteWithRetry(() =>
+                {
+                    using var context = CreateContext();
+                    context.Database.Migrate();
+                    EnsureSchemaPatches(context);
+                }, maxRetries: 2, baseDelayMs: 500);
+            }
+            catch (SqliteException finalEx) when (finalEx.SqliteErrorCode is 5 or 6)
+            {
+                LogSchemaPatchFailure(finalEx, "stale-lock cleanup did not resolve the lock; giving up");
+                throw;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Appends a diagnostic entry (timestamp, SQLite error code, message, and context note) to
+    /// "SchemaPatchWarnings.log" next to the active database file. Used to capture detail on
+    /// "database is locked" failures during <see cref="Initialize"/> that survive the normal
+    /// retry/backoff in <see cref="RetryHelper"/>, without requiring a UI-layer logging
+    /// dependency in this Core project. Never throws.
+    /// </summary>
+    private static void LogSchemaPatchFailure(SqliteException ex, string context)
+    {
+        try
+        {
+            var dbPath = GetDatabasePath();
+            var folder = Path.GetDirectoryName(dbPath);
+            if (string.IsNullOrEmpty(folder))
+                return;
+
+            var logPath = Path.Combine(folder, "SchemaPatchWarnings.log");
+            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} | SqliteErrorCode={ex.SqliteErrorCode} | {ex.Message} | {context}{Environment.NewLine}";
+            File.AppendAllText(logPath, line);
+        }
+        catch
+        {
+            // Diagnostic logging must never itself crash startup.
+        }
     }
 
     /// <summary>
@@ -130,9 +251,15 @@ public static class DatabaseInitializer
             .UseSqlite(BuildConnectionString(dbPath))
             .AddInterceptors(new SqlitePragmaInterceptor())
             .Options;
-        using var context = new AppDbContext(options);
-        context.Database.Migrate();
-        EnsureSchemaPatches(context);
+
+        // See Initialize() — retried for the same reason (transient lock contention on shared
+        // network drives/master files is expected here too).
+        RetryHelper.ExecuteWithRetry(() =>
+        {
+            using var context = new AppDbContext(options);
+            context.Database.Migrate();
+            EnsureSchemaPatches(context);
+        }, maxRetries: 5, baseDelayMs: 500);
     }
 
     /// <summary>
@@ -274,6 +401,60 @@ public static class DatabaseInitializer
             idxCmd.CommandText = @"
                 CREATE UNIQUE INDEX ""IX_IgnoredTemplateDuplicates_SharedLink_LinkType""
                 ON ""IgnoredTemplateDuplicates"" (""SharedLink"", ""LinkType"")";
+            idxCmd.ExecuteNonQuery();
+        }
+
+        // Patch: SyncTombstones table. Records a deletion (table name + encoded primary key)
+        // so that RecordDeletionService's force-delete doesn't get silently undone by the next
+        // sync: without this, a row deleted from master but still present in some other
+        // machine's local database would simply get re-inserted by that machine's next
+        // "local -> master" merge, and then copied straight back down to every other local
+        // database on their next "master -> local" copy-back. See MasterSyncService.MergeTables
+        // (applies tombstones to master before merging local rows in) and
+        // MasterSyncService.ApplyTombstonesLocally (applies them to the local db after copy-back).
+        if (!TableExists(conn, "SyncTombstones"))
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                CREATE TABLE ""SyncTombstones"" (
+                    ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_SyncTombstones"" PRIMARY KEY AUTOINCREMENT,
+                    ""TableName"" TEXT NOT NULL,
+                    ""RecordKey"" TEXT NOT NULL,
+                    ""DeletedAt"" TEXT NOT NULL
+                )";
+            cmd.ExecuteNonQuery();
+
+            using var idxCmd = conn.CreateCommand();
+            idxCmd.CommandText = @"
+                CREATE UNIQUE INDEX ""IX_SyncTombstones_TableName_RecordKey""
+                ON ""SyncTombstones"" (""TableName"", ""RecordKey"")";
+            idxCmd.ExecuteNonQuery();
+        }
+
+        // Patch: SyncSkipList table. Records a record (table name + encoded primary key) that
+        // was deliberately excluded from a "clean" sync because it (or an ancestor) was found
+        // corrupted during a merge (see MasterSyncService.LastFailedRecords and
+        // CorruptedRecordSkipService). Like SyncTombstones, this table travels with the database
+        // and is reconciled bidirectionally on every sync so that every machine permanently
+        // stops re-importing the same corrupted records, even ones it never personally
+        // encountered a merge failure for.
+        if (!TableExists(conn, "SyncSkipList"))
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                CREATE TABLE ""SyncSkipList"" (
+                    ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_SyncSkipList"" PRIMARY KEY AUTOINCREMENT,
+                    ""TableName"" TEXT NOT NULL,
+                    ""RecordKey"" TEXT NOT NULL,
+                    ""SkippedAt"" TEXT NOT NULL,
+                    ""Reason"" TEXT NOT NULL
+                )";
+            cmd.ExecuteNonQuery();
+
+            using var idxCmd = conn.CreateCommand();
+            idxCmd.CommandText = @"
+                CREATE UNIQUE INDEX ""IX_SyncSkipList_TableName_RecordKey""
+                ON ""SyncSkipList"" (""TableName"", ""RecordKey"")";
             idxCmd.ExecuteNonQuery();
         }
     }

@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Threading;
 using HardwareTemplateBuilder.App.Helpers;
 
 namespace HardwareTemplateBuilder.App;
@@ -13,6 +14,15 @@ class Program
     [DllImport("shell32.dll", SetLastError = true)]
     private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
+    // Named Mutex used to detect a second instance of this app running on the same machine.
+    // A second local instance racing to open/patch the same local SQLite database file is one
+    // of the leading causes of a persistent "database is locked" (SQLITE_BUSY) startup failure
+    // that outlives the retry/backoff logic in DatabaseInitializer.Initialize(). This is
+    // intentionally a local (non-"Global\") mutex: separate machines each work against their own
+    // local database copy, so only same-machine duplicate instances need to be prevented.
+    private const string SingleInstanceMutexName = "HardwareTemplateBuilder_SingleInstance";
+    private static Mutex? _singleInstanceMutex;
+
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
@@ -20,6 +30,20 @@ class Program
     public static void Main(string[] args)
     {
         CrashLogger.RegisterGlobalHandlers();
+
+        _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
+        if (!createdNew)
+        {
+            // Another instance of this app is already running on this machine. Starting a
+            // second instance risks two processes racing to open/patch/migrate the same local
+            // SQLite database file, which can leave one of them stuck retrying against a lock
+            // held by the other until the retry budget in DatabaseInitializer.Initialize() is
+            // exhausted. Exit quietly rather than risk that failure mode.
+            CrashLogger.Log(
+                new InvalidOperationException("Startup aborted: another instance of HardwareTemplateBuilder is already running on this machine."),
+                isTerminating: false);
+            return;
+        }
 
         if (OperatingSystem.IsWindows())
         {
@@ -35,6 +59,11 @@ class Program
         {
             CrashLogger.Log(ex, isTerminating: true);
             throw;
+        }
+        finally
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+            _singleInstanceMutex?.Dispose();
         }
     }
 

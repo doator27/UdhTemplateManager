@@ -28,6 +28,7 @@
 					<Button Name="SyncNowButton" Content="Sync Now" Margin="0,0,8,0"/>
 					<Button Name="RebuildMasterButton" Content="Rebuild Master From This Machine"
 							IsVisible="False" Margin="0,0,8,0"/>
+					<Button Name="ClearLockButton" Content="Clear Stuck Lock" Margin="0,0,8,0"/>
 					<ProgressBar Name="SyncProgress"
 								 IsIndeterminate="True"
 								 IsVisible="False"
@@ -35,6 +36,33 @@
 				</StackPanel>
 			</StackPanel>
 		</Border>
+
+		<Border DockPanel.Dock="Top"
+				Name="FailedRecordsPanel"
+				IsVisible="False"
+				BorderBrush="#454952" BorderThickness="1"
+				Padding="8" Margin="0,0,0,8">
+			<StackPanel>
+				<TextBlock TextWrapping="Wrap" Margin="0,0,0,8">
+					These records failed to merge into the master database during the last sync.
+					You can permanently delete one (and every other row that references it) from
+					both the local and master databases.
+				</TextBlock>
+				<StackPanel Name="FailedRecordsList"/>
+				<Button Name="CleanAndSyncButton"
+						Content="Clean &amp; Sync (Skip All Of The Above)"
+						Margin="0,8,0,0"
+						HorizontalAlignment="Left"/>
+				<TextBlock TextWrapping="Wrap" Margin="0,4,0,0" Foreground="#A7ADB8" FontSize="11">
+					Backs up the master database, then builds a clean copy with all of the records
+					above (and any of their child records not used elsewhere) permanently removed,
+					merges this machine's local changes into that clean copy, and promotes it as the
+					new master and new local database. Every other machine will also skip these
+					records on its next sync.
+				</TextBlock>
+			</StackPanel>
+		</Border>
+
 
 	</DockPanel>
 </UserControl>

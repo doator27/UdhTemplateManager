@@ -89,23 +89,7 @@ public partial class RefreshTemplatesView : UserControl
         RefreshResult? result;
         try
         {
-            result = await Task.Run(async () =>
-            {
-                using var ctx    = DatabaseInitializer.CreateContext();
-                var httpHandler = new System.Net.Http.SocketsHttpHandler();
-                httpHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
-                var httpClient  = new HttpClient(httpHandler) { Timeout = TimeSpan.FromSeconds(60) };
-                var service      = new TemplateRefreshService(ctx, httpClient);
-
-                var progress = new Progress<RefreshProgress>(p =>
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        ProgressText.Text =
-                            $"Downloading {p.Current} of {p.Total}: [ID {p.TemplateId}] {p.TemplateName}";
-                    }));
-
-                return await service.RefreshAsync(saveLocation, progress, ct);
-            }, ct);
+            result = await RunRefreshAsync(saveLocation, ct);
         }
         catch (OperationCanceledException)
         {
@@ -113,6 +97,32 @@ public partial class RefreshTemplatesView : UserControl
             StatusLabel.Text = "Refresh cancelled.";
             SetRunningState(running: false);
             return;
+        }
+        catch (Exception ex) when (IsLockedError(ex))
+        {
+            // The local database's own -journal/-wal/-shm sidecar files are the usual cause of a
+            // persistent lock error here (e.g. left behind by a crash), not another process
+            // actively using the database. Clear them once and automatically retry before
+            // surfacing an error, so the user doesn't have to go find a "clear lock" button.
+            var clearMessage = DatabaseInitializer.ClearLocalLock();
+            try
+            {
+                result = await RunRefreshAsync(saveLocation, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                StopElapsedTimer();
+                StatusLabel.Text = "Refresh cancelled.";
+                SetRunningState(running: false);
+                return;
+            }
+            catch (Exception ex2)
+            {
+                StopElapsedTimer();
+                StatusLabel.Text = $"Database is locked. {clearMessage} Retry failed: {ex2.Message}";
+                SetRunningState(running: false);
+                return;
+            }
         }
         catch (Exception ex)
         {
@@ -134,6 +144,43 @@ public partial class RefreshTemplatesView : UserControl
         _timingReportPath = WriteTimingReport(saveLocation, result);
 
         ShowResults(result);
+    }
+
+    private Task<RefreshResult> RunRefreshAsync(string saveLocation, CancellationToken ct)
+    {
+        return Task.Run(async () =>
+        {
+            using var ctx    = DatabaseInitializer.CreateContext();
+            var httpHandler = new System.Net.Http.SocketsHttpHandler();
+            httpHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+            var httpClient  = new HttpClient(httpHandler) { Timeout = TimeSpan.FromSeconds(60) };
+            var service      = new TemplateRefreshService(ctx, httpClient);
+
+            var progress = new Progress<RefreshProgress>(p =>
+                Dispatcher.UIThread.Post(() =>
+                {
+                    ProgressText.Text =
+                        $"Downloading {p.Current} of {p.Total}: [ID {p.TemplateId}] {p.TemplateName}";
+                }));
+
+            return await service.RefreshAsync(saveLocation, progress, ct);
+        }, ct);
+    }
+
+    /// <summary>
+    /// Identifies exceptions caused by the local database being locked (transient SQLITE_BUSY/
+    /// SQLITE_LOCKED, or a stale -journal file left in a readonly/locked state), as opposed to
+    /// other unrelated failures (e.g. network errors while downloading).
+    /// </summary>
+    private static bool IsLockedError(Exception ex)
+    {
+        var message = ex.Message;
+        for (var inner = ex.InnerException; inner != null; inner = inner.InnerException)
+            message += " " + inner.Message;
+
+        return message.Contains("locked", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("readonly database", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("busy", StringComparison.OrdinalIgnoreCase);
     }
 
     // ---------- Timing / estimation ----------
