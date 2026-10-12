@@ -1,7 +1,4 @@
-using System.Threading;
-using System.Threading.Tasks;
 using HardwareTemplateBuilder.Core.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace HardwareTemplateBuilder.Core.Data;
@@ -86,7 +83,7 @@ public class AppDbContext : DbContext
         // DoorMaterial: constrain Material to only "Metal", "Wood", or "Both"
         modelBuilder.Entity<DoorMaterial>()
             .ToTable(t => t.HasCheckConstraint("CK_DoorMaterial_Material",
-                "\"Material\" IN ('Metal', 'Wood', 'Both')"));
+                "`Material` IN ('Metal', 'Wood', 'Both')"));
 
         // Seed the three valid DoorMaterial values
         modelBuilder.Entity<DoorMaterial>().HasData(
@@ -107,7 +104,7 @@ public class AppDbContext : DbContext
         // JobTemplateSnapshot: default SnapshotDate to current UTC time
         modelBuilder.Entity<JobTemplateSnapshot>()
             .Property(s => s.SnapshotDate)
-            .HasDefaultValueSql("datetime('now')");
+            .HasDefaultValueSql("(UTC_TIMESTAMP())");
 
         // Description self-referential hierarchy (parent → children)
         modelBuilder.Entity<Description>()
@@ -271,105 +268,4 @@ public class AppDbContext : DbContext
             .IsUnique();
     }
 
-    /// <summary>
-    /// Serializes all <see cref="SaveChanges(bool)"/>/<see cref="SaveChangesAsync"/> calls made
-    /// by this process into FIFO order. All users now write directly to the shared master
-    /// SQLite file (see <see cref="DatabaseInitializer"/>), so within a single process only one
-    /// save may be in flight at a time; combined with SQLite's own <c>busy_timeout</c> (see
-    /// <see cref="SqlitePragmaInterceptor"/>) and the app-level retry-with-back-off for
-    /// <c>SQLITE_BUSY</c>/<c>SQLITE_LOCKED</c> below, concurrent writers across machines queue at
-    /// the file-lock level instead of racing or failing outright.
-    /// </summary>
-    private static readonly SemaphoreSlim _saveGate = new(1, 1);
-
-    /// <summary>Maximum number of retries for a transient SQLITE_BUSY/SQLITE_LOCKED error.</summary>
-    private const int MaxBusyRetries = 5;
-
-    /// <summary>Base delay, in milliseconds, between SQLITE_BUSY/SQLITE_LOCKED retries (exponential back-off).</summary>
-    private const int BusyRetryBaseDelayMs = 200;
-
-    /// <inheritdoc/>
-    public override int SaveChanges(bool acceptAllChangesOnSuccess)
-    {
-        _saveGate.Wait();
-        try
-        {
-            for (var attempt = 0; ; attempt++)
-            {
-                try
-                {
-                    return base.SaveChanges(acceptAllChangesOnSuccess);
-                }
-                catch (DbUpdateException ex) when (attempt == 0 && IsReadOnlyError(ex))
-                {
-                    RecoverFromReadOnly();
-                }
-                catch (DbUpdateException ex) when (attempt < MaxBusyRetries && IsBusyOrLockedError(ex))
-                {
-                    Thread.Sleep(BusyRetryBaseDelayMs * (int)Math.Pow(2, attempt));
-                }
-            }
-        }
-        finally
-        {
-            _saveGate.Release();
-        }
     }
-
-    /// <inheritdoc/>
-    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
-    {
-        await _saveGate.WaitAsync(cancellationToken);
-        try
-        {
-            for (var attempt = 0; ; attempt++)
-            {
-                try
-                {
-                    return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-                }
-                catch (DbUpdateException ex) when (attempt == 0 && IsReadOnlyError(ex))
-                {
-                    RecoverFromReadOnly();
-                }
-                catch (DbUpdateException ex) when (attempt < MaxBusyRetries && IsBusyOrLockedError(ex))
-                {
-                    await Task.Delay(BusyRetryBaseDelayMs * (int)Math.Pow(2, attempt), cancellationToken);
-                }
-            }
-        }
-        finally
-        {
-            _saveGate.Release();
-        }
-    }
-
-    /// <summary>
-    /// Returns true if <paramref name="ex"/> wraps a SQLite "attempt to write a readonly
-    /// database" error (SQLITE_READONLY, primary result code 8).
-    /// </summary>
-    private static bool IsReadOnlyError(DbUpdateException ex) =>
-        ex.InnerException is SqliteException sqliteEx && (sqliteEx.SqliteErrorCode & 0xFF) == 8;
-
-    /// <summary>
-    /// Returns true if <paramref name="ex"/> wraps a SQLite SQLITE_BUSY (5) or SQLITE_LOCKED (6)
-    /// error, indicating transient lock contention from another concurrent user/process.
-    /// </summary>
-    private static bool IsBusyOrLockedError(DbUpdateException ex) =>
-        ex.InnerException is SqliteException sqliteEx && (sqliteEx.SqliteErrorCode & 0xFF) is 5 or 6;
-
-    /// <summary>
-    /// Recovers from a stale read-only SQLite connection: a connection opened while the database
-    /// file (or its -journal sidecar) was momentarily read-only stays stuck in that state for the
-    /// rest of the process, even after the underlying file permission is fixed, because
-    /// Microsoft.Data.Sqlite pools and reuses native connection handles. Clearing the pool forces
-    /// the next connection to truly reopen the file, and re-running the writable fix-up covers
-    /// the case where the file only just became writable.
-    /// </summary>
-    private void RecoverFromReadOnly()
-    {
-        var dbPath = new SqliteConnectionStringBuilder(Database.GetConnectionString()).DataSource;
-        SqliteConnection.ClearAllPools();
-        DatabaseInitializer.EnsureWritable(dbPath);
-    }
-}

@@ -7,3 +7,6 @@
 
 ## SQL Guidelines
 - When interpolating string constants directly into raw SQL text (not as bound parameters), avoid embedding literal NUL characters (e.g. \u0000) in the constant — SQLite's native marshaling truncates strings at NUL, silently corrupting the generated SQL.
+
+## Entity Framework Core Guidelines
+- When specifying MySQL/MariaDB `defaultValueSql` values that use function calls other than `CURRENT_TIMESTAMP` (e.g. `UTC_TIMESTAMP()`), wrap the expression in parentheses, e.g. `(UTC_TIMESTAMP())`, so it is emitted as a valid expression default.

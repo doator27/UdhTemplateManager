@@ -24,8 +24,6 @@
                 <MenuItem Header="_Batch Generate..."        Name="MenuBatchGenerate" />
                 <MenuItem Header="_Refresh Templates"        Name="MenuRefreshTemplates" />
                 <MenuItem Header="_Deduplicate Hardware..."  Name="MenuDeduplicateHardware" />
-                <MenuItem Header="_Backup Database..."       Name="MenuBackupDatabase" />
-                <MenuItem Header="_Sync Database..."         Name="MenuSyncDatabase" />
             </MenuItem>
             <MenuItem Header="_Admin">
                 <MenuItem Header="_Hardware Items" Name="MenuHardwareItems" />

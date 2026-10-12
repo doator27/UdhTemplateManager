@@ -24,16 +24,14 @@ public class PdfAssemblyServiceTests : IDisposable
         Directory.CreateDirectory(_tempDir);
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlite("Data Source=:memory:")
+            .UseInMemoryDatabase($"HtbAssemblyTests_{Guid.NewGuid():N}")
             .Options;
         _context = new AppDbContext(options);
-        _context.Database.OpenConnection();
         _context.Database.EnsureCreated();
     }
 
     public void Dispose()
     {
-        _context.Database.CloseConnection();
         _context.Dispose();
         if (Directory.Exists(_tempDir))
             Directory.Delete(_tempDir, recursive: true);

@@ -4,13 +4,13 @@
         x:CompileBindings="False"
         Title="Database Setup"
         Width="530"
-        Height="510"
+        Height="360"
         WindowStartupLocation="CenterScreen"
         CanResize="False"
         Background="#2C2F38">
     <DockPanel Margin="16">
 
-        <!-- Error banner — shown only when previously configured path is unreachable -->
+        <!-- Error banner — shown only when previously configured connection is unreachable -->
         <Border Name="ErrorPanel"
                 DockPanel.Dock="Top"
                 Background="#3B1219"
@@ -28,48 +28,26 @@
         <!-- Heading -->
         <TextBlock DockPanel.Dock="Top"
                    Name="HeaderLabel"
-                   Text="Welcome — Set Up Your Shared Database"
+                   Text="Connect to the Shared Database"
                    FontSize="13" FontWeight="Bold"
                    Margin="0,0,0,4"/>
         <TextBlock DockPanel.Dock="Top"
-                   Text="The database is shared across the team. Point every workstation at the same file."
+                   Text="Enter the MySQL connection string used by every workstation to reach the shared, centralized database."
                    TextWrapping="Wrap"
                    Foreground="#A7ADB8"
                    Margin="0,0,0,12"/>
 
-        <!-- Option A: Create new database -->
-        <Border DockPanel.Dock="Top"
-                BorderBrush="#454952" BorderThickness="1"
-                Padding="10" Margin="0,0,0,8">
-            <StackPanel>
-                <TextBlock Text="Create a new database" FontWeight="Bold" Margin="0,0,0,6"/>
-                <TextBlock Text="Choose a shared folder (e.g. a mapped network drive). The database file will be created there."
-                           TextWrapping="Wrap" Margin="0,0,0,6"/>
-                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                    <TextBox Grid.Column="0" Name="CreateFolderBox"
-                             Watermark="\\server\share  or  Z:\DatabaseFolder"/>
-                    <Button  Grid.Column="1" Name="BrowseCreateButton"
-                             Content="..." Width="32" Margin="4,0,0,0"/>
-                </Grid>
-                <Button Name="CreateButton" Content="Create Database Here" HorizontalAlignment="Left"/>
-                <TextBlock Name="CreateStatusLabel" Foreground="#FF6B6B"
-                           TextWrapping="Wrap" Margin="0,4,0,0"/>
-            </StackPanel>
-        </Border>
-
-        <!-- Option B: Connect to existing database -->
+        <!-- Connection string entry -->
         <Border BorderBrush="#454952" BorderThickness="1" Padding="10">
             <StackPanel>
-                <TextBlock Text="Connect to an existing database" FontWeight="Bold" Margin="0,0,0,6"/>
-                <TextBlock Text="Select the hardware_templates.db file already on your network share."
-                           TextWrapping="Wrap" Margin="0,0,0,6"/>
-                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                    <TextBox Grid.Column="0" Name="ConnectPathBox"
-                             Watermark="Path to existing .db file..."/>
-                    <Button  Grid.Column="1" Name="BrowseConnectButton"
-                             Content="..." Width="32" Margin="4,0,0,0"/>
-                </Grid>
-                <Button Name="ConnectButton" Content="Connect to This Database" HorizontalAlignment="Left"/>
+                <TextBlock Text="MySQL connection string" FontWeight="Bold" Margin="0,0,0,6"/>
+                <TextBlock Text="Example: Server=myserver;Port=3306;Database=hardware_templates;Uid=appuser;Pwd=secret;"
+                           TextWrapping="Wrap" Foreground="#A7ADB8" Margin="0,0,0,6"/>
+                <TextBox Name="ConnectionStringBox"
+                         Watermark="Server=...;Port=3306;Database=...;Uid=...;Pwd=...;"
+                         AcceptsReturn="False"
+                         Margin="0,0,0,8"/>
+                <Button Name="ConnectButton" Content="Connect" HorizontalAlignment="Left"/>
                 <TextBlock Name="ConnectStatusLabel" Foreground="#FF6B6B"
                            TextWrapping="Wrap" Margin="0,4,0,0"/>
             </StackPanel>

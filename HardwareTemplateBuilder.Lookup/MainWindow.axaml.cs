@@ -52,11 +52,11 @@ public partial class MainWindow : Window
 
     private void InitializeCore()
     {
-        var dbPath = DatabaseInitializer.GetDatabasePath();
-        if (!File.Exists(dbPath))
+        var connectionString = DatabaseLocationService.GetConfiguredConnectionString();
+        if (string.IsNullOrWhiteSpace(connectionString))
         {
             StatusLabel.Text =
-                $"Database not found at: {dbPath}\nLaunch Hardware Template Builder first to create it.";
+                "No database connection configured. Launch Hardware Template Builder first to configure it.";
             return;
         }
 

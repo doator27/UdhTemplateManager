@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Language/Runtime:** C# / .NET 8
 - **UI:** Avalonia UI 11.3.9 (cross-platform Linux + Windows)
-- **Database:** SQLite via Entity Framework Core 8.0
+- **Database:** MySQL via Entity Framework Core 9.0 (Pomelo.EntityFrameworkCore.MySql) — centralized server, all clients connect directly via a shared connection string
 - **PDF manipulation:** PdfSharp 6.1 (merging, page extraction, rotation)
 - **PDF generation:** QuestPDF 2024 (cover sheet)
-- **Tests:** xUnit with in-memory SQLite (`UseSqlite("Data Source=:memory:")` + `EnsureCreated()`)
+- **Tests:** xUnit with EF Core InMemory provider (`UseInMemoryDatabase(...)`)
 - **Target platforms:** Linux (dev) and Windows (production)
 
 ## Solution Structure
@@ -20,7 +20,8 @@ HardwareTemplateBuilder.sln
 ├── HardwareTemplateBuilder.App/        # Avalonia UI application (main product)
 ├── HardwareTemplateBuilder.Lookup/     # Standalone read-only Avalonia app: search + generate/open a merged template PDF, no write access to the DB
 ├── HardwareTemplateBuilder.Tests/      # xUnit tests
-└── HardwareTemplateBuilder.SmokeTest/  # Console smoke tests: full CRUD against all entity types
+├── HardwareTemplateBuilder.SmokeTest/  # Console smoke tests: full CRUD against all entity types
+└── HardwareTemplateBuilder.MigrationTool/  # One-time console tool: copies data from a legacy SQLite DB into MySQL
 
 HardwareTemplateBuilder.Diagnostic/     # Standalone console scratch project (not in the .sln) for probing manufacturer
                                          # websites/sitemaps to find template PDF URLs when configuring TemplateSource data
@@ -42,13 +43,12 @@ dotnet ef database update --project HardwareTemplateBuilder.Core        # Apply 
 
 ### Data Layer (Core/Data/ and Core/Models/)
 
-- **AppDbContext** manages 17 SQLite tables via EF Core
-- **DatabaseInitializer** handles creation, migration, and post-migration schema patches (`EnsureSchemaPatches()`) on startup; patches are idempotent and used for retroactive schema fixes
+- **AppDbContext** manages 17 tables via EF Core against MySQL (Pomelo provider)
+- **DatabaseInitializer** resolves the active MySQL connection string, builds the `AppDbContext`, and applies pending migrations (`Database.Migrate()`) on startup; `EnableRetryOnFailure()` handles transient network blips automatically
 - **DatabaseInitializer.CreateContext()** is the standard way to obtain a db context — contexts are created per-operation, not shared
-- **DatabaseLocationService** manages the configurable database file path (default: `%AppData%/HardwareTemplateBuilder/hardware_templates.db`)
+- **DatabaseLocationService** manages the configured MySQL connection string (persisted via a small pointer file at `%AppData%/HardwareTemplateBuilder/db_connection.txt`, falling back to an exe-directory pointer)
 - **MachineIdentityService** generates a stable machine UUID stored in `UserProfile.MachineId`, enabling auto-selection of the matching profile on login
-- **SqlitePragmaInterceptor** (EF Core `DbConnectionInterceptor`) applies `PRAGMA busy_timeout=5000` on every connection open; the `DELETE` journal mode is (re)asserted once at startup via `DatabaseInitializer` and persists in the DB file — **not** `WAL`: the database may live on a shared network drive (see `DatabaseLocationService`), and WAL's shared-memory reader/writer coordination is unsafe over SMB/NFS and can silently revert recently-written values
-- **RetryHelper** provides `ExecuteWithRetry()` for write operations that may hit `SQLITE_BUSY`/`SQLITE_LOCKED` — exponential back-off, 3 retries by default
+- **HardwareTemplateBuilder.MigrationTool** is a one-time console tool for teams migrating from the legacy SQLite architecture: it copies every table from an old `.db` file into the configured MySQL database
 - **Generic `IRepository<T>`** with `GetById`, `GetAll`, `Add`, `Update`, `Delete`; `IHardwareItemRepository` adds `Search(manufacturer, description, modelNumber)` returning results sorted by `Frequency` descending
 - All `Add()` methods include duplicate detection — return existing record if already present
 - `JobTemplateSnapshot` records are written once at PDF generation and **never modified**

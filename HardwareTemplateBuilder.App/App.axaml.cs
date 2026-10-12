@@ -32,19 +32,17 @@ public partial class App : Application
             {
                 try
                 {
-                    // Step 1: (Reserved) master database location resolution hook.
+                    // Step 1: Ensure a MySQL connection is configured; prompt if not.
                     await ResolveDatabaseLocationAsync(mainWindow);
 
-                    // Step 2: Apply migrations / create schema for the local, per-machine working
-                    // copy of the database.
+                    // Step 2: Apply migrations / create schema on the shared, centralized
+                    // MySQL database used by all clients.
                     await Task.Run(DatabaseInitializer.Initialize);
 
-                    // Step 2b: Sync the local working copy with the master database, if configured
-                    // and reachable — new/changed local rows are merged into master, then the local
-                    // file is refreshed with a clean copy of master. If the master is unreachable,
-                    // this is a no-op and the app continues working offline against the local copy.
-                    await Task.Run(() =>
-                        MasterSyncService.Sync(DatabaseInitializer.GetMasterPath(), DatabaseInitializer.GetDatabasePath()));
+                    // The initial "Jobs" navigation in MainWindow's constructor may have been
+                    // skipped if the database wasn't configured yet at that point. Retry it
+                    // now that a valid connection is guaranteed.
+                    mainWindow.NavigateToJobsIfEmpty();
 
                     // Step 3: Auto-select the profile bound to this machine, or show picker.
                     var machineId = MachineIdentityService.GetMachineId();
@@ -89,13 +87,18 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Reports whether a master database path is configured; no longer blocks startup when the
-    /// master is unreachable — the app always has a usable local working copy
-    /// (<see cref="DatabaseInitializer.GetDatabasePath"/>) and syncs with master best-effort via
-    /// <see cref="MasterSyncService"/>. Users can still open <see cref="DatabaseSetupDialog"/>
-    /// from the File menu to configure or change the master location at any time.
+    /// Ensures a MySQL connection string is configured, prompting the user via
+    /// <see cref="DatabaseSetupDialog"/> if one has not yet been set up on this machine.
     /// </summary>
-    private static Task ResolveDatabaseLocationAsync(Window owner) => Task.CompletedTask;
+    private static async Task ResolveDatabaseLocationAsync(Window owner)
+    {
+        var connectionString = DatabaseLocationService.GetConfiguredConnectionString();
+        if (!string.IsNullOrWhiteSpace(connectionString))
+            return;
+
+        var dialog = new DatabaseSetupDialog(unreachablePath: null, required: true);
+        await dialog.ShowDialog(owner);
+    }
 
 
     /// <summary>

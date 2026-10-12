@@ -4,19 +4,12 @@ using System.IO;
 namespace HardwareTemplateBuilder.Core.Data;
 
 /// <summary>
-/// Reads and writes the <c>db_location.txt</c> pointer file that stores the path to the
-/// shared "master" SQLite database used by <see cref="MasterSyncService"/>.
-/// <para>
-/// The app always works against a local, per-machine copy of the database
-/// (<see cref="DatabaseInitializer.GetDefaultPath"/>). On startup, if a master location is
-/// configured here and reachable, new/changed local rows are merged into it and the local
-/// copy is refreshed from a clean copy of the master. If the master is unreachable, the app
-/// continues working offline against the local copy and retries next launch.
-/// </para>
+/// Reads and writes the <c>db_connection.txt</c> pointer file that stores the MySQL connection
+/// string used to connect every client directly to the centralized, shared database.
 /// <para>
 /// Priority order when reading:
 /// <list type="number">
-///   <item>Exe-directory pointer (<c>{exe folder}/db_location.txt</c>) — shared when the
+///   <item>Exe-directory pointer (<c>{exe folder}/db_connection.txt</c>) — shared when the
 ///     application is run from a network drive.</item>
 ///   <item>Per-machine AppData pointer — legacy fallback for local installs.</item>
 /// </list>
@@ -26,13 +19,13 @@ namespace HardwareTemplateBuilder.Core.Data;
 /// </summary>
 public static class DatabaseLocationService
 {
-    private const string FileName = "db_location.txt";
+    private const string FileName = "db_connection.txt";
 
     /// <summary>
-    /// Returns the configured database file path, or <c>null</c> if neither pointer file
+    /// Returns the configured MySQL connection string, or <c>null</c> if neither pointer file
     /// exists or both contain only whitespace.
     /// </summary>
-    public static string? GetConfiguredPath()
+    public static string? GetConfiguredConnectionString()
     {
         // 1. Exe-directory pointer (shared config — works when exe is on a network drive).
         var exePath = GetExeDirectoryPointerPath();
@@ -59,14 +52,14 @@ public static class DatabaseLocationService
     }
 
     /// <summary>
-    /// Saves <paramref name="dbPath"/> to the pointer file. Writes to the exe-directory
-    /// location (shared) if writable; otherwise writes to the AppData location.
+    /// Saves <paramref name="connectionString"/> to the pointer file. Writes to the
+    /// exe-directory location (shared) if writable; otherwise writes to the AppData location.
     /// </summary>
-    /// <param name="dbPath">Full path to the SQLite <c>.db</c> file.</param>
-    public static void SetConfiguredPath(string dbPath)
+    /// <param name="connectionString">The MySQL connection string to persist.</param>
+    public static void SetConfiguredConnectionString(string connectionString)
     {
-        if (!TryWriteExeDirectory(dbPath))
-            File.WriteAllText(GetAppDataPointerPath(), dbPath);
+        if (!TryWriteExeDirectory(connectionString))
+            File.WriteAllText(GetAppDataPointerPath(), connectionString);
     }
 
     /// <summary>
@@ -79,11 +72,11 @@ public static class DatabaseLocationService
         return GetAppDataPointerPath();
     }
 
-    private static bool TryWriteExeDirectory(string dbPath)
+    private static bool TryWriteExeDirectory(string connectionString)
     {
         var exePath = GetExeDirectoryPointerPath();
         if (exePath == null) return false;
-        try { File.WriteAllText(exePath, dbPath); return true; }
+        try { File.WriteAllText(exePath, connectionString); return true; }
         catch { return false; }
     }
 

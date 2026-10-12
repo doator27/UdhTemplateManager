@@ -15,21 +15,19 @@ public class RedundancyCheckTests : IDisposable
 {
     private readonly AppDbContext _context;
 
-    /// <summary>Creates a fresh in-memory SQLite database for each test.</summary>
+    /// <summary>Creates a fresh in-memory database for each test.</summary>
     public RedundancyCheckTests()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlite($"Data Source=:memory:")
+            .UseInMemoryDatabase($"HtbRedundancyTests_{Guid.NewGuid():N}")
             .Options;
         _context = new AppDbContext(options);
-        _context.Database.OpenConnection();
         _context.Database.EnsureCreated();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        _context.Database.CloseConnection();
         _context.Dispose();
     }
 

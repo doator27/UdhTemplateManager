@@ -24,7 +24,13 @@ public partial class MainWindow : Window
         _router = new ViewRouter(ContentArea);
         RegisterViews();
         WireMenuItems();
-        NavigateTo("Jobs");
+
+        // Do NOT navigate here: the database connection may not be configured yet on first
+        // launch, and views like JobsView query the database as soon as their Loaded event
+        // fires — which happens when the window's visual tree is attached, before App.axaml.cs's
+        // Opened handler gets a chance to show the DatabaseSetupDialog. Navigation is deferred
+        // to App.axaml.cs's NavigateToJobsIfEmpty() call, made only after the database
+        // connection has been resolved and initialized.
 
         // Phase 24: Run missing-template alert check at startup (best-effort, background).
         Task.Run(() =>
@@ -65,8 +71,6 @@ public partial class MainWindow : Window
         _router.Register("BatchGenerate",        () => { var v = new BatchGenerateView();        v.NavigationRequested += NavigateTo; return v; });
         _router.Register("RefreshTemplates",     () => { var v = new RefreshTemplatesView();     v.NavigationRequested += NavigateTo; return v; });
         _router.Register("DeduplicateHardware", () => { var v = new DeduplicateHardwareView(); v.NavigationRequested += NavigateTo; return v; });
-        _router.Register("BackupDatabase",      () => { var v = new BackupDatabaseView();      v.NavigationRequested += NavigateTo; return v; });
-        _router.Register("SyncDatabase",        () => { var v = new SyncDatabaseView();        v.NavigationRequested += NavigateTo; return v; });
     }
 
     /// <summary>Wires all menu item click events to their corresponding navigation targets.</summary>
@@ -79,7 +83,7 @@ public partial class MainWindow : Window
             await DialogHelper.ShowInfoAsync(this,
                 $"Hardware Template Builder  v{verStr}\n\n" +
                 "Manages door hardware templates and generates PDF packages for job orders.\n\n" +
-                "Built with .NET 8 · Avalonia UI · PDFsharp · QuestPDF · SQLite",
+                "Built with .NET 8 · Avalonia UI · PDFsharp · QuestPDF · MySQL",
                 "About Hardware Template Builder");
         };
         MenuFileChangeUser.Click += async (_, _) =>
@@ -103,8 +107,6 @@ public partial class MainWindow : Window
         MenuTemplateLookup.Click += (_, _) => NavigateTo("TemplateLookup");
         MenuRefreshTemplates.Click     += (_, _) => NavigateTo("RefreshTemplates");
         MenuDeduplicateHardware.Click  += (_, _) => NavigateTo("DeduplicateHardware");
-        MenuBackupDatabase.Click       += (_, _) => NavigateTo("BackupDatabase");
-        MenuSyncDatabase.Click         += (_, _) => NavigateTo("SyncDatabase");
         MenuHardwareItems.Click += (_, _) => NavigateTo("HardwareItems");
         MenuTemplates.Click += (_, _) => NavigateTo("Templates");
         MenuCustomers.Click += (_, _) => NavigateTo("Customers");
@@ -214,6 +216,17 @@ public partial class MainWindow : Window
         var u = SessionService.ActiveUserProfile?.UserName;
         var sfx = u != null ? $"  —  {u}" : string.Empty;
         StatusText.Text = viewName == "Dashboard" ? $"Ready{sfx}" : $"{viewName}{sfx}";
+    }
+
+    /// <summary>
+    /// Re-attempts navigation to the "Jobs" view if the content area is still empty, i.e. the
+    /// initial navigation in the constructor was skipped because the database connection
+    /// wasn't configured yet. Safe to call unconditionally after startup.
+    /// </summary>
+    public void NavigateToJobsIfEmpty()
+    {
+        if (ContentArea.Content == null)
+            NavigateTo("Jobs");
     }
 
     /// <summary>Updates the status bar to reflect the newly chosen active user.</summary>

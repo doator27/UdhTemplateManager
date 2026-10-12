@@ -98,32 +98,6 @@ public partial class RefreshTemplatesView : UserControl
             SetRunningState(running: false);
             return;
         }
-        catch (Exception ex) when (IsLockedError(ex))
-        {
-            // The local database's own -journal/-wal/-shm sidecar files are the usual cause of a
-            // persistent lock error here (e.g. left behind by a crash), not another process
-            // actively using the database. Clear them once and automatically retry before
-            // surfacing an error, so the user doesn't have to go find a "clear lock" button.
-            var clearMessage = DatabaseInitializer.ClearLocalLock();
-            try
-            {
-                result = await RunRefreshAsync(saveLocation, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                StopElapsedTimer();
-                StatusLabel.Text = "Refresh cancelled.";
-                SetRunningState(running: false);
-                return;
-            }
-            catch (Exception ex2)
-            {
-                StopElapsedTimer();
-                StatusLabel.Text = $"Database is locked. {clearMessage} Retry failed: {ex2.Message}";
-                SetRunningState(running: false);
-                return;
-            }
-        }
         catch (Exception ex)
         {
             StopElapsedTimer();
@@ -168,21 +142,6 @@ public partial class RefreshTemplatesView : UserControl
     }
 
     /// <summary>
-    /// Identifies exceptions caused by the local database being locked (transient SQLITE_BUSY/
-    /// SQLITE_LOCKED, or a stale -journal file left in a readonly/locked state), as opposed to
-    /// other unrelated failures (e.g. network errors while downloading).
-    /// </summary>
-    private static bool IsLockedError(Exception ex)
-    {
-        var message = ex.Message;
-        for (var inner = ex.InnerException; inner != null; inner = inner.InnerException)
-            message += " " + inner.Message;
-
-        return message.Contains("locked", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("readonly database", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("busy", StringComparison.OrdinalIgnoreCase);
-    }
-
     // ---------- Timing / estimation ----------
 
     /// <summary>Starts a UI timer that updates <see cref="ElapsedText"/> once per second.</summary>

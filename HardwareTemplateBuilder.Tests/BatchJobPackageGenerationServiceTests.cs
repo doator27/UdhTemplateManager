@@ -2,7 +2,6 @@ using System.Net.Http;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Services.Pdf;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PdfSharp.Pdf;
 
@@ -12,7 +11,6 @@ namespace HardwareTemplateBuilder.Tests;
 public class BatchJobPackageGenerationServiceTests : IDisposable
 {
     private readonly string _tempDir;
-    private readonly SqliteConnection _connection;
     private readonly DbContextOptions<AppDbContext> _options;
 
     public BatchJobPackageGenerationServiceTests()
@@ -20,9 +18,9 @@ public class BatchJobPackageGenerationServiceTests : IDisposable
         _tempDir = Path.Combine(Path.GetTempPath(), $"HtbBatchTests_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
 
-        _connection = new SqliteConnection("Data Source=:memory:");
-        _connection.Open();
-        _options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options;
+        _options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase($"HtbBatchTests_{Guid.NewGuid():N}")
+            .Options;
 
         using var ctx = new AppDbContext(_options);
         ctx.Database.EnsureCreated();
@@ -30,7 +28,6 @@ public class BatchJobPackageGenerationServiceTests : IDisposable
 
     public void Dispose()
     {
-        _connection.Dispose();
         if (Directory.Exists(_tempDir))
             Directory.Delete(_tempDir, recursive: true);
     }

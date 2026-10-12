@@ -2,7 +2,6 @@ using System.Net.Http;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Services.Pdf;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PdfSharp.Pdf;
 
@@ -12,7 +11,6 @@ namespace HardwareTemplateBuilder.Tests;
 public class JobPackageGenerationServiceTests : IDisposable
 {
     private readonly string _tempDir;
-    private readonly SqliteConnection _connection;
     private readonly DbContextOptions<AppDbContext> _options;
 
     public JobPackageGenerationServiceTests()
@@ -20,11 +18,11 @@ public class JobPackageGenerationServiceTests : IDisposable
         _tempDir = Path.Combine(Path.GetTempPath(), $"HtbJobPkgTests_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
 
-        // A shared, kept-open connection lets every context created via the service's
+        // A shared in-memory database name lets every context created via the service's
         // Func<AppDbContext> factory see the same in-memory database.
-        _connection = new SqliteConnection("Data Source=:memory:");
-        _connection.Open();
-        _options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options;
+        _options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase($"HtbJobPkgTests_{Guid.NewGuid():N}")
+            .Options;
 
         using var ctx = new AppDbContext(_options);
         ctx.Database.EnsureCreated();
@@ -32,7 +30,6 @@ public class JobPackageGenerationServiceTests : IDisposable
 
     public void Dispose()
     {
-        _connection.Dispose();
         if (Directory.Exists(_tempDir))
             Directory.Delete(_tempDir, recursive: true);
     }

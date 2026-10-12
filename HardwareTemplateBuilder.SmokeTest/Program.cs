@@ -8,7 +8,7 @@ Console.WriteLine();
 // Initialize database
 Console.WriteLine("Initializing database...");
 DatabaseInitializer.Initialize();
-Console.WriteLine($"Database at: {DatabaseInitializer.GetDatabasePath()}");
+Console.WriteLine($"Database connection: {DatabaseInitializer.GetConnectionString()}");
 Console.WriteLine();
 
 using var context = DatabaseInitializer.CreateContext();

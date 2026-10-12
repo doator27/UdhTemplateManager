@@ -676,7 +676,6 @@ public partial class BulkHardwareEntryView : UserControl
             labelsPanel.Children.Remove(row);
             UpdateLabelRemoveButtons(item, labelsPanel);
         };
-
         customBox.TextChanged += (_, _) => label.CustomLabel = customBox.Text?.Trim() ?? string.Empty;
         remarksBox.TextChanged += (_, _) =>
             label.Remarks = string.IsNullOrWhiteSpace(remarksBox.Text) ? null : remarksBox.Text.Trim();

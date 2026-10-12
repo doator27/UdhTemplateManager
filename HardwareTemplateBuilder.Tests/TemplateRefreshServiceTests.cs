@@ -13,24 +13,22 @@ public class TemplateRefreshServiceTests : IDisposable
     private readonly string _tempDir;
     private readonly AppDbContext _context;
 
-    /// <summary>Creates a fresh in-memory SQLite database and a temporary directory for downloaded files.</summary>
+    /// <summary>Creates a fresh in-memory database and a temporary directory for downloaded files.</summary>
     public TemplateRefreshServiceTests()
     {
         _tempDir = Path.Combine(Path.GetTempPath(), $"HtbRefreshTests_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlite("Data Source=:memory:")
+            .UseInMemoryDatabase($"HtbRefreshTests_{Guid.NewGuid():N}")
             .Options;
         _context = new AppDbContext(options);
-        _context.Database.OpenConnection();
         _context.Database.EnsureCreated();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        _context.Database.CloseConnection();
         _context.Dispose();
         if (Directory.Exists(_tempDir))
             Directory.Delete(_tempDir, recursive: true);

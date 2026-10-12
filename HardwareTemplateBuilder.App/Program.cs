@@ -15,11 +15,10 @@ class Program
     private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
     // Named Mutex used to detect a second instance of this app running on the same machine.
-    // A second local instance racing to open/patch the same local SQLite database file is one
-    // of the leading causes of a persistent "database is locked" (SQLITE_BUSY) startup failure
-    // that outlives the retry/backoff logic in DatabaseInitializer.Initialize(). This is
-    // intentionally a local (non-"Global\") mutex: separate machines each work against their own
-    // local database copy, so only same-machine duplicate instances need to be prevented.
+    // Multiple instances on the same machine serve no purpose (they'd just be duplicate UIs
+    // against the same centralized MySQL database) and can cause confusing double-prompts or
+    // duplicate Start Menu shortcut writes. This is intentionally a local (non-"Global\") mutex:
+    // other machines connect to the same shared MySQL server independently and are unaffected.
     private const string SingleInstanceMutexName = "HardwareTemplateBuilder_SingleInstance";
     private static Mutex? _singleInstanceMutex;
 
@@ -34,11 +33,8 @@ class Program
         _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
         if (!createdNew)
         {
-            // Another instance of this app is already running on this machine. Starting a
-            // second instance risks two processes racing to open/patch/migrate the same local
-            // SQLite database file, which can leave one of them stuck retrying against a lock
-            // held by the other until the retry budget in DatabaseInitializer.Initialize() is
-            // exhausted. Exit quietly rather than risk that failure mode.
+            // Another instance of this app is already running on this machine. Exit quietly
+            // rather than opening a redundant duplicate window against the same shared database.
             CrashLogger.Log(
                 new InvalidOperationException("Startup aborted: another instance of HardwareTemplateBuilder is already running on this machine."),
                 isTerminating: false);
