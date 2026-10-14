@@ -9,7 +9,7 @@ namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
 /// Admin view for managing global application settings, such as the shared
-/// template storage location and the active MySQL database connection.
+/// template storage location and the active SQL Server database connection.
 /// </summary>
 public partial class AppSettingsView : UserControl
 {

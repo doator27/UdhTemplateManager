@@ -32,11 +32,11 @@ public partial class App : Application
             {
                 try
                 {
-                    // Step 1: Ensure a MySQL connection is configured; prompt if not.
+                    // Step 1: Ensure a SQL Server connection is configured; prompt if not.
                     await ResolveDatabaseLocationAsync(mainWindow);
 
                     // Step 2: Apply migrations / create schema on the shared, centralized
-                    // MySQL database used by all clients.
+                    // SQL Server database used by all clients.
                     await Task.Run(DatabaseInitializer.Initialize);
 
                     // The initial "Jobs" navigation in MainWindow's constructor may have been
@@ -74,9 +74,9 @@ public partial class App : Application
                     // the user plainly instead of failing silently.
                     Helpers.CrashLogger.Log(ex, isTerminating: false);
 
-                    var message = ex is MySqlConnector.MySqlException or System.Net.Sockets.SocketException
-                        ? "Hardware Template Builder could not connect to the MySQL database " +
-                          "(Server=localhost;Port=3306;Database=templatedb). Verify the MySQL server is running " +
+                    var message = ex is Microsoft.Data.SqlClient.SqlException or System.Net.Sockets.SocketException
+                        ? "Hardware Template Builder could not connect to the SQL Server database " +
+                          "(Server=localhost;Database=templatedb). Verify the SQL Server instance is running " +
                           $"and reachable, then restart the application. Details: {ex.Message}"
                         : "Hardware Template Builder ran into a problem while starting up and could not finish " +
                           "loading. The error has been recorded in CrashReports.txt next to the application. " +
@@ -91,7 +91,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Ensures a MySQL connection string is configured, prompting the user via
+    /// Ensures a SQL Server connection string is configured, prompting the user via
     /// <see cref="DatabaseSetupDialog"/> if one has not yet been set up on this machine.
     /// </summary>
     private static Task ResolveDatabaseLocationAsync(Window owner)

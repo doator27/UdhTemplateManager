@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.App.Navigation;
 using HardwareTemplateBuilder.App.Views;
@@ -83,7 +84,7 @@ public partial class MainWindow : Window
             await DialogHelper.ShowInfoAsync(this,
                 $"Hardware Template Builder  v{verStr}\n\n" +
                 "Manages door hardware templates and generates PDF packages for job orders.\n\n" +
-                "Built with .NET 8 · Avalonia UI · PDFsharp · QuestPDF · MySQL",
+                "Built with .NET 8 · Avalonia UI · PDFsharp · QuestPDF · SQL Server",
                 "About Hardware Template Builder");
         };
         MenuFileChangeUser.Click += async (_, _) =>
@@ -107,6 +108,8 @@ public partial class MainWindow : Window
         MenuTemplateLookup.Click += (_, _) => NavigateTo("TemplateLookup");
         MenuRefreshTemplates.Click     += (_, _) => NavigateTo("RefreshTemplates");
         MenuDeduplicateHardware.Click  += (_, _) => NavigateTo("DeduplicateHardware");
+        MenuDumpDatabase.Click         += async (_, _) => await DumpDatabaseAsync();
+        MenuExportSqlServerScript.Click += async (_, _) => await ExportSqlServerScriptAsync();
         MenuHardwareItems.Click += (_, _) => NavigateTo("HardwareItems");
         MenuTemplates.Click += (_, _) => NavigateTo("Templates");
         MenuCustomers.Click += (_, _) => NavigateTo("Customers");
@@ -234,6 +237,69 @@ public partial class MainWindow : Window
     {
         if (ContentArea.Content == null)
             NavigateTo("Jobs");
+    }
+
+    /// <summary>
+    /// Prompts for a destination text file and dumps the full contents of every database
+    /// table into it, for ad-hoc inspection or off-site backup.
+    /// </summary>
+    private async Task DumpDatabaseAsync()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Dump Database To Text File",
+            SuggestedFileName = $"database-dump-{System.DateTime.Now:yyyyMMdd-HHmmss}.txt",
+            FileTypeChoices = new[] { new FilePickerFileType("Text File") { Patterns = new[] { "*.txt" } } }
+        });
+        if (file == null) return;
+
+        try
+        {
+            using var context = DatabaseInitializer.CreateContext();
+            var tableCount = DatabaseDumpService.DumpToTextFile(context, file.Path.LocalPath);
+            await DialogHelper.ShowInfoAsync(this,
+                $"Database dumped successfully.\n\n{tableCount} table(s) written to:\n{file.Path.LocalPath}",
+                "Dump Database");
+        }
+        catch (System.Exception ex)
+        {
+            await DialogHelper.ShowInfoAsync(this, $"Error dumping database: {ex.Message}", "Dump Database");
+        }
+    }
+
+    /// <summary>
+    /// Prompts for a destination .sql file and exports the full schema and contents of the
+    /// active database to a flat T-SQL script that can be run directly in SQL Server
+    /// Management Studio against an empty/target database.
+    /// </summary>
+    private async Task ExportSqlServerScriptAsync()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export SQL Server Script",
+            SuggestedFileName = $"database-export-{System.DateTime.Now:yyyyMMdd-HHmmss}.sql",
+            FileTypeChoices = new[] { new FilePickerFileType("SQL Script") { Patterns = new[] { "*.sql" } } }
+        });
+        if (file == null) return;
+
+        try
+        {
+            using var context = DatabaseInitializer.CreateContext();
+            var tableCount = await SqlServerScriptExportService.ExportAsync(context, file.Path.LocalPath);
+            await DialogHelper.ShowInfoAsync(this,
+                $"Database exported successfully.\n\n{tableCount} table(s) written to:\n{file.Path.LocalPath}",
+                "Export SQL Server Script");
+        }
+        catch (System.Exception ex)
+        {
+            await DialogHelper.ShowInfoAsync(this, $"Error exporting database: {ex.Message}", "Export SQL Server Script");
+        }
     }
 
     /// <summary>Updates the status bar to reflect the newly chosen active user.</summary>

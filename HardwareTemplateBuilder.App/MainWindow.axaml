@@ -24,6 +24,9 @@
                 <MenuItem Header="_Batch Generate..."        Name="MenuBatchGenerate" />
                 <MenuItem Header="_Refresh Templates"        Name="MenuRefreshTemplates" />
                 <MenuItem Header="_Deduplicate Hardware..."  Name="MenuDeduplicateHardware" />
+                <Separator />
+                <MenuItem Header="_Dump Database..."         Name="MenuDumpDatabase" />
+                <MenuItem Header="_Export SQL Server Script..." Name="MenuExportSqlServerScript" />
             </MenuItem>
             <MenuItem Header="_Admin">
                 <MenuItem Header="_Hardware Items" Name="MenuHardwareItems" />

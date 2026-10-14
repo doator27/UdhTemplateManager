@@ -5,8 +5,8 @@ using HardwareTemplateBuilder.Core.Data;
 namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
-/// Modal dialog used to configure the MySQL connection string that every client uses to connect
-/// directly to the shared, centralized database (see <see cref="DatabaseInitializer"/>).
+/// Modal dialog used to configure the SQL Server connection string that every client uses to
+/// connect directly to the shared, centralized database (see <see cref="DatabaseInitializer"/>).
 /// <para>
 /// Once a valid connection string is confirmed, it is written to
 /// <see cref="DatabaseLocationService"/> and the dialog closes. When <paramref name="required"/>
