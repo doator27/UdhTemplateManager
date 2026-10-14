@@ -21,6 +21,7 @@ namespace HardwareTemplateBuilder.App.Views;
 public partial class HardwareItemDetailView : UserControl
 {
     private readonly int _itemId;
+    private readonly string? _returnRoute;
     private int _itemManufacturerId;
     private int _itemDescriptionId;
     private int _editingTemplateId;
@@ -32,9 +33,15 @@ public partial class HardwareItemDetailView : UserControl
 
     /// <summary>Initializes the detail view for the given hardware item.</summary>
     /// <param name="itemId">The ID of the hardware item to manage.</param>
-    public HardwareItemDetailView(int itemId)
+    /// <param name="returnRoute">
+    /// Optional navigation route to return to when Back is clicked, overriding the default
+    /// "HardwareItems" list. Used when navigating here from a context (e.g. bulk hardware entry)
+    /// that should be restored afterward.
+    /// </param>
+    public HardwareItemDetailView(int itemId, string? returnRoute = null)
     {
         _itemId = itemId;
+        _returnRoute = returnRoute;
         InitializeComponent();
         Loaded += (_, _) => Initialize();
     }
@@ -81,7 +88,7 @@ public partial class HardwareItemDetailView : UserControl
         LoadLinkedTemplates();
         SearchTemplates();
 
-        BackButton.Click           += (_, _) => NavigationRequested?.Invoke("HardwareItems");
+        BackButton.Click           += (_, _) => NavigationRequested?.Invoke(_returnRoute ?? "HardwareItems");
         RemoveTemplateButton.Click += (_, _) => RemoveTemplate();
         AddTemplateButton.Click    += (_, _) => AddLinkTemplate();
         BrowseLocalLinkButton.Click += async (_, _) => await BrowseLocalLinkAsync();

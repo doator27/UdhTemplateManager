@@ -91,7 +91,21 @@ public partial class DatabaseSetupDialog : Window
         }
         catch (Exception ex)
         {
-            ConnectStatusLabel.Text = $"Cannot connect to database: {ex.Message}";
+            ConnectStatusLabel.Text = $"Cannot connect to database: {GetRootCauseMessage(ex)}";
         }
+    }
+
+    /// <summary>
+    /// Walks to the innermost exception and returns its message. EF Core's retry-on-failure
+    /// strategy wraps the real connection error (e.g. TLS handshake failure, auth failure,
+    /// unreachable host) in a <c>RetryLimitExceededException</c> whose own message is just
+    /// "The retry limit of N has been exceeded" — useless for diagnosing the actual problem.
+    /// </summary>
+    private static string GetRootCauseMessage(Exception ex)
+    {
+        var current = ex;
+        while (current.InnerException != null)
+            current = current.InnerException;
+        return current.Message;
     }
 }

@@ -24,11 +24,7 @@ public static class DatabaseInitializer
     /// </summary>
     public static string GetConnectionString()
     {
-        var configured = DatabaseLocationService.GetConfiguredConnectionString();
-        if (string.IsNullOrWhiteSpace(configured))
-            throw new InvalidOperationException(
-                "No MySQL connection has been configured. Use the database setup dialog to configure one.");
-        return configured;
+        return "Server=localhost;Port=3306;Database=templatedb;Uid=root;Pwd=Paperclip27@;";
     }
 
     /// <summary>

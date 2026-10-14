@@ -41,7 +41,7 @@
         <Border BorderBrush="#454952" BorderThickness="1" Padding="10">
             <StackPanel>
                 <TextBlock Text="MySQL connection string" FontWeight="Bold" Margin="0,0,0,6"/>
-                <TextBlock Text="Example: Server=myserver;Port=3306;Database=hardware_templates;Uid=appuser;Pwd=secret;"
+                <TextBlock Text="Example: Server=localhost;Port=3306;Database=hardware_templates;Uid=root;Pwd=secret;"
                            TextWrapping="Wrap" Foreground="#A7ADB8" Margin="0,0,0,6"/>
                 <TextBox Name="ConnectionStringBox"
                          Watermark="Server=...;Port=3306;Database=...;Uid=...;Pwd=...;"

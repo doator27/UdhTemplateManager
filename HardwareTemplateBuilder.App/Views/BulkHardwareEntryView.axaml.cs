@@ -62,6 +62,9 @@ public partial class BulkHardwareEntryView : UserControl
 
         /// <summary>Refreshes the compact summary text blocks from current entry state.</summary>
         public Action? UpdateCompact { get; set; }
+
+        /// <summary>Refreshes the match label/compact summary after <see cref="MatchedItem"/> is set programmatically.</summary>
+        public Action? RefreshMatchDisplay { get; set; }
     }
 
     private sealed class LabelEntry
@@ -235,6 +238,15 @@ public partial class BulkHardwareEntryView : UserControl
             Padding = new Avalonia.Thickness(6, 2)
         };
 
+        var addEditTemplateBtn = new Button
+        {
+            Content = "Add/Edit Template",
+            FontSize = 10,
+            Padding = new Avalonia.Thickness(6, 2),
+            Margin = new Avalonia.Thickness(0, 0, 4, 0)
+        };
+        addEditTemplateBtn.Click += (_, _) => OpenOrCreateTemplateEditorForItem(entry);
+
         var openTemplatesBtn = new Button
         {
             Content = "Templates",
@@ -256,7 +268,7 @@ public partial class BulkHardwareEntryView : UserControl
 
         var topRow = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("250,160,*,70,Auto,Auto"),
+            ColumnDefinitions = new ColumnDefinitions("250,160,*,70,Auto,Auto,Auto"),
             Margin = new Avalonia.Thickness(0, 0, 0, 8),
             ContextMenu = expandedContextMenu
         };
@@ -267,9 +279,11 @@ public partial class BulkHardwareEntryView : UserControl
         topRow.Children.Add(itemRemarksBox);
         Grid.SetColumn(matchLabel, 3);
         topRow.Children.Add(matchLabel);
-        Grid.SetColumn(openTemplatesBtn, 4);
+        Grid.SetColumn(addEditTemplateBtn, 4);
+        topRow.Children.Add(addEditTemplateBtn);
+        Grid.SetColumn(openTemplatesBtn, 5);
         topRow.Children.Add(openTemplatesBtn);
-        Grid.SetColumn(removeItemBtn, 5);
+        Grid.SetColumn(removeItemBtn, 6);
         topRow.Children.Add(removeItemBtn);
 
         var labelsPanel = new StackPanel { Spacing = 4, Margin = new Avalonia.Thickness(0, 4, 0, 0) };
@@ -317,6 +331,16 @@ public partial class BulkHardwareEntryView : UserControl
             VerticalAlignment = VerticalAlignment.Center
         };
 
+        var compactAddEditTemplateBtn = new Button
+        {
+            Content = "Add/Edit Template",
+            FontSize = 10,
+            Padding = new Avalonia.Thickness(6, 2),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Avalonia.Thickness(0, 0, 4, 0)
+        };
+        compactAddEditTemplateBtn.Click += (_, _) => OpenOrCreateTemplateEditorForItem(entry);
+
         var compactTemplatesBtn = new Button
         {
             Content = "Templates",
@@ -328,7 +352,7 @@ public partial class BulkHardwareEntryView : UserControl
 
         var compactRow = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("200,150,*,70,Auto"),
+            ColumnDefinitions = new ColumnDefinitions("200,150,*,70,Auto,Auto"),
             Cursor = new Cursor(StandardCursorType.Hand),
             Background = Brushes.Transparent,
             ContextMenu = itemContextMenu
@@ -337,7 +361,8 @@ public partial class BulkHardwareEntryView : UserControl
         Grid.SetColumn(compactModelText,  1); compactRow.Children.Add(compactModelText);
         Grid.SetColumn(compactRemarksText, 2); compactRow.Children.Add(compactRemarksText);
         Grid.SetColumn(compactMatchText,  3); compactRow.Children.Add(compactMatchText);
-        Grid.SetColumn(compactTemplatesBtn, 4); compactRow.Children.Add(compactTemplatesBtn);
+        Grid.SetColumn(compactAddEditTemplateBtn, 4); compactRow.Children.Add(compactAddEditTemplateBtn);
+        Grid.SetColumn(compactTemplatesBtn, 5); compactRow.Children.Add(compactTemplatesBtn);
 
         entry.UpdateCompact = () =>
         {
@@ -351,21 +376,7 @@ public partial class BulkHardwareEntryView : UserControl
 
             compactRemarksText.Text = entry.HardwareItemRemarks ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(entry.ModelNumber))
-            {
-                compactMatchText.Text = "";
-                compactMatchText.Foreground = AppColors.Muted;
-            }
-            else if (entry.MatchedItem != null)
-            {
-                compactMatchText.Text = " ✓ Matched";
-                compactMatchText.Foreground = AppColors.Success;
-            }
-            else
-            {
-                compactMatchText.Text = " (new)";
-                compactMatchText.Foreground = AppColors.Info;
-            }
+            UpdateMatchLabel(compactMatchText, entry.MatchedItem, entry.ModelNumber);
         };
 
         compactRow.PointerPressed += (_, _) => SetActiveEntry(entry);
@@ -469,6 +480,12 @@ public partial class BulkHardwareEntryView : UserControl
             UpdateMatchLabel(matchLabel, entry.MatchedItem, text);
             entry.UpdateCompact?.Invoke();
         }
+
+        entry.RefreshMatchDisplay = () =>
+        {
+            UpdateMatchLabel(matchLabel, entry.MatchedItem, entry.ModelNumber);
+            entry.UpdateCompact?.Invoke();
+        };
 
         // Guard to prevent re-entrant calls when SelectDescription programmatically
         // clears descCombo.Text and SelectedItem after a selection is made.
@@ -700,6 +717,51 @@ public partial class BulkHardwareEntryView : UserControl
     /// Prefers the locally cached file (<see cref="IndividualTemplate.LocalLink"/>); falls back
     /// to the online link if no local copy is available. Reports status if nothing can be opened.
     /// </summary>
+    /// <summary>
+    /// Navigates to <see cref="HardwareItemDetailView"/> for this row's hardware item so the user can
+    /// add or edit its templates directly from the bulk entry screen, without waiting for the
+    /// Template Resolution Wizard step. If the row isn't matched to an existing <see cref="HardwareItem"/>
+    /// yet, finds a matching one by Manufacturer+Description+ModelNumber or creates it on the fly
+    /// (mirroring the dedup logic in the "Add All to Job" commit path).
+    /// </summary>
+    private void OpenOrCreateTemplateEditorForItem(ItemEntry entry)
+    {
+        if (entry.Description == null || string.IsNullOrWhiteSpace(entry.ModelNumber))
+        {
+            StatusLabel.Text = "Select a description and enter a model number before adding a template.";
+            return;
+        }
+
+        if (entry.MatchedItem == null)
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var item = ctx.HardwareItems.FirstOrDefault(h =>
+                h.ManufacturerId == _manufacturerId &&
+                h.DescriptionId  == entry.Description.Id &&
+                h.ModelNumber    == entry.ModelNumber);
+
+            if (item == null)
+            {
+                item = new HardwareItem
+                {
+                    ManufacturerId = _manufacturerId,
+                    DescriptionId  = entry.Description.Id,
+                    ModelNumber    = entry.ModelNumber,
+                    Remarks        = entry.HardwareItemRemarks
+                };
+                ctx.HardwareItems.Add(item);
+                ctx.SaveChanges();
+            }
+
+            entry.MatchedItem = item;
+            entry.RefreshMatchDisplay?.Invoke();
+        }
+
+        SaveDraft();
+        NavigationRequested?.Invoke(
+            $"HardwareItemDetail:{entry.MatchedItem.Id}:BulkHardwareEntry:{_jobId}:{_manufacturerId}");
+    }
+
     private void OpenTemplatesForItem(ItemEntry entry)
     {
         if (entry.MatchedItem == null)
@@ -812,13 +874,25 @@ public partial class BulkHardwareEntryView : UserControl
         else if (matched != null)
         {
             label.Text = " ✓ Matched";
-            label.Foreground = AppColors.Success;
+            label.Foreground = HasLinkedTemplates(matched.Id) ? AppColors.Success : AppColors.Warning;
         }
         else
         {
             label.Text = " (new)";
             label.Foreground = AppColors.Info;
         }
+    }
+
+    /// <summary>
+    /// Checks whether the given hardware item has at least one linked template. A matched
+    /// <see cref="HardwareItem"/> with no linked templates is still shown as "(new)" so the user
+    /// knows it hasn't actually been catalogued yet — this covers items that were only just
+    /// created via the "Add/Edit Template" button (see <see cref="OpenOrCreateTemplateEditorForItem"/>).
+    /// </summary>
+    private static bool HasLinkedTemplates(int hardwareItemId)
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        return ctx.HardwareItemTemplates.Any(hit => hit.HardwareItemId == hardwareItemId);
     }
 
     private void RefreshDescriptions()

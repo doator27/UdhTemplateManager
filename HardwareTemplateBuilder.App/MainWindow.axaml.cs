@@ -199,17 +199,24 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Parameterized route: "HardwareItemDetail:{id}"
-        if (viewName.StartsWith("HardwareItemDetail:") &&
-            int.TryParse(viewName.Substring("HardwareItemDetail:".Length), out var itemId))
+        // Parameterized route: "HardwareItemDetail:{id}" or "HardwareItemDetail:{id}:{returnRoute}"
+        if (viewName.StartsWith("HardwareItemDetail:"))
         {
-            var detail = new HardwareItemDetailView(itemId);
-            detail.NavigationRequested += NavigateTo;
-            ContentArea.Content = detail;
-            var user = SessionService.ActiveUserProfile?.UserName;
-            var suffix = user != null ? $"  —  {user}" : string.Empty;
-            StatusText.Text = $"Hardware Item Detail{suffix}";
-            return;
+            var remainder = viewName.Substring("HardwareItemDetail:".Length);
+            var splitIndex = remainder.IndexOf(':');
+            var idPart = splitIndex < 0 ? remainder : remainder.Substring(0, splitIndex);
+            var returnRoute = splitIndex < 0 ? null : remainder.Substring(splitIndex + 1);
+
+            if (int.TryParse(idPart, out var itemId))
+            {
+                var detail = new HardwareItemDetailView(itemId, returnRoute);
+                detail.NavigationRequested += NavigateTo;
+                ContentArea.Content = detail;
+                var user = SessionService.ActiveUserProfile?.UserName;
+                var suffix = user != null ? $"  —  {user}" : string.Empty;
+                StatusText.Text = $"Hardware Item Detail{suffix}";
+                return;
+            }
         }
 
         _router.NavigateTo(viewName);

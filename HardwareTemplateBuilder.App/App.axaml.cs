@@ -73,12 +73,16 @@ public partial class App : Application
                     // indistinguishable from the app "locking up" during launch. Log it and tell
                     // the user plainly instead of failing silently.
                     Helpers.CrashLogger.Log(ex, isTerminating: false);
-                    await Helpers.DialogHelper.ShowInfoAsync(
-                        mainWindow,
-                        "Hardware Template Builder ran into a problem while starting up and could not finish " +
-                        "loading. The error has been recorded in CrashReports.txt next to the application. " +
-                        $"Details: {ex.Message}",
-                        "Startup error");
+
+                    var message = ex is MySqlConnector.MySqlException or System.Net.Sockets.SocketException
+                        ? "Hardware Template Builder could not connect to the MySQL database " +
+                          "(Server=localhost;Port=3306;Database=templatedb). Verify the MySQL server is running " +
+                          $"and reachable, then restart the application. Details: {ex.Message}"
+                        : "Hardware Template Builder ran into a problem while starting up and could not finish " +
+                          "loading. The error has been recorded in CrashReports.txt next to the application. " +
+                          $"Details: {ex.Message}";
+
+                    await Helpers.DialogHelper.ShowInfoAsync(mainWindow, message, "Startup error");
                 }
             };
         }
@@ -90,14 +94,11 @@ public partial class App : Application
     /// Ensures a MySQL connection string is configured, prompting the user via
     /// <see cref="DatabaseSetupDialog"/> if one has not yet been set up on this machine.
     /// </summary>
-    private static async Task ResolveDatabaseLocationAsync(Window owner)
+    private static Task ResolveDatabaseLocationAsync(Window owner)
     {
-        var connectionString = DatabaseLocationService.GetConfiguredConnectionString();
-        if (!string.IsNullOrWhiteSpace(connectionString))
-            return;
-
-        var dialog = new DatabaseSetupDialog(unreachablePath: null, required: true);
-        await dialog.ShowDialog(owner);
+        // Connection string is hardcoded in DatabaseInitializer.GetConnectionString(),
+        // so no setup prompt is needed.
+        return Task.CompletedTask;
     }
 
 
