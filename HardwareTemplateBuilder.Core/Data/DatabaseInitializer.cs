@@ -38,7 +38,14 @@ public static class DatabaseInitializer
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlServer(connectionString, sqlServerOptions =>
-                sqlServerOptions.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null))
+            {
+                sqlServerOptions.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null);
+                // Avoid translating List<T>.Contains(...) to OPENJSON(...) WITH (...), which fails
+                // with "Incorrect syntax near the keyword 'WITH'" on databases whose compatibility
+                // level doesn't support OPENJSON (SQL Server 2014 or earlier, i.e. < 130). Falls
+                // back to inlining the values as SQL constants instead.
+                sqlServerOptions.TranslateParameterizedCollectionsToConstants();
+            })
             .Options;
         return new AppDbContext(options);
     }
