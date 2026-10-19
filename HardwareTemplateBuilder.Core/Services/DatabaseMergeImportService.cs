@@ -220,21 +220,29 @@ public sealed class DatabaseMergeImportService
         }
 
         await using var target = _targetContextFactory();
-        await using var transaction = await target.Database.BeginTransactionAsync(ct);
+        var strategy = target.Database.CreateExecutionStrategy();
 
         try
         {
-            foreach (var step in _pendingApplySteps)
+            await strategy.ExecuteAsync(async () =>
             {
-                await step(target);
-            }
+                target.ChangeTracker.Clear();
+                await using var transaction = await target.Database.BeginTransactionAsync(ct);
+                try
+                {
+                    foreach (var step in _pendingApplySteps)
+                    {
+                        await step(target);
+                    }
 
-            await transaction.CommitAsync(ct);
-        }
-        catch
-        {
-            await transaction.RollbackAsync(ct);
-            throw;
+                    await transaction.CommitAsync(ct);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(ct);
+                    throw;
+                }
+            });
         }
         finally
         {
@@ -294,30 +302,42 @@ public sealed class DatabaseMergeImportService
         var nextId = (targetRows.Count == 0 ? 0 : targetRows.Keys.Max()) + 1;
         var toInsert = new List<TEntity>();
 
+        // Index existing master rows by their identity fields (not just Id) so a row that
+        // already exists under a *different* Id than it had in the legacy file is still
+        // recognized as a duplicate instead of being inserted again.
+        var targetByKey = new Dictionary<string, int>();
+        foreach (var kvp in targetRows)
+        {
+            targetByKey[identityKey(kvp.Value)] = kvp.Key;
+        }
+
         foreach (var row in sourceRows)
         {
             var oldId = getId(row);
             remapForeignKeys?.Invoke(row);
+            var key = identityKey(row);
 
-            if (targetRows.TryGetValue(oldId, out var existing))
+            if (targetByKey.TryGetValue(key, out var matchedId))
             {
-                if (identityKey(existing) == identityKey(row))
-                {
-                    remap.Record(tableName, oldId, oldId);
-                    preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = oldId, Action = TableMergeAction.Skip, Description = describe(row) });
-                    continue;
-                }
+                remap.Record(tableName, oldId, matchedId);
+                preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = matchedId, Action = TableMergeAction.Skip, Description = describe(row) });
+                continue;
+            }
 
+            if (targetRows.ContainsKey(oldId))
+            {
                 var newId = nextId++;
                 setId(row, newId);
                 remap.Record(tableName, oldId, newId);
                 toInsert.Add(row);
+                targetByKey[key] = newId;
                 preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = newId, Action = TableMergeAction.InsertNewId, Description = describe(row) });
             }
             else
             {
                 remap.Record(tableName, oldId, oldId);
                 toInsert.Add(row);
+                targetByKey[key] = oldId;
                 preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = oldId, Action = TableMergeAction.InsertSameId, Description = describe(row) });
             }
         }
@@ -374,32 +394,45 @@ public sealed class DatabaseMergeImportService
         var nextId = (targetRows.Count == 0 ? 0 : targetRows.Keys.Max()) + 1;
         var toInsert = new List<Description>();
 
+        static string Key(Description d) => $"{d.DescriptionText}|{d.SortOrder}";
+
+        // Index existing master rows by content so a row already present under a different Id
+        // (e.g. imported previously, or diverged from the legacy file's numbering) is matched
+        // instead of being inserted again as a duplicate.
+        var targetByKey = new Dictionary<string, int>();
+        foreach (var kvp in targetRows)
+        {
+            targetByKey[Key(kvp.Value)] = kvp.Key;
+        }
+
         // Pass 1: decide Skip / InsertSameId / InsertNewId using DescriptionText + SortOrder only
         // (ParentId is deferred because a parent row's new Id may not be known yet).
         foreach (var row in sourceRows)
         {
             var oldId = row.Id;
-            static string Key(Description d) => $"{d.DescriptionText}|{d.SortOrder}";
+            var key = Key(row);
 
-            if (targetRows.TryGetValue(oldId, out var existing))
+            if (targetByKey.TryGetValue(key, out var matchedId))
             {
-                if (Key(existing) == Key(row))
-                {
-                    remap.Record(tableName, oldId, oldId);
-                    preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = oldId, Action = TableMergeAction.Skip, Description = row.DescriptionText });
-                    continue;
-                }
+                remap.Record(tableName, oldId, matchedId);
+                preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = matchedId, Action = TableMergeAction.Skip, Description = row.DescriptionText });
+                continue;
+            }
 
+            if (targetRows.ContainsKey(oldId))
+            {
                 var newId = nextId++;
                 row.Id = newId;
                 remap.Record(tableName, oldId, newId);
                 toInsert.Add(row);
+                targetByKey[key] = newId;
                 preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = newId, Action = TableMergeAction.InsertNewId, Description = row.DescriptionText });
             }
             else
             {
                 remap.Record(tableName, oldId, oldId);
                 toInsert.Add(row);
+                targetByKey[key] = oldId;
                 preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = oldId, Action = TableMergeAction.InsertSameId, Description = row.DescriptionText });
             }
         }
@@ -462,31 +495,41 @@ public sealed class DatabaseMergeImportService
         var nextId = (targetRows.Count == 0 ? 0 : targetRows.Keys.Max()) + 1;
         var toInsert = new List<BulkAddDraft>();
 
+        static string Key(BulkAddDraft d) => $"{d.JobId}|{d.DraftJson}";
+
+        var targetByKey = new Dictionary<string, int>();
+        foreach (var kvp in targetRows)
+        {
+            targetByKey[Key(kvp.Value)] = kvp.Key;
+        }
+
         foreach (var row in sourceRows)
         {
             var oldId = row.Id;
             row.JobId = remap.Resolve("Jobs", row.JobId);
-            static string Key(BulkAddDraft d) => $"{d.JobId}|{d.DraftJson}";
+            var key = Key(row);
 
-            if (targetRows.TryGetValue(oldId, out var existing))
+            if (targetByKey.TryGetValue(key, out var matchedId))
             {
-                if (Key(existing) == Key(row))
-                {
-                    remap.Record(tableName, oldId, oldId);
-                    preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = oldId, Action = TableMergeAction.Skip, Description = $"Draft for Job {row.JobId}" });
-                    continue;
-                }
+                remap.Record(tableName, oldId, matchedId);
+                preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = matchedId, Action = TableMergeAction.Skip, Description = $"Draft for Job {row.JobId}" });
+                continue;
+            }
 
+            if (targetRows.ContainsKey(oldId))
+            {
                 var newId = nextId++;
                 row.Id = newId;
                 remap.Record(tableName, oldId, newId);
                 toInsert.Add(row);
+                targetByKey[key] = newId;
                 preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = newId, Action = TableMergeAction.InsertNewId, Description = $"Draft for Job {row.JobId}" });
             }
             else
             {
                 remap.Record(tableName, oldId, oldId);
                 toInsert.Add(row);
+                targetByKey[key] = oldId;
                 preview.Results.Add(new MergeRowResult { OldId = oldId, NewId = oldId, Action = TableMergeAction.InsertSameId, Description = $"Draft for Job {row.JobId}" });
             }
         }

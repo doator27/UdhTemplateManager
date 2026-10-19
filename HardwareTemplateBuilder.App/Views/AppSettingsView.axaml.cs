@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
@@ -37,6 +38,65 @@ public partial class AppSettingsView : UserControl
         SaveButton.Click      += (_, _) => Save();
         BrowseButton.Click    += async (_, _) => await BrowseStorageFolderAsync();
         DbConnectButton.Click += (_, _) => ConnectDatabase();
+
+        BrowseSqliteButton.Click         += async (_, _) => await BrowseSqliteFileAsync();
+        UploadMissingRecordsButton.Click += async (_, _) => await UploadMissingRecordsAsync();
+    }
+
+    private async Task BrowseSqliteFileAsync()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Select Old SQLite Database",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("SQLite Database") { Patterns = new[] { "*.db", "*.sqlite", "*.sqlite3" } },
+                FilePickerFileTypes.All
+            }
+        });
+
+        if (files.Count > 0)
+            SqliteMergePathBox.Text = files[0].Path.LocalPath;
+    }
+
+    private async Task UploadMissingRecordsAsync()
+    {
+        SqliteMergeStatusLabel.Foreground = AppColors.Danger;
+        SqliteMergeStatusLabel.Text = string.Empty;
+
+        var sqlitePath = SqliteMergePathBox.Text?.Trim();
+        if (string.IsNullOrEmpty(sqlitePath))
+        {
+            SqliteMergeStatusLabel.Text = "Select an old SQLite database file first.";
+            return;
+        }
+
+        UploadMissingRecordsButton.IsEnabled = false;
+        try
+        {
+            using var context = DatabaseInitializer.CreateContext();
+            var results = await SqliteMergeService.MergeMissingRecordsAsync(sqlitePath, context);
+
+            var totalInserted = results.Sum(r => r.InsertedCount);
+            SqliteMergeStatusLabel.Foreground = AppColors.Success;
+            SqliteMergeStatusLabel.Text = totalInserted == 0
+                ? "No missing records found. The active database already has everything from that file."
+                : $"Done. Inserted {totalInserted} missing record(s): " +
+                  string.Join(", ", results.Where(r => r.InsertedCount > 0).Select(r => $"{r.TableName}={r.InsertedCount}"));
+        }
+        catch (System.Exception ex)
+        {
+            SqliteMergeStatusLabel.Foreground = AppColors.Danger;
+            SqliteMergeStatusLabel.Text = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            UploadMissingRecordsButton.IsEnabled = true;
+        }
     }
 
     private void ConnectDatabase()

@@ -24,9 +24,13 @@
                 <MenuItem Header="_Batch Generate..."        Name="MenuBatchGenerate" />
                 <MenuItem Header="_Refresh Templates"        Name="MenuRefreshTemplates" />
                 <MenuItem Header="_Deduplicate Hardware..."  Name="MenuDeduplicateHardware" />
+                <MenuItem Header="_Relink Templates..."      Name="MenuRelinkTemplates" />
                 <Separator />
                 <MenuItem Header="_Dump Database..."         Name="MenuDumpDatabase" />
                 <MenuItem Header="_Export SQL Server Script..." Name="MenuExportSqlServerScript" />
+                <Separator />
+                <MenuItem Header="_Import Legacy Database..." Name="MenuImportLegacyDatabase" />
+                <MenuItem Header="_Import Jobs Wizard..."     Name="MenuImportJobsWizard" />
             </MenuItem>
             <MenuItem Header="_Admin">
                 <MenuItem Header="_Hardware Items" Name="MenuHardwareItems" />

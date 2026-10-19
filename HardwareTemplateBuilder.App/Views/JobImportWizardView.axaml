@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 x:Class="HardwareTemplateBuilder.App.Views.JobImportWizardView">
+	<DockPanel Margin="8">
+
+		<DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+			<TextBlock Text="Import Jobs Wizard" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+		</DockPanel>
+
+		<TextBlock DockPanel.Dock="Bottom"
+				   Name="StatusLabel"
+				   Foreground="#FF6B6B"
+				   TextWrapping="Wrap"
+				   Margin="0,4,0,0"/>
+
+		<!-- ═══ Step 1: pick legacy file ═══ -->
+		<StackPanel Name="PickFilePanel" DockPanel.Dock="Top">
+			<TextBlock TextWrapping="Wrap" Margin="0,0,0,8">
+				Compares every job in a legacy SQLite database against this master database.
+				Jobs that are already identical are skipped automatically. For each job that is
+				new, or already exists but is missing some hardware, you'll be shown exactly what
+				would be added and can accept or skip it individually — nothing is written until
+				you accept a job.
+			</TextBlock>
+			<Button Name="BrowseButton" Content="Browse for Legacy Database..." HorizontalAlignment="Left"/>
+
+			<StackPanel Name="UserFilterPanel" Orientation="Horizontal" IsVisible="False" Margin="0,12,0,0">
+				<TextBlock Text="Filter by creator:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+				<ComboBox Name="UserFilterComboBox" MinWidth="200"/>
+				<Button Name="ContinueAfterUserFilterButton" Content="Continue" Margin="8,0,0,0"/>
+			</StackPanel>
+		</StackPanel>
+
+		<!-- ═══ Step 2: summary before stepping through ═══ -->
+		<StackPanel Name="SummaryPanel" DockPanel.Dock="Top" IsVisible="False" Margin="0,0,0,8">
+			<TextBlock Name="SummaryText" TextWrapping="Wrap" Margin="0,0,0,8"/>
+			<Button Name="StartReviewButton" Content="Start Review" HorizontalAlignment="Left"/>
+		</StackPanel>
+
+		<!-- ═══ Step 3: per-job review ═══ -->
+		<Grid Name="ReviewPanel" DockPanel.Dock="Top" IsVisible="False" RowDefinitions="Auto,Auto,*,Auto">
+
+			<TextBlock Grid.Row="0" Name="ProgressLabel" Foreground="#A7ADB8" Margin="0,0,0,8"/>
+
+			<Border Grid.Row="1" BorderBrush="#454952" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+				<StackPanel>
+					<TextBlock Name="JobHeaderText" FontSize="14" FontWeight="Bold" Margin="0,0,0,4"/>
+					<TextBlock Name="JobStatusText" Foreground="#A7ADB8" Margin="0,0,0,4" TextWrapping="Wrap"/>
+					<TextBlock Name="JobNewRecordsText" Foreground="#F2C94C" TextWrapping="Wrap"/>
+				</StackPanel>
+			</Border>
+
+			<Border Grid.Row="2" BorderBrush="#454952" BorderThickness="1" Padding="8">
+				<DockPanel>
+					<TextBlock DockPanel.Dock="Top" Text="Hardware lines to add:" FontWeight="Bold" Margin="0,0,0,4"/>
+					<ListBox Name="HardwareLinesList"/>
+				</DockPanel>
+			</Border>
+
+			<StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
+				<Button Name="AcceptButton" Content="Accept This Job" Margin="0,0,8,0"/>
+				<Button Name="SkipButton" Content="Skip This Job" Margin="0,0,8,0"/>
+			</StackPanel>
+		</Grid>
+
+		<!-- ═══ Step 4: final summary ═══ -->
+		<StackPanel Name="FinishPanel" DockPanel.Dock="Top" IsVisible="False">
+			<TextBlock Name="FinishSummaryText" TextWrapping="Wrap" Margin="0,0,0,8"/>
+			<Button Name="DoneButton" Content="Done" HorizontalAlignment="Left"/>
+		</StackPanel>
+
+	</DockPanel>
+</UserControl>

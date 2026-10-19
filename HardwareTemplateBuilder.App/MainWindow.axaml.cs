@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -72,6 +73,7 @@ public partial class MainWindow : Window
         _router.Register("BatchGenerate",        () => { var v = new BatchGenerateView();        v.NavigationRequested += NavigateTo; return v; });
         _router.Register("RefreshTemplates",     () => { var v = new RefreshTemplatesView();     v.NavigationRequested += NavigateTo; return v; });
         _router.Register("DeduplicateHardware", () => { var v = new DeduplicateHardwareView(); v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("JobImportWizard", () => { var v = new JobImportWizardView(); v.NavigationRequested += NavigateTo; return v; });
     }
 
     /// <summary>Wires all menu item click events to their corresponding navigation targets.</summary>
@@ -108,8 +110,11 @@ public partial class MainWindow : Window
         MenuTemplateLookup.Click += (_, _) => NavigateTo("TemplateLookup");
         MenuRefreshTemplates.Click     += (_, _) => NavigateTo("RefreshTemplates");
         MenuDeduplicateHardware.Click  += (_, _) => NavigateTo("DeduplicateHardware");
+        MenuRelinkTemplates.Click     += async (_, _) => await RelinkTemplatesAsync();
         MenuDumpDatabase.Click         += async (_, _) => await DumpDatabaseAsync();
         MenuExportSqlServerScript.Click += async (_, _) => await ExportSqlServerScriptAsync();
+        MenuImportLegacyDatabase.Click += async (_, _) => await ImportLegacyDatabaseAsync();
+        MenuImportJobsWizard.Click += (_, _) => NavigateTo("JobImportWizard");
         MenuHardwareItems.Click += (_, _) => NavigateTo("HardwareItems");
         MenuTemplates.Click += (_, _) => NavigateTo("Templates");
         MenuCustomers.Click += (_, _) => NavigateTo("Customers");
@@ -299,6 +304,162 @@ public partial class MainWindow : Window
         catch (System.Exception ex)
         {
             await DialogHelper.ShowInfoAsync(this, $"Error exporting database: {ex.Message}", "Export SQL Server Script");
+        }
+    }
+
+    /// <summary>
+    /// Prompts for a legacy/standalone SQLite database file, computes a dry-run merge plan
+    /// against the master database (comparing Jobs and all related tables on their identity
+    /// fields, ignoring timestamps), shows the plan for review, and — only after explicit
+    /// confirmation — applies it. Conflicting Ids are remapped automatically, including every
+    /// foreign key (e.g. JobHardware.JobId) that points at the affected rows.
+    /// </summary>
+    private async Task ImportLegacyDatabaseAsync()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Select Legacy SQLite Database to Import",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("SQLite Database") { Patterns = new[] { "*.db", "*.sqlite", "*.sqlite3" } },
+                FilePickerFileTypes.All
+            }
+        });
+        if (files == null || files.Count == 0) return;
+
+        var sqlitePath = files[0].Path.LocalPath;
+        var mergeService = new DatabaseMergeImportService(DatabaseInitializer.CreateContext);
+
+        MergeImportPlan plan;
+        try
+        {
+            plan = await mergeService.PreviewAsync(sqlitePath);
+        }
+        catch (System.Exception ex)
+        {
+            await DialogHelper.ShowInfoAsync(this, $"Error reading legacy database: {ex.Message}", "Import Legacy Database");
+            return;
+        }
+
+        if (!plan.HasChanges)
+        {
+            await DialogHelper.ShowScrollableInfoAsync(this,
+                "No new rows to import — every row in the legacy database already exists in the master database.\n\n" +
+                string.Join("\n", plan.TablePreviews.Select(t => t.Summary)),
+                "Import Legacy Database");
+            return;
+        }
+
+        var summary = string.Join("\n", plan.TablePreviews.Select(t => t.Summary));
+        var proceed = await DialogHelper.ConfirmAsync(this,
+            $"The following changes will be imported from:\n{sqlitePath}\n\n{summary}\n\n" +
+            $"Total rows to insert: {plan.TotalInsertCount}\n\n" +
+            "Rows whose Id conflicts with a different existing record will be assigned a new Id, " +
+            "and every related record (hardware links, releases, snapshots, attachments, etc.) will be " +
+            "updated to reference the new Id automatically.\n\n" +
+            "Proceed with the import?",
+            "Confirm Import Legacy Database");
+        if (!proceed) return;
+
+        try
+        {
+            await mergeService.ApplyAsync(plan);
+            await DialogHelper.ShowInfoAsync(this,
+                $"Import completed successfully.\n\n{plan.TotalInsertCount} row(s) imported.",
+                "Import Legacy Database");
+        }
+        catch (System.Exception ex)
+        {
+            await DialogHelper.ShowInfoAsync(this, $"Error applying import: {ex.Message}", "Import Legacy Database");
+        }
+    }
+
+    /// <summary>
+    /// Prompts for a legacy/standalone SQLite database file, matches hardware items and
+    /// templates between it and the master database by Manufacturer + Description path +
+    /// Model/Template number (ignoring Ids, which may differ), and restores any global
+    /// hardware-item/template links present in the legacy file but missing in the master
+    /// database. Shows a preview for review and requires explicit confirmation before
+    /// writing. Never removes or duplicates existing links.
+    /// </summary>
+    private async Task RelinkTemplatesAsync()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Select Legacy SQLite Database to Compare",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("SQLite Database") { Patterns = new[] { "*.db", "*.sqlite", "*.sqlite3" } },
+                FilePickerFileTypes.All
+            }
+        });
+        if (files == null || files.Count == 0) return;
+
+        var sqlitePath = files[0].Path.LocalPath;
+        var relinkService = new TemplateRelinkService(DatabaseInitializer.CreateContext);
+
+        TemplateRelinkPlan plan;
+        try
+        {
+            plan = await relinkService.PreviewAsync(sqlitePath);
+        }
+        catch (System.Exception ex)
+        {
+            await DialogHelper.ShowInfoAsync(this, $"Error reading legacy database: {ex.Message}", "Relink Templates");
+            return;
+        }
+
+        if (!plan.HasChanges)
+        {
+            await DialogHelper.ShowScrollableInfoAsync(this,
+                "No missing links found — every hardware-item/template link in the legacy database " +
+                "that could be matched already exists in the master database.\n\n" +
+                plan.Summary +
+                (plan.UnmatchedHardwareItems.Count > 0
+                    ? "\n\nUnmatched hardware items:\n" + string.Join("\n", plan.UnmatchedHardwareItems)
+                    : string.Empty) +
+                (plan.UnmatchedTemplates.Count > 0
+                    ? "\n\nUnmatched templates:\n" + string.Join("\n", plan.UnmatchedTemplates)
+                    : string.Empty),
+                "Relink Templates");
+            return;
+        }
+
+        var details = string.Join("\n", plan.ToAdd.Select(r => $"{r.HardwareItemDescription}  ->  {r.TemplateDescription}"));
+        var unmatchedSection =
+            (plan.UnmatchedHardwareItems.Count > 0
+                ? $"\n\n{plan.UnmatchedHardwareItems.Count} legacy hardware item(s) could not be matched and were skipped:\n" + string.Join("\n", plan.UnmatchedHardwareItems)
+                : string.Empty) +
+            (plan.UnmatchedTemplates.Count > 0
+                ? $"\n\n{plan.UnmatchedTemplates.Count} legacy template(s) could not be matched and were skipped:\n" + string.Join("\n", plan.UnmatchedTemplates)
+                : string.Empty);
+
+        var proceed = await DialogHelper.ConfirmAsync(this,
+            $"Comparing against:\n{sqlitePath}\n\n" +
+            $"{plan.ToAdd.Count} missing link(s) will be restored (only global links; job-scoped links are not touched):\n\n{details}" +
+            unmatchedSection +
+            "\n\nNo existing links will be changed or removed. Proceed?",
+            "Confirm Relink Templates");
+        if (!proceed) return;
+
+        try
+        {
+            await relinkService.ApplyAsync(plan);
+            await DialogHelper.ShowInfoAsync(this,
+                $"Relink completed successfully.\n\n{plan.ToAdd.Count} link(s) restored.",
+                "Relink Templates");
+        }
+        catch (System.Exception ex)
+        {
+            await DialogHelper.ShowInfoAsync(this, $"Error applying relink: {ex.Message}", "Relink Templates");
         }
     }
 
