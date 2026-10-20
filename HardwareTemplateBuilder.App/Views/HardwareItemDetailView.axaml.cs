@@ -24,6 +24,7 @@ public partial class HardwareItemDetailView : UserControl
     private readonly string? _returnRoute;
     private int _itemManufacturerId;
     private int _itemDescriptionId;
+    private string _itemModelNumber = string.Empty;
     private int _editingTemplateId;
     private List<DescriptionComboItem> _descComboItems = new();
     private List<DoorMaterial> _doorMaterials = new();
@@ -60,6 +61,7 @@ public partial class HardwareItemDetailView : UserControl
 
         _itemManufacturerId = item?.ManufacturerId ?? 0;
         _itemDescriptionId  = item?.DescriptionId  ?? 0;
+        _itemModelNumber    = item?.ModelNumber    ?? string.Empty;
 
         var allRawDescs = new DescriptionRepository(context).GetAll().ToList();
         _descComboItems = DescriptionHelper.BuildComboItems(allRawDescs);
@@ -91,6 +93,7 @@ public partial class HardwareItemDetailView : UserControl
         BackButton.Click           += (_, _) => NavigationRequested?.Invoke(_returnRoute ?? "HardwareItems");
         RemoveTemplateButton.Click += (_, _) => RemoveTemplate();
         AddTemplateButton.Click    += (_, _) => AddLinkTemplate();
+        RequestedFromManufacturerButton.Click += (_, _) => AddRequestedFromManufacturerLink();
         BrowseLocalLinkButton.Click += async (_, _) => await BrowseLocalLinkAsync();
         SearchDescCombo.SelectionChanged += (_, _) => SearchTemplates();
         SearchTemplateNumBox.TextChanged  += (_, _) => SearchTemplates();
@@ -328,6 +331,54 @@ public partial class HardwareItemDetailView : UserControl
         AddOnlineLinkBox.Text         = "";
         AddLocalLinkBox.Text          = "";
 
+        LoadLinkedTemplates();
+    }
+
+    /// <summary>
+    /// Marks this hardware item as having a template requested from the manufacturer but not yet
+    /// received. Links the hardware item directly to the specific placeholder
+    /// <see cref="IndividualTemplate"/> configured in App Settings
+    /// ("RequestedFromManufacturerTemplateId"), setting
+    /// <see cref="HardwareItemTemplate.IsRequestedFromManufacturer"/> to true.
+    /// </summary>
+    private void AddRequestedFromManufacturerLink()
+    {
+        using var context = DatabaseInitializer.CreateContext();
+        var hitRepo = new HardwareItemTemplateRepository(context);
+
+        var templateIdText = new AppSettingRepository(context).GetValue("RequestedFromManufacturerTemplateId");
+        if (!int.TryParse(templateIdText, out var templateId))
+        {
+            AddStatusLabel.Text = "No placeholder template configured. Set one under App Settings first.";
+            return;
+        }
+
+        var template = context.IndividualTemplates.FirstOrDefault(t => t.Id == templateId);
+        if (template == null)
+        {
+            AddStatusLabel.Text = "The configured placeholder template no longer exists. Choose a new one under App Settings.";
+            return;
+        }
+
+        var existingLink = context.HardwareItemTemplates
+            .FirstOrDefault(hit => hit.HardwareItemId == _itemId && hit.IndividualTemplateId == template.Id && hit.JobId == null);
+        if (existingLink != null)
+        {
+            existingLink.IsRequestedFromManufacturer = true;
+            context.SaveChanges();
+        }
+        else
+        {
+            var link = new HardwareItemTemplate
+            {
+                HardwareItemId              = _itemId,
+                IndividualTemplateId        = template.Id,
+                IsRequestedFromManufacturer = true,
+            };
+            hitRepo.Add(link);
+        }
+
+        AddStatusLabel.Text = $"Marked as requested from manufacturer: {template.TemplateNumber}";
         LoadLinkedTemplates();
     }
 

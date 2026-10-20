@@ -213,6 +213,11 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.Property<int>("IndividualTemplateId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsRequestedFromManufacturer")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<int?>("JobId")
                         .HasColumnType("int");
 

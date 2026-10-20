@@ -1000,14 +1000,20 @@ public partial class BulkHardwareEntryView : UserControl
                             ? label.CustomLabel
                             : item.ModelNumber;
 
-                        // Combine item-level and label-level remarks.
-                        string? combinedRemarks = (item.HardwareItemRemarks, label.Remarks) switch
-                        {
-                            (null or "", null or "") => null,
-                            (var a, null or "")      => a,
-                            (null or "", var b)      => b,
-                            (var a, var b)           => $"{a} | {b}"
-                        };
+                        // Combine item-level remarks with every label's remark for this description,
+                        // separated by "|" when there are multiple distinct values.
+                        var remarkParts = new List<string>();
+                        if (!string.IsNullOrWhiteSpace(item.HardwareItemRemarks))
+                            remarkParts.Add(item.HardwareItemRemarks!.Trim());
+                        remarkParts.AddRange(labelEntries
+                            .Select(l => l.Remarks)
+                            .Where(r => !string.IsNullOrWhiteSpace(r))
+                            .Select(r => r!.Trim())
+                            .Distinct());
+
+                        string? combinedRemarks = remarkParts.Count > 0
+                            ? string.Join(" | ", remarkParts)
+                            : null;
 
                         rows.Add(new CoverSheetRow
                         {

@@ -127,6 +127,7 @@ public partial class JobDetailView : UserControl
         RemoveHardwareButton.Click                += (_, _) => RemoveHardwareFromJob();
         GeneratePackageButton.Click               += async (_, _) => await OnGeneratePackageAsync();
         GenerateForManufacturerButton.Click       += async (_, _) => await OnGenerateCoverSheetForManufacturerAsync();
+        MissingTemplatesButton.Click              += async (_, _) => await OnGenerateMissingTemplatesCoverSheetAsync();
         OpenCurrentPackageButton.Click     += (_, _) => OpenCurrentPackage();
         BrowseOldVersionsButton.Click      += (_, _) => BrowseOldVersions();
         OpenJobFolderButton.Click          += (_, _) => OpenJobFolder();
@@ -1111,6 +1112,140 @@ public partial class JobDetailView : UserControl
         finally
         {
             GenerateForManufacturerButton.IsEnabled = true;
+            PackageProgress.IsVisible = false;
+        }
+
+        PackageStatusLabel.Text = $"Generated: {Path.GetFileName(outputPath)}";
+        try { Process.Start(new ProcessStartInfo(outputPath) { UseShellExecute = true }); }
+        catch { }
+    }
+
+    /// <summary>
+    /// Generates a standalone cover sheet PDF containing every hardware item on this job that
+    /// currently has at least one active "requested from manufacturer" template link
+    /// (<see cref="HardwareItemTemplate.IsRequestedFromManufacturer"/>). No template PDFs are
+    /// merged; page numbers are left blank.
+    /// </summary>
+    private async Task OnGenerateMissingTemplatesCoverSheetAsync()
+    {
+        if (_linkedHardware.Count == 0)
+        {
+            PackageStatusLabel.Text = "No hardware items linked to this job.";
+            return;
+        }
+
+        MissingTemplatesButton.IsEnabled = false;
+        PackageProgress.IsVisible = true;
+        PackageStatusLabel.Text = "Building missing templates cover sheet...";
+
+        string outputPath;
+        try
+        {
+            outputPath = await Task.Run(() =>
+            {
+                using var context = DatabaseInitializer.CreateContext();
+
+                var job = context.Jobs
+                    .Include(j => j.Customer)
+                    .Include(j => j.ProjectManager)
+                    .First(j => j.Id == _jobId);
+
+                var release = _currentReleaseId.HasValue
+                    ? context.JobReleases.FirstOrDefault(r => r.Id == _currentReleaseId.Value)
+                    : null;
+                var displayName = release?.ReleaseLabel ?? job.JobName;
+
+                var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
+                var appSettingsDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
+                if (string.IsNullOrWhiteSpace(appSettingsDir))
+                    appSettingsDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                var jobLocation = JobStorageLocationResolver.Resolve(appSettingsDir, profile);
+                var saveDir = jobLocation.PrimaryRoot;
+
+                var allItemIds = _linkedHardware.Select(jh => jh.HardwareItemId).Distinct().ToList();
+                var hardwareDict = context.HardwareItems
+                    .Include(h => h.Manufacturer)
+                    .Include(h => h.Description)
+                    .Where(h => allItemIds.Contains(h.Id))
+                    .ToDictionary(h => h.Id);
+
+                var rows = new List<CoverSheetRow>();
+                foreach (var jh in _linkedHardware)
+                {
+                    if (!hardwareDict.TryGetValue(jh.HardwareItemId, out var item)) continue;
+
+                    var requestedTemplateNumbers = context.HardwareItemTemplates
+                        .Include(hit => hit.IndividualTemplate)
+                        .Where(hit => hit.HardwareItemId == jh.HardwareItemId &&
+                                      (hit.JobId == null || hit.JobId == _jobId) &&
+                                      hit.IsRequestedFromManufacturer)
+                        .Select(hit => hit.IndividualTemplate.TemplateNumber)
+                        .ToList();
+
+                    if (requestedTemplateNumbers.Count == 0) continue;
+
+                    var calloutRemark = !string.IsNullOrWhiteSpace(jh.CalloutRemarks) ? jh.CalloutRemarks : jh.Remarks;
+                    string? combinedRemarks = (item.Remarks, calloutRemark) switch
+                    {
+                        (null or "", null or "") => null,
+                        (var a, null or "")      => a,
+                        (null or "", var b)      => b,
+                        (var a, var b)           => $"{a} | {b}"
+                    };
+
+                    rows.Add(new CoverSheetRow
+                    {
+                        Manufacturer        = item.Manufacturer?.ManufacturerName ?? string.Empty,
+                        HardwareType        = item.Description?.DescriptionText   ?? string.Empty,
+                        HardwareDescription = !string.IsNullOrWhiteSpace(jh.CustomDescription)
+                                                ? jh.CustomDescription!
+                                                : item.ModelNumber,
+                        TemplateNumbers     = string.Join(", ", requestedTemplateNumbers),
+                        PageNumbers         = string.Empty,
+                        Remarks             = combinedRemarks
+                    });
+                }
+
+                if (rows.Count == 0)
+                    throw new InvalidOperationException("No hardware items on this job have templates requested from the manufacturer.");
+
+                var coverData = new CoverSheetData
+                {
+                    JobNumber          = job.JobNumber,
+                    JobName            = displayName,
+                    CustomerName       = job.Customer?.CustomerName             ?? string.Empty,
+                    ProjectManagerName = job.ProjectManager?.ProjectManagerName ?? string.Empty,
+                    DateCreated        = DateTime.Now,
+                    PreparedBy         = profile?.UserName ?? string.Empty,
+                    Rows               = rows.AsReadOnly()
+                };
+
+                var jobDir = Path.Combine(saveDir, job.JobNumber);
+                Directory.CreateDirectory(jobDir);
+                var outPath = Path.Combine(jobDir, "Cover Sheet - Missing Templates.pdf");
+
+                new CoverSheetBuilder().Build(coverData, outPath);
+
+                if (jobLocation.SecondaryRoot != null)
+                {
+                    var secondaryJobDir = Path.Combine(jobLocation.SecondaryRoot, job.JobNumber);
+                    DirectoryMirrorHelper.CopyFile(outPath, secondaryJobDir);
+                }
+
+                return outPath;
+            });
+        }
+        catch (Exception ex)
+        {
+            PackageStatusLabel.Text = "Missing templates cover sheet generation failed.";
+            var win = TopLevel.GetTopLevel(this) as Window;
+            if (win != null)
+                await DialogHelper.ShowScrollableInfoAsync(win, ex.Message, "Missing Templates Cover Sheet Failed");
+            return;
+        }
+        finally
+        {
+            MissingTemplatesButton.IsEnabled = true;
             PackageProgress.IsVisible = false;
         }
 

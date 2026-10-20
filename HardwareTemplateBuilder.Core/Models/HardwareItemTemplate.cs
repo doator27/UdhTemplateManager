@@ -31,4 +31,11 @@ public class HardwareItemTemplate
 
     /// <summary>Gets or sets the job this link is scoped to (null = global).</summary>
     public Job? Job { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether this link represents a template that has been requested from the
+    /// manufacturer but not yet received, and is linked to a placeholder <see cref="IndividualTemplate"/>
+    /// owned by the "By Others" manufacturer. Used to generate the "Missing Templates" cover sheet.
+    /// </summary>
+    public bool IsRequestedFromManufacturer { get; set; }
 }

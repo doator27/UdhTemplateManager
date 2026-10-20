@@ -101,6 +101,11 @@ public class AppDbContext : DbContext
             .Property(h => h.IsActive)
             .HasDefaultValue(true);
 
+        // HardwareItemTemplate: default IsRequestedFromManufacturer to false
+        modelBuilder.Entity<HardwareItemTemplate>()
+            .Property(hit => hit.IsRequestedFromManufacturer)
+            .HasDefaultValue(false);
+
         // JobTemplateSnapshot: default SnapshotDate to current UTC time
         modelBuilder.Entity<JobTemplateSnapshot>()
             .Property(s => s.SnapshotDate)

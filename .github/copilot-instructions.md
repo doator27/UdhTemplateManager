@@ -10,3 +10,6 @@
 
 ## Entity Framework Core Guidelines
 - When specifying MySQL/MariaDB `defaultValueSql` values that use function calls other than `CURRENT_TIMESTAMP` (e.g. `UTC_TIMESTAMP()`), wrap the expression in parentheses, e.g. `(UTC_TIMESTAMP())`, so it is emitted as a valid expression default.
+
+## App Settings Guidelines
+- App settings in HardwareTemplateBuilder are stored as simple key/value pairs via `AppSettingRepository.GetValue/SetValue`, surfaced in `AppSettingsView.axaml` with one Border/StackPanel section per setting group.

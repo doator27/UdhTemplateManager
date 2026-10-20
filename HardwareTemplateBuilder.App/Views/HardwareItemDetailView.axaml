@@ -53,6 +53,7 @@
                             <Button Name="AddTemplateButton" Content="Add / Link Template" HorizontalAlignment="Left"/>
                             <Button Name="SaveTemplateChangesButton" Content="Save Changes" HorizontalAlignment="Left" IsVisible="False"/>
                             <Button Name="CancelEditButton" Content="Cancel Edit" HorizontalAlignment="Left" IsVisible="False"/>
+                            <Button Name="RequestedFromManufacturerButton" Content="Requested from Manufacturer" HorizontalAlignment="Left"/>
                         </StackPanel>
                         <TextBlock Name="AddStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
                     </StackPanel>

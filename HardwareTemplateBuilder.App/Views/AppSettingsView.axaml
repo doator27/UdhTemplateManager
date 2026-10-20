@@ -64,6 +64,23 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Requested-from-manufacturer placeholder template -->
+                <Border BorderBrush="#454952" BorderThickness="1" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Requested-from-Manufacturer Placeholder:" FontWeight="Bold" Margin="0,0,0,4" />
+                        <TextBlock TextWrapping="Wrap" Foreground="#A7ADB8" FontSize="11"
+                                   Text="The local PDF file used (linked as-is) when marking a hardware item's template as 'Requested from Manufacturer'."
+                                   Margin="0,0,0,8" />
+                        <TextBlock Text="Placeholder PDF path:" Margin="0,0,0,2" />
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                            <TextBox Grid.Column="0" Name="RequestedFromManufacturerPdfPathBox" Watermark="e.g. \\server\templates\placeholder.pdf" />
+                            <Button Grid.Column="1" Name="BrowseRequestedFromManufacturerPdfButton" Content="Browse..." Width="80" Margin="6,0,0,0" />
+                        </Grid>
+                        <Button Name="SaveRequestedFromManufacturerButton" Content="Save" HorizontalAlignment="Left" />
+                        <TextBlock Name="RequestedFromManufacturerStatusLabel" Margin="0,10,0,0" Foreground="#FF6B6B" />
+                    </StackPanel>
+                </Border>
+
             </StackPanel>
         </ScrollViewer>
     </DockPanel>

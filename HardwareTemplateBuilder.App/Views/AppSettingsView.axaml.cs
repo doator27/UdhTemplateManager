@@ -1,10 +1,13 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
+using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace HardwareTemplateBuilder.App.Views;
 
@@ -41,6 +44,29 @@ public partial class AppSettingsView : UserControl
 
         BrowseSqliteButton.Click         += async (_, _) => await BrowseSqliteFileAsync();
         UploadMissingRecordsButton.Click += async (_, _) => await UploadMissingRecordsAsync();
+
+        RequestedFromManufacturerPdfPathBox.Text = _repo.GetValue("RequestedFromManufacturerPdfPath");
+        BrowseRequestedFromManufacturerPdfButton.Click += async (_, _) => await BrowseRequestedFromManufacturerPdfAsync();
+        SaveRequestedFromManufacturerButton.Click += (_, _) => SaveRequestedFromManufacturer();
+    }
+
+    private async Task BrowseRequestedFromManufacturerPdfAsync()
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Select Placeholder PDF",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("PDF Files") { Patterns = new[] { "*.pdf" } }
+            }
+        });
+
+        if (files.Count > 0)
+            RequestedFromManufacturerPdfPathBox.Text = files[0].Path.LocalPath;
     }
 
     private async Task BrowseSqliteFileAsync()
@@ -144,5 +170,59 @@ public partial class AppSettingsView : UserControl
         var path = StorageLocationBox.Text?.Trim() ?? string.Empty;
         _repo!.SetValue("TemplateStorageLocation", path);
         StatusLabel.Text = "Saved.";
+    }
+
+    private void SaveRequestedFromManufacturer()
+    {
+        var path = RequestedFromManufacturerPdfPathBox.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(path))
+        {
+            RequestedFromManufacturerStatusLabel.Foreground = AppColors.Danger;
+            RequestedFromManufacturerStatusLabel.Text = "Select a PDF file first.";
+            return;
+        }
+
+        if (!System.IO.File.Exists(path))
+        {
+            RequestedFromManufacturerStatusLabel.Foreground = AppColors.Danger;
+            RequestedFromManufacturerStatusLabel.Text = "File does not exist.";
+            return;
+        }
+
+        using var context = DatabaseInitializer.CreateContext();
+
+        const string placeholderTemplateNumber = "REQUESTED-FROM-MFR-PLACEHOLDER";
+        var placeholderManufacturer = context.Manufacturers.FirstOrDefault(m => m.ManufacturerName == "By Others")
+            ?? new ManufacturerRepository(context).Add(new Manufacturer { ManufacturerName = "By Others" });
+        var placeholderDescription = context.Descriptions.FirstOrDefault(d => d.DescriptionText == "Requested From Manufacturer" && d.ParentId == null)
+            ?? new DescriptionRepository(context).Add(new Description { DescriptionText = "Requested From Manufacturer" });
+        var placeholderDoorMaterial = context.DoorMaterials.First(dm => dm.Material == "Both");
+
+        var placeholderTemplate = context.IndividualTemplates
+            .FirstOrDefault(t => t.TemplateNumber == placeholderTemplateNumber);
+        if (placeholderTemplate != null)
+        {
+            placeholderTemplate.LocalLink = path;
+            context.SaveChanges();
+        }
+        else
+        {
+            placeholderTemplate = new IndividualTemplate
+            {
+                ManufacturerId = placeholderManufacturer.Id,
+                DescriptionId  = placeholderDescription.Id,
+                TemplateNumber = placeholderTemplateNumber,
+                NumPages       = 1,
+                PagesToPrint   = "1",
+                DoorMaterialId = placeholderDoorMaterial.Id,
+                LocalLink      = path
+            };
+            new IndividualTemplateRepository(context).Add(placeholderTemplate);
+        }
+
+        _repo!.SetValue("RequestedFromManufacturerTemplateId", placeholderTemplate.Id.ToString());
+        _repo.SetValue("RequestedFromManufacturerPdfPath", path);
+        RequestedFromManufacturerStatusLabel.Foreground = AppColors.Success;
+        RequestedFromManufacturerStatusLabel.Text = "Saved.";
     }
 }
