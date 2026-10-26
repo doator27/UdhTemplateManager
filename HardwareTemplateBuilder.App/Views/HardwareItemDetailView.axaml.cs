@@ -64,7 +64,7 @@ public partial class HardwareItemDetailView : UserControl
         _itemModelNumber    = item?.ModelNumber    ?? string.Empty;
 
         var allRawDescs = new DescriptionRepository(context).GetAll().ToList();
-        _descComboItems = DescriptionHelper.BuildComboItems(allRawDescs);
+        _descComboItems = DescriptionHelper.BuildComboItems(allRawDescs, activeOnly: true);
         _doorMaterials  = new DoorMaterialRepository(context).GetAll().OrderBy(d => d.Material).ToList();
 
         // Quick-add combos — pre-filter descriptions to item's description subtree.

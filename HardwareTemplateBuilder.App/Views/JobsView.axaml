@@ -5,9 +5,9 @@
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="Jobs" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
-        <Grid ColumnDefinitions="260,*">
+        <Grid ColumnDefinitions="260,Auto,*">
             <!-- Left: job list -->
-            <DockPanel Grid.Column="0" Margin="0,0,8,0">
+            <DockPanel Grid.Column="0" MinWidth="160" Margin="0,0,0,0">
                 <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2"/>
                 <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4"/>
                 <CheckBox DockPanel.Dock="Top" Name="ShowCompletedCheck" Content="Show completed" Margin="0,0,0,4"/>
@@ -19,8 +19,9 @@
                 </StackPanel>
                 <ListBox Name="JobList" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
             </DockPanel>
+            <GridSplitter Grid.Column="1" Width="6" Background="#454952" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
             <!-- Right: metadata form -->
-            <ScrollViewer Grid.Column="1">
+            <ScrollViewer Grid.Column="2" Margin="8,0,0,0">
                 <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
                     <StackPanel>
                         <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">

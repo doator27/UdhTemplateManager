@@ -14,10 +14,10 @@
         <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Margin="0,6,0,0"
                    Foreground="#FF6B6B" TextWrapping="Wrap"/>
 
-        <Grid ColumnDefinitions="*,Auto,*">
+        <Grid ColumnDefinitions="*,Auto,Auto,Auto,*">
 
             <!-- Left: all manufacturers (searchable) -->
-            <DockPanel Grid.Column="0">
+            <DockPanel Grid.Column="0" MinWidth="160">
                 <TextBlock DockPanel.Dock="Top" Text="All Manufacturers:" FontWeight="Bold" Margin="0,0,0,4"/>
                 <TextBox DockPanel.Dock="Top" Name="SearchBox" Watermark="Search…" Margin="0,0,0,4"/>
 
@@ -38,14 +38,18 @@
                 <ListBox Name="AllMfrList" SelectionMode="Multiple"/>
             </DockPanel>
 
+            <GridSplitter Grid.Column="1" Width="6" Background="#454952" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+
             <!-- Middle: add/remove buttons -->
-            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+            <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="6">
                 <Button Name="AddButton"    Content="→" Width="36" HorizontalContentAlignment="Center"/>
                 <Button Name="RemoveButton" Content="←" Width="36" HorizontalContentAlignment="Center"/>
             </StackPanel>
 
+            <GridSplitter Grid.Column="3" Width="6" Background="#454952" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+
             <!-- Right: selected manufacturers -->
-            <DockPanel Grid.Column="2">
+            <DockPanel Grid.Column="4" MinWidth="160">
                 <TextBlock DockPanel.Dock="Top" Text="Selected (for this job):" FontWeight="Bold" Margin="0,0,0,4"/>
                 <TextBlock DockPanel.Dock="Top" Name="SelectedCountLabel" FontSize="11"
                            Foreground="#A7ADB8" Margin="0,0,0,4"/>

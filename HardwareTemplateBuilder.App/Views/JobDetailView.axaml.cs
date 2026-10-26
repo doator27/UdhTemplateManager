@@ -83,7 +83,7 @@ public partial class JobDetailView : UserControl
         _jobHardwareRepo = new JobHardwareRepository(context);
         _jobReleaseRepo  = new JobReleaseRepository(context);
         _manufacturers  = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
-        _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll());
+        _descComboItems = DescriptionHelper.BuildComboItems(new DescriptionRepository(context).GetAll(), activeOnly: true);
 
         // Show job header and completion status
         var job = context.Jobs.Find(_jobId);

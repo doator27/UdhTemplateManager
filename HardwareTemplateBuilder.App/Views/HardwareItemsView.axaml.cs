@@ -19,6 +19,7 @@ public partial class HardwareItemsView : UserControl
     private HardwareItemRepository? _repo;
     private List<Manufacturer> _manufacturers = new();
     private List<DescriptionComboItem> _descComboItems = new();
+    private List<DescriptionComboItem> _searchDescComboItems = new();
     private List<Description> _allRawDescs = new();
     private DescriptionComboItem? _selectedDescItem;
     private int _selectedId;
@@ -43,6 +44,10 @@ public partial class HardwareItemsView : UserControl
         _allRawDescs   = new DescriptionRepository(_context).GetAll().ToList();
         _descComboItems = DescriptionHelper.BuildComboItems(_allRawDescs);
 
+        // Inactive descriptions (and their hardware) must not be discoverable via search.
+        var activeDescIds = _allRawDescs.Where(d => d.IsActive).Select(d => d.Id).ToHashSet();
+        _searchDescComboItems = _descComboItems.Where(d => activeDescIds.Contains(d.Id)).ToList();
+
         // Populate Manufacturer combo with "(Any)" sentinel at index 0.
         var anyMfr = new List<Manufacturer> { new() { Id = 0, ManufacturerName = "(Any)" } };
         anyMfr.AddRange(_manufacturers);
@@ -52,7 +57,7 @@ public partial class HardwareItemsView : UserControl
 
         // Populate Description combo with "(Any)" sentinel at index 0.
         var anyDesc = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
-        anyDesc.AddRange(_descComboItems);
+        anyDesc.AddRange(_searchDescComboItems);
         DescCombo.ItemsSource = anyDesc;
         DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
         DescCombo.SelectedIndex = 0;
@@ -87,7 +92,8 @@ public partial class HardwareItemsView : UserControl
     {
         var window = TopLevel.GetTopLevel(this) as Window;
         if (window == null) return;
-        var selectedId = await new DescriptionPickerWindow(_allRawDescs).ShowDialog<int?>(window);
+        var activeDescs = _allRawDescs.Where(d => d.IsActive).ToList();
+        var selectedId = await new DescriptionPickerWindow(activeDescs).ShowDialog<int?>(window);
         if (selectedId == null) return;
         _selectedDescItem = _descComboItems.FirstOrDefault(d => d.Id == selectedId.Value);
         DescriptionLabel.Text = _selectedDescItem?.DisplayText ?? "(none)";
@@ -106,17 +112,17 @@ public partial class HardwareItemsView : UserControl
 
         if (mfrId == 0)
         {
-            filtered.AddRange(_descComboItems);
+            filtered.AddRange(_searchDescComboItems);
         }
         else
         {
             using var ctx = DatabaseInitializer.CreateContext();
             var descIds = ctx.HardwareItems
-                .Where(h => h.ManufacturerId == mfrId && h.IsActive)
+                .Where(h => h.ManufacturerId == mfrId && h.IsActive && h.Description.IsActive)
                 .Select(h => h.DescriptionId)
                 .Distinct()
                 .ToHashSet();
-            filtered.AddRange(_descComboItems.Where(d => descIds.Contains(d.Id)));
+            filtered.AddRange(_searchDescComboItems.Where(d => descIds.Contains(d.Id)));
         }
 
         _updatingDescCombo = true;

@@ -24,6 +24,8 @@ public interface IHardwareItemRepository : IRepository<HardwareItem>
     /// Searches hardware items by manufacturer name, description ID, and model number,
     /// filtering by active status.
     /// Any parameter may be null or empty to skip that filter.
+    /// When <paramref name="activeOnly"/> is true, items that are themselves inactive, or
+    /// whose description is inactive, are excluded.
     /// Results are sorted by <see cref="HardwareItem.Frequency"/> descending (most-used first).
     /// </summary>
     /// <param name="manufacturerName">Optional manufacturer name filter (partial match).</param>

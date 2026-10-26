@@ -36,7 +36,7 @@ public class HardwareItemRepository : RepositoryBase<HardwareItem>, IHardwareIte
             .AsQueryable();
 
         if (activeOnly)
-            query = query.Where(h => h.IsActive);
+            query = query.Where(h => h.IsActive && h.Description.IsActive);
 
         if (!string.IsNullOrWhiteSpace(manufacturerName))
             query = query.Where(h => h.Manufacturer.ManufacturerName.Contains(manufacturerName));

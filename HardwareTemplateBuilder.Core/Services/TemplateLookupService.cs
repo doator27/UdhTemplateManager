@@ -40,7 +40,7 @@ public class TemplateLookupService
         int? manufacturerId, int? descriptionId, string? modelNumber)
     {
         IQueryable<IndividualTemplate> baseQuery = _context.IndividualTemplates
-            .Where(t => t.OriginJobId == null);
+            .Where(t => t.OriginJobId == null && t.Description.IsActive);
 
         if (manufacturerId.HasValue)
             baseQuery = baseQuery.Where(t => t.ManufacturerId == manufacturerId.Value);
@@ -50,7 +50,9 @@ public class TemplateLookupService
         if (!string.IsNullOrWhiteSpace(modelNumber))
         {
             var linkedIds = _context.HardwareItemTemplates
-                .Where(hit => hit.HardwareItem.ModelNumber.Contains(modelNumber))
+                .Where(hit => hit.HardwareItem.ModelNumber.Contains(modelNumber)
+                    && hit.HardwareItem.IsActive
+                    && hit.HardwareItem.Description.IsActive)
                 .Select(hit => hit.IndividualTemplateId)
                 .Distinct()
                 .ToList();

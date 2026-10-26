@@ -33,6 +33,13 @@ public class Description
     /// </summary>
     public int SortOrder { get; set; }
 
+    /// <summary>
+    /// Gets or sets whether this description is active.
+    /// When a description is made inactive, all hardware items associated with it
+    /// (directly or via nested child descriptions) are also marked inactive.
+    /// </summary>
+    public bool IsActive { get; set; } = true;
+
     /// <summary>Gets or sets the hardware items with this description.</summary>
     public ICollection<HardwareItem> HardwareItems { get; set; } = new List<HardwareItem>();
 

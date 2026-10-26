@@ -30,6 +30,7 @@ public partial class BulkHardwareEntryView : UserControl
     private Manufacturer? _manufacturer;
     private List<Description> _allDescriptions = new();
     private List<DescriptionComboItem> _descComboItems = new();
+    private List<DescriptionComboItem> _searchDescComboItems = new();
 
     /// <summary>In-memory item with its matched state and UI restore callback.</summary>
     private sealed class ItemEntry
@@ -104,6 +105,10 @@ public partial class BulkHardwareEntryView : UserControl
         // Full hierarchy, including intermediate parent categories, so the user can pick
         // any node from the description tree in the combo/picker below.
         _descComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
+        // Inactive descriptions (and their hardware) must not be discoverable via search/autocomplete.
+        _searchDescComboItems = _descComboItems
+            .Where(d => _allDescriptions.First(x => x.Id == d.Id).IsActive)
+            .ToList();
 
         HeaderLabel.Text = _manufacturer != null
             ? $"{_manufacturer.ManufacturerName} — Items"
@@ -421,7 +426,7 @@ public partial class BulkHardwareEntryView : UserControl
 
             using var ctx = DatabaseInitializer.CreateContext();
             var q = ctx.HardwareItems.AsQueryable()
-                .Where(h => h.ManufacturerId == _manufacturerId && h.IsActive);
+                .Where(h => h.ManufacturerId == _manufacturerId && h.IsActive && h.Description.IsActive);
 
             // Only filter by description if checkbox is unchecked and a description is selected
             if (showAllModelsCheckBox.IsChecked != true && entry.Description != null)
@@ -466,7 +471,8 @@ public partial class BulkHardwareEntryView : UserControl
                         i.ManufacturerId == _manufacturerId &&
                         i.DescriptionId == entry.Description.Id &&
                         i.ModelNumber == text &&
-                        i.IsActive);
+                        i.IsActive &&
+                        i.Description.IsActive);
                 }
             }
 
@@ -531,7 +537,7 @@ public partial class BulkHardwareEntryView : UserControl
                 descMatchList.IsVisible = false;
                 return;
             }
-            var hits = _descComboItems
+            var hits = _searchDescComboItems
                 .Where(d => d.DisplayText.Contains(q, StringComparison.OrdinalIgnoreCase))
                 .Take(8)
                 .ToList();
@@ -565,16 +571,48 @@ public partial class BulkHardwareEntryView : UserControl
             var window = TopLevel.GetTopLevel(this) as Window;
             if (window == null) return;
 
-            // Let the user choose where in the hierarchy this new description belongs,
-            // instead of always creating it as a top-level node.
+            // Let the user pick a reference node in the hierarchy; the new description is
+            // inserted as a sibling placed immediately after that node (not as its child).
             var parentPicker = new DescriptionPickerWindow(_allDescriptions, allowTopLevel: true);
             var parentPick = await parentPicker.ShowDialog<int?>(window);
             if (!parentPick.HasValue) return; // cancelled
 
-            int? parentId = parentPick.Value == DescriptionPickerWindow.TopLevelId ? null : parentPick.Value;
-
             using var ctx = DatabaseInitializer.CreateContext();
-            var newDesc = new DescriptionRepository(ctx).Add(new Description { DescriptionText = name, ParentId = parentId });
+
+            int? parentId;
+            int? afterId;
+            if (parentPick.Value == DescriptionPickerWindow.TopLevelId)
+            {
+                parentId = null;
+                afterId = null;
+            }
+            else
+            {
+                var reference = ctx.Descriptions.FirstOrDefault(d => d.Id == parentPick.Value);
+                parentId = reference?.ParentId;
+                afterId = reference?.Id;
+            }
+
+            var siblings = ctx.Descriptions
+                .Where(d => d.ParentId == parentId)
+                .OrderBy(d => d.SortOrder)
+                .ThenBy(d => d.DescriptionText)
+                .ToList();
+
+            var insertIndex = afterId.HasValue
+                ? siblings.FindIndex(d => d.Id == afterId.Value) + 1
+                : siblings.Count;
+            if (insertIndex < 0) insertIndex = siblings.Count;
+
+            // Normalise existing sibling sort orders, then shift everything at/after the
+            // insertion point down by one to make room for the new node.
+            for (int i = 0; i < siblings.Count; i++)
+                siblings[i].SortOrder = i >= insertIndex ? i + 1 : i;
+
+            var newDesc = new Description { DescriptionText = name, ParentId = parentId, SortOrder = insertIndex };
+            ctx.Descriptions.Add(newDesc);
+            ctx.SaveChanges();
+
             RefreshDescriptions();
             SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == newDesc.Id));
         };
@@ -900,6 +938,9 @@ public partial class BulkHardwareEntryView : UserControl
         using var ctx = DatabaseInitializer.CreateContext();
         _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
         _descComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
+        _searchDescComboItems = _descComboItems
+            .Where(d => _allDescriptions.First(x => x.Id == d.Id).IsActive)
+            .ToList();
     }
 
     private async Task<int?> OpenDescriptionPickerAsync()
@@ -925,11 +966,11 @@ public partial class BulkHardwareEntryView : UserControl
     {
         using var ctx = DatabaseInitializer.CreateContext();
         var usedDescIds = ctx.HardwareItems
-            .Where(h => h.ManufacturerId == manufacturerId && h.IsActive)
+            .Where(h => h.ManufacturerId == manufacturerId && h.IsActive && h.Description.IsActive)
             .Select(h => h.DescriptionId)
             .Distinct()
             .ToHashSet();
-        return _descComboItems.Where(d => usedDescIds.Contains(d.Id)).ToList();
+        return _searchDescComboItems.Where(d => usedDescIds.Contains(d.Id)).ToList();
     }
 
     private string BuildDescPath(Description target)

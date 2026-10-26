@@ -27,6 +27,8 @@ public partial class DescriptionsView : UserControl
         public string DescriptionText { get; set; } = "";
         public int SortOrder { get; set; }
         public int? ParentId { get; set; }
+        public bool IsActive { get; set; } = true;
+        public string DisplayDescriptionText => IsActive ? DescriptionText : $"[INACTIVE] {DescriptionText}";
         public ObservableCollection<DescriptionNode> Children { get; } = new();
     }
 
@@ -62,6 +64,7 @@ public partial class DescriptionsView : UserControl
         MoveDownButton.Click      += (_, _) => MoveSelected(1);
         IndentButton.Click        += (_, _) => IndentSelected();
         UnindentButton.Click      += (_, _) => UnindentSelected();
+        ShowInactiveCheck.IsCheckedChanged += (_, _) => LoadTree();
 
         LoadTree();
     }
@@ -85,6 +88,8 @@ public partial class DescriptionsView : UserControl
 
         using var ctx = DatabaseInitializer.CreateContext();
         var all = ctx.Descriptions.AsNoTracking().ToList();
+        if (ShowInactiveCheck.IsChecked != true)
+            all = all.Where(d => d.IsActive).ToList();
         _roots.Clear();
         BuildNodes(all, null, _roots);
 
@@ -199,7 +204,8 @@ public partial class DescriptionsView : UserControl
             var node = new DescriptionNode
             {
                 Id = d.Id, DescriptionText = d.DescriptionText,
-                SortOrder = d.SortOrder, ParentId = d.ParentId
+                SortOrder = d.SortOrder, ParentId = d.ParentId,
+                IsActive = d.IsActive
             };
             BuildNodes(all, d.Id, node.Children);
             target.Add(node);
@@ -214,6 +220,7 @@ public partial class DescriptionsView : UserControl
         if (SelectedNode is DescriptionNode node)
         {
             DescriptionBox.Text = node.DescriptionText;
+            ActiveCheckBox.IsChecked = node.IsActive;
             StatusLabel.Text = "";
         }
     }
@@ -230,10 +237,54 @@ public partial class DescriptionsView : UserControl
 
         var existing = _repo!.GetById(node.Id);
         if (existing == null) return;
+        var wasActive = existing.IsActive;
+        var isActive = ActiveCheckBox.IsChecked ?? true;
         existing.DescriptionText = text;
+        existing.IsActive = isActive;
         _repo.Update(existing);
+
+        if (wasActive && !isActive)
+            DeactivateHardwareItemsUnder(node.Id);
+
         StatusLabel.Text = "Saved.";
         LoadTree(node.Id);
+    }
+
+    /// <summary>
+    /// Marks every hardware item belonging to the given description, or to any of its
+    /// descendant descriptions, as inactive.
+    /// </summary>
+    private void DeactivateHardwareItemsUnder(int descriptionId)
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var ids = CollectDescendantDescriptionIds(ctx, descriptionId);
+
+        var items = ctx.HardwareItems.Where(h => ids.Contains(h.DescriptionId)).ToList();
+        foreach (var item in items)
+            item.IsActive = false;
+
+        ctx.SaveChanges();
+    }
+
+    /// <summary>Returns the given description ID plus the IDs of all its descendant nodes.</summary>
+    private static HashSet<int> CollectDescendantDescriptionIds(AppDbContext ctx, int rootId)
+    {
+        var all = ctx.Descriptions.AsNoTracking().ToList();
+        var result = new HashSet<int> { rootId };
+        var queue = new Queue<int>();
+        queue.Enqueue(rootId);
+
+        while (queue.Count > 0)
+        {
+            var currentId = queue.Dequeue();
+            foreach (var child in all.Where(d => d.ParentId == currentId))
+            {
+                if (result.Add(child.Id))
+                    queue.Enqueue(child.Id);
+            }
+        }
+
+        return result;
     }
 
     private void AddNode(int? parentId)

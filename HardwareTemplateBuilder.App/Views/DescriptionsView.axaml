@@ -5,10 +5,11 @@
     <DockPanel Margin="8">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="Descriptions" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+            <CheckBox Name="ShowInactiveCheck" Content="Show Inactive" Margin="16,0,0,0" VerticalAlignment="Center"/>
         </DockPanel>
-        <Grid ColumnDefinitions="300,*">
+        <Grid ColumnDefinitions="300,Auto,*">
             <!-- Left: tree + reorder buttons -->
-            <DockPanel Grid.Column="0" Margin="0,0,8,0">
+            <DockPanel Grid.Column="0" MinWidth="180" Margin="0,0,0,0">
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
                     <Button Name="MoveUpButton"   Content="▲ Up"   Margin="0,0,4,0"/>
                     <Button Name="MoveDownButton" Content="▼ Down" Margin="0,0,4,0"/>
@@ -18,16 +19,18 @@
                 <TreeView Name="DescTree" MinHeight="200">
                     <TreeView.ItemTemplate>
                         <TreeDataTemplate ItemsSource="{Binding Children}">
-                            <TextBlock Text="{Binding DescriptionText}"/>
+                            <TextBlock Text="{Binding DisplayDescriptionText}"/>
                         </TreeDataTemplate>
                     </TreeView.ItemTemplate>
                 </TreeView>
             </DockPanel>
+            <GridSplitter Grid.Column="1" Width="6" Background="#454952" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
             <!-- Right: form -->
-            <Border Grid.Column="1" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
+            <Border Grid.Column="2" Margin="8,0,0,0" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
                 <StackPanel>
                     <TextBlock Text="Name:" Margin="0,0,0,2"/>
                     <TextBox Name="DescriptionBox" Margin="0,0,0,10"/>
+                    <CheckBox Name="ActiveCheckBox" Content="Active" Margin="0,0,0,10"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
                         <Button Name="SaveButton"        Content="Save"           Margin="0,0,8,0"/>
                         <Button Name="AddRootButton"     Content="+ Root Item"    Margin="0,0,8,0"/>

@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
+using HardwareTemplateBuilder.Core.Services.Pdf;
 using Microsoft.EntityFrameworkCore;
 
 namespace HardwareTemplateBuilder.Core.Services;
@@ -166,6 +167,7 @@ public class TemplateRefreshService
 
                 // Persist the updated local path immediately so partial progress is not lost.
                 template.LocalLink = destPath;
+                UpdatePageCount(template, destPath);
                 await _context.SaveChangesAsync(cancellationToken);
                 downloadStopwatch.Stop();
                 successCount++;
@@ -235,6 +237,7 @@ public class TemplateRefreshService
         Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
         await DownloadAsync(template.OnlineLink!, destPath, cancellationToken);
         template.LocalLink = destPath;
+        UpdatePageCount(template, destPath);
         try
         {
             await _context.SaveChangesAsync(cancellationToken);
@@ -250,26 +253,78 @@ public class TemplateRefreshService
     }
 
     /// <summary>
-    /// Identifies templates whose download time was more than one standard deviation above the
-    /// mean download time for the run, along with a human-readable reason.
+    /// Opens the newly-downloaded PDF at <paramref name="localPath"/> to detect its page
+    /// count, then updates <c>NumPages</c> and (when not narrowed to a sub-range already)
+    /// defaults <c>PagesToPrint</c> to the full page range. Swallows any failure to read
+    /// the PDF so a download is never marked as failed solely because the page count
+    /// couldn't be detected.
+    /// </summary>
+    private static void UpdatePageCount(IndividualTemplate template, string localPath)
+    {
+        try
+        {
+            var pageCount = CoverSheetBuilder.GetPageCount(localPath);
+            template.NumPages = pageCount;
+
+            if (string.IsNullOrWhiteSpace(template.PagesToPrint))
+                template.PagesToPrint = pageCount <= 1 ? "1" : $"1-{pageCount}";
+        }
+        catch
+        {
+            // Leave NumPages/PagesToPrint untouched if the downloaded file can't be read as a PDF.
+        }
+    }
+
+    /// <summary>
+    /// The one-tailed z-score threshold corresponding to 95% confidence (alpha = 0.05) that a
+    /// download time is a genuine statistical outlier rather than ordinary variance.
+    /// </summary>
+    public const double SignificanceZScore = 1.645;
+
+    /// <summary>
+    /// The minimum "additional time" (in seconds) a download must exceed the mean by to be
+    /// flagged, used when the standard deviation for the run is so small (below
+    /// <see cref="MinStdDevSeconds"/>) that the z-score threshold would otherwise flag trivial
+    /// differences in download time.
+    /// </summary>
+    public const double MinSignificantGapSeconds = 2.0;
+
+    /// <summary>
+    /// Standard deviations below this (in seconds) are treated as "too small to be meaningful",
+    /// since the run's download times were all very consistent. In that case the outlier
+    /// threshold falls back to <see cref="MinSignificantGapSeconds"/> above the mean instead of
+    /// a z-score multiple of the (tiny) standard deviation.
+    /// </summary>
+    public const double MinStdDevSeconds = 1.0;
+
+    /// <summary>
+    /// Identifies templates whose download time is a statistically significant amount longer than
+    /// the mean download time for the run (95% confidence, i.e. a z-score above
+    /// <see cref="SignificanceZScore"/>), along with a human-readable reason.
     /// </summary>
     /// <param name="timings">Per-template timings collected from a completed refresh.</param>
     /// <returns>
-    /// The mean, standard deviation, and the subset of <paramref name="timings"/> considered slow
-    /// outliers (empty if there are fewer than 2 timings, since a standard deviation is not
-    /// meaningful with only one data point).
+    /// The mean, standard deviation, and the subset of <paramref name="timings"/> considered
+    /// statistically significant slow outliers (empty if there are fewer than 3 timings, since a
+    /// standard deviation is not meaningful/reliable with fewer data points).
     /// </returns>
     public static (double Mean, double StdDev, IReadOnlyList<TemplateTiming> Outliers) FindSlowOutliers(
         IReadOnlyList<TemplateTiming> timings)
     {
-        if (timings.Count < 2)
-            return (timings.Count == 1 ? timings[0].ElapsedSeconds : 0, 0, Array.Empty<TemplateTiming>());
+        if (timings.Count < 3)
+            return (timings.Count == 1 ? timings[0].ElapsedSeconds : timings.Count == 2
+                ? timings.Average(t => t.ElapsedSeconds) : 0, 0, Array.Empty<TemplateTiming>());
 
         var mean = timings.Average(t => t.ElapsedSeconds);
-        var variance = timings.Sum(t => Math.Pow(t.ElapsedSeconds - mean, 2)) / timings.Count;
+        var variance = timings.Sum(t => Math.Pow(t.ElapsedSeconds - mean, 2)) / (timings.Count - 1);
         var stdDev = Math.Sqrt(variance);
 
-        var threshold = mean + stdDev;
+        if (stdDev <= 0)
+            return (mean, stdDev, Array.Empty<TemplateTiming>());
+
+        var threshold = stdDev < MinStdDevSeconds
+            ? mean + MinSignificantGapSeconds
+            : mean + SignificanceZScore * stdDev;
         var outliers = timings.Where(t => t.ElapsedSeconds > threshold).ToList();
 
         return (mean, stdDev, outliers.AsReadOnly());

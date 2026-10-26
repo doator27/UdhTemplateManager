@@ -62,7 +62,7 @@ public partial class DescriptionPickerWindow : Window
     private void BuildTree()
     {
         var roots = _allDescs
-            .Where(d => d.ParentId == null)
+            .Where(d => d.ParentId == null && d.IsActive)
             .OrderBy(d => d.SortOrder)
             .Select(BuildNode)
             .ToList();
@@ -76,7 +76,7 @@ public partial class DescriptionPickerWindow : Window
     private DescriptionNode BuildNode(Description d)
     {
         var node = new DescriptionNode { Id = d.Id, DescriptionText = d.DescriptionText };
-        foreach (var child in _allDescs.Where(c => c.ParentId == d.Id).OrderBy(c => c.SortOrder))
+        foreach (var child in _allDescs.Where(c => c.ParentId == d.Id && c.IsActive).OrderBy(c => c.SortOrder))
             node.Children.Add(BuildNode(child));
         return node;
     }

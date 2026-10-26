@@ -251,8 +251,8 @@ public partial class RefreshTemplatesView : UserControl
         var (mean, stdDev, outliers) = TemplateRefreshService.FindSlowOutliers(result.Timings);
         if (outliers.Count > 0)
         {
-            SlowDownloadsLabel.Text = $"{outliers.Count} download(s) took unusually long " +
-                $"(more than 1 standard deviation above the {FormatDuration(mean)} average):";
+            SlowDownloadsLabel.Text = $"{outliers.Count} download(s) took a statistically significant amount longer " +
+                $"than the {FormatDuration(mean)} average:";
             SlowDownloadsList.ItemsSource = outliers
                 .Select(o => $"[ID {o.TemplateId}] {o.TemplateName}: {FormatDuration(o.ElapsedSeconds)} " +
                              $"(average {FormatDuration(mean)}, std dev {FormatDuration(stdDev)})")
@@ -364,7 +364,12 @@ public partial class RefreshTemplatesView : UserControl
             sb.AppendLine($"Total refresh time: {FormatDuration(result.TotalElapsedSeconds)} " +
                           $"for {result.SuccessCount} template(s).");
             sb.AppendLine($"Average download time: {FormatDuration(mean)}, standard deviation: {FormatDuration(stdDev)}.");
-            sb.AppendLine($"{outliers.Count} download(s) exceeded {FormatDuration(mean + stdDev)} (mean + 1 std dev):");
+            var reportThreshold = stdDev < TemplateRefreshService.MinStdDevSeconds
+                ? mean + TemplateRefreshService.MinSignificantGapSeconds
+                : mean + TemplateRefreshService.SignificanceZScore * stdDev;
+            sb.AppendLine($"{outliers.Count} download(s) were statistically significant outliers, exceeding " +
+                          $"{FormatDuration(reportThreshold)} " +
+                          $"(95% confidence threshold):");
             sb.AppendLine();
 
             foreach (var o in outliers)

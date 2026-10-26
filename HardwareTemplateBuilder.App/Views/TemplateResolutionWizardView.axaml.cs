@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
@@ -9,6 +11,7 @@ using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
 using HardwareTemplateBuilder.Core.Services;
+using HardwareTemplateBuilder.Core.Services.Pdf;
 using Microsoft.EntityFrameworkCore;
 
 namespace HardwareTemplateBuilder.App.Views;
@@ -27,6 +30,7 @@ public partial class TemplateResolutionWizardView : UserControl
     private List<Description> _allDescriptions = new();
     private List<DescriptionComboItem> _descComboItems = new();
     private List<DoorMaterial> _doorMaterials = new();
+    private readonly PageRangeParser _pageRangeParser = new();
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event Action<string>? NavigationRequested;
@@ -45,7 +49,7 @@ public partial class TemplateResolutionWizardView : UserControl
     {
         using var ctx = DatabaseInitializer.CreateContext();
         _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
-        _descComboItems  = DescriptionHelper.BuildComboItems(_allDescriptions);
+        _descComboItems  = DescriptionHelper.BuildComboItems(_allDescriptions, activeOnly: true);
         _doorMaterials   = new DoorMaterialRepository(ctx).GetAll().OrderBy(d => d.Material).ToList();
 
         TplMaterialCombo.ItemsSource = _doorMaterials;
@@ -60,6 +64,8 @@ public partial class TemplateResolutionWizardView : UserControl
         RemovePendingTemplateButton.Click   += (_, _) => RemovePendingTemplate();
         RemoveImportedTemplateButton.Click  += (_, _) => RemoveImportedTemplate();
         TplBrowseButton.Click               += async (_, _) => await BrowseLocalFileAsync();
+        TplPagesBox.TextChanged             += (_, _) => RecalculateNumPagesFromRange();
+        TplOnlineLinkBox.LostFocus          += async (_, _) => await DetectPageCountFromOnlineLinkAsync();
 
         ToggleSearchButton.Click      += (_, _) => ToggleSearchPanel();
         StageSearchResultButton.Click += (_, _) => StageSearchResult();
@@ -500,7 +506,8 @@ public partial class TemplateResolutionWizardView : UserControl
         var templateRepo = new IndividualTemplateRepository(ctx);
         var query = templateRepo.GetVisibleForJob(_jobId)
             .Include(t => t.Manufacturer)
-            .Include(t => t.Description);
+            .Include(t => t.Description)
+            .Where(t => t.Description.IsActive);
 
         IQueryable<IndividualTemplate> filtered = query;
         if (mfrId > 0)
@@ -559,7 +566,84 @@ public partial class TemplateResolutionWizardView : UserControl
             FileTypeFilter = new[] { new FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } } }
         });
         if (files.Count > 0)
-            TplLocalLinkBox.Text = files[0].Path.LocalPath;
+        {
+            var path = files[0].Path.LocalPath;
+            TplLocalLinkBox.Text = path;
+            DetectPageCount(path);
+        }
+    }
+
+    /// <summary>
+    /// Opens the PDF at <paramref name="path"/> to detect its page count, then populates
+    /// Num Pages and defaults Pages To Print to the full page range (e.g. "1-12").
+    /// </summary>
+    private void DetectPageCount(string path)
+    {
+        try
+        {
+            var pageCount = CoverSheetBuilder.GetPageCount(path);
+            TplNumPagesBox.Text = pageCount.ToString();
+            TplPagesBox.Text = pageCount <= 1 ? "1" : $"1-{pageCount}";
+        }
+        catch
+        {
+            // Leave existing values untouched if the file can't be read as a PDF.
+        }
+    }
+
+    /// <summary>
+    /// Recomputes Num Pages to match the number of pages currently specified in the
+    /// Pages To Print box, so narrowing/widening the range keeps Num Pages in sync.
+    /// Invalid/incomplete range text is ignored until it becomes parseable.
+    /// </summary>
+    private void RecalculateNumPagesFromRange()
+    {
+        var pagesToPrint = TplPagesBox.Text?.Trim();
+        if (string.IsNullOrEmpty(pagesToPrint)) return;
+
+        try
+        {
+            var pages = _pageRangeParser.Parse(pagesToPrint);
+            if (pages.Count > 0)
+                TplNumPagesBox.Text = pages.Count.ToString();
+        }
+        catch
+        {
+            // Ignore invalid/in-progress input; keep the last valid Num Pages value.
+        }
+    }
+
+    /// <summary>
+    /// When an Online Link is entered (and no local file has already been browsed to),
+    /// downloads the PDF to a temp file to detect its page count, then populates Num Pages
+    /// and defaults Pages To Print to the full page range, same as <see cref="DetectPageCount"/>
+    /// does for local files. Silently does nothing on download/parse failure.
+    /// </summary>
+    private async Task DetectPageCountFromOnlineLinkAsync()
+    {
+        var url = TplOnlineLinkBox.Text?.Trim();
+        if (string.IsNullOrEmpty(url) || !string.IsNullOrEmpty(TplLocalLinkBox.Text?.Trim()))
+            return;
+
+        var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.pdf");
+        try
+        {
+            var handler = new System.Net.Http.SocketsHttpHandler();
+            handler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(60) };
+            var bytes = await http.GetByteArrayAsync(url);
+            await File.WriteAllBytesAsync(tempPath, bytes);
+            DetectPageCount(tempPath);
+        }
+        catch
+        {
+            // Leave existing values untouched if the file can't be downloaded or read as a PDF.
+        }
+        finally
+        {
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); }
+            catch { /* best-effort cleanup */ }
+        }
     }
 
     /// <summary>Returns the ID of <paramref name="rootId"/> plus all recursive descendants.</summary>

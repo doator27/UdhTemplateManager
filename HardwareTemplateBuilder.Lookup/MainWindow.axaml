@@ -20,25 +20,32 @@
         <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Foreground="#800000" TextWrapping="Wrap"/>
 
         <!-- Manufacturer / Description / Model# (cascading, multi-select) + Selected Item panel -->
-        <Grid ColumnDefinitions="*,*,*,220">
+        <Grid ColumnDefinitions="*,Auto,*,Auto,*,Auto,220">
 
-            <DockPanel Grid.Column="0" Margin="0,0,4,0">
+            <DockPanel Grid.Column="0" MinWidth="120" Margin="0,0,0,0">
                 <TextBlock DockPanel.Dock="Top" Text="Manufacturer" FontWeight="Bold" Margin="0,0,0,4"/>
                 <ListBox Name="MfrList" SelectionMode="Multiple"/>
             </DockPanel>
 
-            <DockPanel Grid.Column="1" Margin="0,0,4,0">
+            <GridSplitter Grid.Column="1" Width="6" Background="#808080" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+
+            <DockPanel Grid.Column="2" MinWidth="120" Margin="0,0,0,0">
                 <TextBlock DockPanel.Dock="Top" Text="Description" FontWeight="Bold" Margin="0,0,0,4"/>
                 <ListBox Name="DescList" SelectionMode="Multiple"/>
             </DockPanel>
 
-            <DockPanel Grid.Column="2" Margin="0,0,8,0">
+            <GridSplitter Grid.Column="3" Width="6" Background="#808080" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+
+            <DockPanel Grid.Column="4" MinWidth="120" Margin="0,0,0,0">
                 <TextBlock DockPanel.Dock="Top" Text="Model #" FontWeight="Bold" Margin="0,0,0,4"/>
                 <ListBox Name="ModelList"/>
             </DockPanel>
 
+            <GridSplitter Grid.Column="5" Width="6" Background="#808080" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+
             <!-- Selected item + action panel -->
-            <Border Grid.Column="3"
+            <Border Grid.Column="6"
+                    Margin="8,0,0,0"
                     BorderBrush="#808080" BorderThickness="1"
                     Padding="8">
                 <StackPanel>

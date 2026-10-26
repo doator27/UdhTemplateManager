@@ -71,8 +71,15 @@ public partial class MainWindow : Window
         _manufacturers = new ManufacturerRepository(ctx).GetAll().OrderBy(m => m.ManufacturerName).ToList();
 
         // Leaf-only — intermediate parent categories aren't meaningful hardware-item
-        // descriptions on their own.
-        _leafDescComboItems = DescriptionHelper.BuildLeafComboItems(allDescriptions);
+        // descriptions on their own. Descriptions that have hardware items assigned to them
+        // are always included even if they later gained child nodes (no longer true leaves),
+        // so existing items' descriptions never silently disappear from the list.
+        var descIdsInUse = ctx.HardwareItems
+            .Where(h => h.IsActive && h.Description.IsActive)
+            .Select(h => h.DescriptionId)
+            .Distinct()
+            .ToHashSet();
+        _leafDescComboItems = DescriptionHelper.BuildSelectableComboItems(allDescriptions, descIdsInUse, activeOnly: true);
 
         MfrList.ItemsSource = _manufacturers;
         MfrList.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
@@ -109,7 +116,7 @@ public partial class MainWindow : Window
         {
             using var ctx = DatabaseInitializer.CreateContext();
             var descIds = ctx.HardwareItems
-                .Where(h => h.IsActive && mfrIds.Contains(h.ManufacturerId))
+                .Where(h => h.IsActive && h.Description.IsActive && mfrIds.Contains(h.ManufacturerId))
                 .Select(h => h.DescriptionId)
                 .Distinct()
                 .ToHashSet();
@@ -138,7 +145,7 @@ public partial class MainWindow : Window
         var query = ctx.HardwareItems
             .Include(h => h.Manufacturer)
             .Include(h => h.Description)
-            .Where(h => h.IsActive)
+            .Where(h => h.IsActive && h.Description.IsActive)
             .AsQueryable();
 
         if (mfrIds.Count > 0) query = query.Where(h => mfrIds.Contains(h.ManufacturerId));

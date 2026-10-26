@@ -101,6 +101,11 @@ public class AppDbContext : DbContext
             .Property(h => h.IsActive)
             .HasDefaultValue(true);
 
+        // Description: default IsActive to true
+        modelBuilder.Entity<Description>()
+            .Property(d => d.IsActive)
+            .HasDefaultValue(true);
+
         // HardwareItemTemplate: default IsRequestedFromManufacturer to false
         modelBuilder.Entity<HardwareItemTemplate>()
             .Property(hit => hit.IsRequestedFromManufacturer)

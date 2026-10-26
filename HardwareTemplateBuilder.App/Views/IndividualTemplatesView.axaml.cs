@@ -11,6 +11,7 @@ using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using HardwareTemplateBuilder.Core.Repositories;
 using HardwareTemplateBuilder.Core.Services;
+using HardwareTemplateBuilder.Core.Services.Pdf;
 using Microsoft.EntityFrameworkCore;
 
 namespace HardwareTemplateBuilder.App.Views;
@@ -44,9 +45,16 @@ public partial class IndividualTemplatesView : UserControl
             _manufacturers = new ManufacturerRepository(context).GetAll().OrderBy(m => m.ManufacturerName).ToList();
             // Full tree for the add/edit form — an existing template may already reference a
             // non-leaf description, and the form needs to be able to display/keep that as-is.
-            _descComboItems = DescriptionHelper.BuildComboItems(allDescriptions);
-            // Leaf-only for the search filter.
-            _leafDescComboItems = DescriptionHelper.BuildLeafComboItems(allDescriptions);
+            // Inactive descriptions are excluded unless an existing template still references
+            // them, so new/edited templates can't be assigned an inactive description while
+            // existing records keep showing their current (possibly now-inactive) value.
+            var activeDescIds = allDescriptions.Where(d => d.IsActive).Select(d => d.Id).ToHashSet();
+            var descIdsUsedByTemplates = context.IndividualTemplates.Select(t => t.DescriptionId).Distinct().ToHashSet();
+            _descComboItems = DescriptionHelper.BuildComboItems(allDescriptions)
+                .Where(d => activeDescIds.Contains(d.Id) || descIdsUsedByTemplates.Contains(d.Id))
+                .ToList();
+            // Leaf-only for the search filter; inactive descriptions aren't searchable.
+            _leafDescComboItems = DescriptionHelper.BuildLeafComboItems(allDescriptions, activeOnly: true);
             _doorMaterials = new DoorMaterialRepository(context).GetAll().ToList();
         }
 
@@ -54,8 +62,10 @@ public partial class IndividualTemplatesView : UserControl
         ManufacturerCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
         DescriptionCombo.ItemsSource = _descComboItems;
         DescriptionCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+        DescriptionCombo.SelectedItem = _descComboItems.FirstOrDefault();
         DoorMaterialCombo.ItemsSource = _doorMaterials;
         DoorMaterialCombo.DisplayMemberBinding = new Avalonia.Data.Binding("Material");
+        DoorMaterialCombo.SelectedItem = _doorMaterials.FirstOrDefault();
 
         MfrList.ItemsSource = _manufacturers;
         MfrList.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
@@ -64,6 +74,7 @@ public partial class IndividualTemplatesView : UserControl
         DescList.SelectionChanged += (_, _) => RefreshTemplateNumberList();
         TemplateNumberList.SelectionChanged += (_, _) => OnSelectionChanged();
         TemplateNumberSearchBox.TextChanged += (_, _) => RefreshTemplateNumberList();
+        PagesToPrintBox.TextChanged += (_, _) => RecalculateNumPagesFromRange();
 
         RefreshDescList();
         RefreshTemplateNumberList();
@@ -97,7 +108,7 @@ public partial class IndividualTemplatesView : UserControl
         {
             using var ctx = DatabaseInitializer.CreateContext();
             var descIds = ctx.IndividualTemplates
-                .Where(t => mfrIds.Contains(t.ManufacturerId))
+                .Where(t => mfrIds.Contains(t.ManufacturerId) && t.Description.IsActive)
                 .Select(t => t.DescriptionId)
                 .Distinct()
                 .ToHashSet();
@@ -121,7 +132,7 @@ public partial class IndividualTemplatesView : UserControl
         var descIds = SelectedIds(DescList, (DescriptionComboItem d) => d.Id);
 
         using var ctx = DatabaseInitializer.CreateContext();
-        var query = ctx.IndividualTemplates.AsQueryable();
+        var query = ctx.IndividualTemplates.Where(t => t.Description.IsActive).AsQueryable();
         if (mfrIds.Count > 0) query = query.Where(t => mfrIds.Contains(t.ManufacturerId));
         if (descIds.Count > 0) query = query.Where(t => descIds.Contains(t.DescriptionId));
 
@@ -149,7 +160,51 @@ public partial class IndividualTemplatesView : UserControl
             FileTypeFilter = new[] { new FilePickerFileType("PDF Files") { Patterns = new[] { "*.pdf" } } }
         });
         if (files.Count > 0)
-            LocalLinkBox.Text = files[0].Path.LocalPath;
+        {
+            var path = files[0].Path.LocalPath;
+            LocalLinkBox.Text = path;
+            DetectPageCount(path);
+        }
+    }
+
+    /// <summary>
+    /// Opens the PDF at <paramref name="path"/> to detect its page count, then populates
+    /// Num Pages and defaults Pages To Print to the full page range (e.g. "1-12").
+    /// </summary>
+    private void DetectPageCount(string path)
+    {
+        try
+        {
+            var pageCount = CoverSheetBuilder.GetPageCount(path);
+            NumPagesBox.Text = pageCount.ToString();
+            PagesToPrintBox.Text = pageCount <= 1 ? "1" : $"1-{pageCount}";
+        }
+        catch
+        {
+            // Leave existing values untouched if the file can't be read as a PDF.
+        }
+    }
+
+    /// <summary>
+    /// Recomputes Num Pages to match the number of pages currently specified in the
+    /// Pages To Print box, so narrowing/widening the range keeps Num Pages in sync.
+    /// Invalid/incomplete range text is ignored until it becomes parseable.
+    /// </summary>
+    private void RecalculateNumPagesFromRange()
+    {
+        var pagesToPrint = PagesToPrintBox.Text?.Trim();
+        if (string.IsNullOrEmpty(pagesToPrint)) return;
+
+        try
+        {
+            var pages = _pageRangeParser.Parse(pagesToPrint);
+            if (pages.Count > 0)
+                NumPagesBox.Text = pages.Count.ToString();
+        }
+        catch
+        {
+            // Ignore invalid/in-progress input; keep the last valid Num Pages value.
+        }
     }
 
     private void OnSelectionChanged()
@@ -279,6 +334,26 @@ public partial class IndividualTemplatesView : UserControl
             var service = new TemplateRefreshService(refreshCtx, http);
             var success = await service.RefreshSingleAsync(templateId, saveLocation);
 
+            if (success)
+            {
+                // Re-read the record so NumPages/PagesToPrint reflect the page count
+                // detected from the just-downloaded PDF.
+                var refreshed = refreshCtx.IndividualTemplates.Find(templateId);
+                if (refreshed != null)
+                {
+                    var numPages = refreshed.NumPages;
+                    var pagesToPrint = refreshed.PagesToPrint;
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (_selectedId == templateId)
+                        {
+                            NumPagesBox.Text = numPages.ToString();
+                            PagesToPrintBox.Text = pagesToPrint;
+                        }
+                    });
+                }
+            }
+
             Dispatcher.UIThread.Post(() =>
                 StatusLabel.Text = success ? "Saved. Template downloaded." : "Saved.");
         }
@@ -302,13 +377,13 @@ public partial class IndividualTemplatesView : UserControl
     {
         _selectedId = 0;
         ManufacturerCombo.SelectedItem = null;
-        DescriptionCombo.SelectedItem = null;
+        DescriptionCombo.SelectedItem = _descComboItems.FirstOrDefault();
         TemplateNumberBox.Text = "";
         NumPagesBox.Text = "";
         PagesToPrintBox.Text = "";
         PagesToRotateBox.Text = "";
         RotationDirectionBox.Text = "0";
-        DoorMaterialCombo.SelectedItem = null;
+        DoorMaterialCombo.SelectedItem = _doorMaterials.FirstOrDefault();
         OnlineLinkBox.Text = "";
         LocalLinkBox.Text = "";
         StatusLabel.Text = "";

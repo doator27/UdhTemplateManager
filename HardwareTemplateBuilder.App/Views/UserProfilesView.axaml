@@ -5,13 +5,14 @@
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <TextBlock Text="User Profiles" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
-        <Grid ColumnDefinitions="250,*">
-            <DockPanel Grid.Column="0" Margin="0,0,8,0">
+        <Grid ColumnDefinitions="250,Auto,*">
+            <DockPanel Grid.Column="0" MinWidth="150" Margin="0,0,0,0">
                 <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2" />
                 <TextBox DockPanel.Dock="Top" Name="FilterBox" Watermark="Search..." Margin="0,0,0,4" />
                 <ListBox Name="RecordList" />
             </DockPanel>
-            <Border Grid.Column="1" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
+            <GridSplitter Grid.Column="1" Width="6" Background="#454952" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+            <Border Grid.Column="2" Margin="8,0,0,0" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
                 <StackPanel>
                     <TextBlock Text="User Name:" Margin="0,0,0,2" />
                     <TextBox Name="UserNameBox" Margin="0,0,0,10" />
