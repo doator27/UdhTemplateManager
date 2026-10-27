@@ -8,6 +8,20 @@
         <ScrollViewer>
             <StackPanel MaxWidth="600" HorizontalAlignment="Left" Spacing="12">
 
+                <!-- Appearance -->
+                <Border BorderBrush="#454952" BorderThickness="1" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Appearance:" FontWeight="Bold" Margin="0,0,0,4" />
+                        <TextBlock TextWrapping="Wrap" Foreground="#A7ADB8" FontSize="11"
+                                   Text="Choose Light or Dark mode. Light mode uses a neutral gray/white palette similar to the standalone Template Lookup tool."
+                                   Margin="0,0,0,8" />
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <RadioButton Name="DarkThemeRadio" Content="Dark" GroupName="Theme" />
+                            <RadioButton Name="LightThemeRadio" Content="Light" GroupName="Theme" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <!-- Template storage location -->
                 <Border BorderBrush="#454952" BorderThickness="1" Padding="16">
                     <StackPanel>

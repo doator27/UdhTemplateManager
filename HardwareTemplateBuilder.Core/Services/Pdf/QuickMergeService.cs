@@ -22,7 +22,7 @@ namespace HardwareTemplateBuilder.Core.Services.Pdf;
 /// </summary>
 public class QuickMergeService
 {
-    private readonly AppDbContext _context;
+    private readonly AppDbContext? _context;
     private readonly HttpClient _httpClient;
 
     /// <summary>Initializes a new <see cref="QuickMergeService"/>.</summary>
@@ -31,6 +31,18 @@ public class QuickMergeService
     public QuickMergeService(AppDbContext context, HttpClient httpClient)
     {
         _context = context;
+        _httpClient = httpClient;
+    }
+
+    /// <summary>
+    /// Initializes a new <see cref="QuickMergeService"/> with no database context — only the
+    /// overload that accepts pre-loaded templates may be used. Used by the standalone Lookup
+    /// app, which reads its template metadata from a JSON snapshot instead of the database.
+    /// </summary>
+    /// <param name="httpClient">HTTP client used to download templates with no local copy.</param>
+    public QuickMergeService(HttpClient httpClient)
+    {
+        _context = null;
         _httpClient = httpClient;
     }
 
@@ -66,6 +78,11 @@ public class QuickMergeService
         IProgress<string>? progress,
         CancellationToken ct)
     {
+        if (_context is null)
+            throw new InvalidOperationException(
+                "This QuickMergeService instance has no database context. Use the overload that " +
+                "accepts pre-loaded templates instead.");
+
         var templates = _context.HardwareItemTemplates
             .Include(hit => hit.IndividualTemplate)
                 .ThenInclude(t => t.Manufacturer)
@@ -75,13 +92,40 @@ public class QuickMergeService
             .Select(hit => hit.IndividualTemplate)
             .ToList();
 
+        var allDescriptions = _context.Descriptions.ToDictionary(d => d.Id);
+
+        return await GenerateAsync(item, templates, allDescriptions, saveLocation, workDirPrefix, progress, ct);
+    }
+
+    /// <summary>
+    /// Database-independent core of the other <c>GenerateAsync</c> overload: sorts the given
+    /// <paramref name="templates"/>, acquires/processes each PDF, merges them, and saves the
+    /// result. Used directly by the standalone Lookup app, which supplies templates loaded from
+    /// a JSON snapshot instead of the database.
+    /// </summary>
+    /// <param name="item">The hardware item whose linked templates should be merged.</param>
+    /// <param name="templates">Every template linked to <paramref name="item"/>.</param>
+    /// <param name="allDescriptions">Every description, keyed by ID, used for sort weighting.</param>
+    /// <param name="saveLocation">Destination directory for the merged output file.</param>
+    /// <param name="workDirPrefix">Prefix for the temporary working directory name.</param>
+    /// <param name="progress">Optional progress reporter for per-template status messages.</param>
+    /// <param name="ct">Token to cancel the operation between templates.</param>
+    /// <returns>The full path to the merged output PDF.</returns>
+    public async Task<string> GenerateAsync(
+        HardwareItem item,
+        IReadOnlyList<IndividualTemplate> templates,
+        IReadOnlyDictionary<int, Description> allDescriptions,
+        string saveLocation,
+        string workDirPrefix,
+        IProgress<string>? progress,
+        CancellationToken ct)
+    {
         if (templates.Count == 0)
             throw new InvalidOperationException(
                 "This hardware item has no linked templates. Link templates via the Hardware Items screen.");
 
-        var allDescriptions = _context.Descriptions.ToDictionary(d => d.Id);
         var sortedTemplates = new TemplateSorter(new WeightTemplateSortStrategy())
-            .Sort(templates, allDescriptions);
+            .Sort(templates.ToList(), allDescriptions);
 
         // Run heavy PDF work on a thread-pool thread to keep the calling UI thread responsive.
         return await Task.Run(async () =>

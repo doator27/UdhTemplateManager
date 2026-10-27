@@ -4,83 +4,166 @@
              RequestedThemeVariant="Dark">
 
     <!--
-        Dark theme, chosen for long-session eye comfort. RequestedThemeVariant="Dark" makes
-        FluentTheme fall back to its own dark-mode defaults for anything not explicitly
-        overridden below (ScrollBar, ProgressBar, TabItem, etc.); the overrides here re-accent
-        and re-neutral everything the app actually uses on top of that baseline. FluentTheme's
-        control templates read these Color/DynamicResource keys internally, so this alone
-        re-tints standard interactive states app-wide; AppTheme.axaml layers additional Style
-        overrides (Window/UserControl background, typography, rounded corners) on top.
-
-        The accent (#4FA3D1) is deliberately lighter than a light-theme accent would be — dark
-        themes need a brighter accent to stay visible against a dark background; darkening
-        everything else would otherwise make the accent disappear rather than just "less bright".
+        Dark theme is the default (chosen for long-session eye comfort), with a Light mode
+        available from App Settings (styled after the standalone Lookup app's neutral gray/white
+        look). RequestedThemeVariant is set at startup by ThemeService from the persisted
+        "ThemeVariant" app setting. The brushes below are split into Light/Dark via
+        ResourceDictionary.ThemeDictionaries so FluentTheme's control templates automatically
+        pick up the right set for the active variant; AppTheme.axaml's Styles use the
+        App*/Text*/Button*/etc. DynamicResource keys defined here instead of hardcoded colors.
     -->
     <Application.Resources>
-        <Color x:Key="SystemAccentColor">#4FA3D1</Color>
-        <Color x:Key="SystemAccentColorLight1">#6FB6DB</Color>
-        <Color x:Key="SystemAccentColorLight2">#8FC9E5</Color>
-        <Color x:Key="SystemAccentColorLight3">#AFDCEF</Color>
-        <Color x:Key="SystemAccentColorDark1">#3D82AA</Color>
-        <Color x:Key="SystemAccentColorDark2">#2B6183</Color>
-        <Color x:Key="SystemAccentColorDark3">#19405C</Color>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <Color x:Key="SystemAccentColor">#4FA3D1</Color>
+                    <Color x:Key="SystemAccentColorLight1">#6FB6DB</Color>
+                    <Color x:Key="SystemAccentColorLight2">#8FC9E5</Color>
+                    <Color x:Key="SystemAccentColorLight3">#AFDCEF</Color>
+                    <Color x:Key="SystemAccentColorDark1">#3D82AA</Color>
+                    <Color x:Key="SystemAccentColorDark2">#2B6183</Color>
+                    <Color x:Key="SystemAccentColorDark3">#19405C</Color>
 
-        <!--
-            FluentTheme's Button/TextBox/ComboBox/CheckBox/MenuFlyout control templates read
-            their interaction-state colors from these DynamicResource keys — overriding them
-            here re-skins hover/pressed/focus/disabled visuals app-wide without needing to
-            replace any ControlTemplate.
-        -->
-        <SolidColorBrush x:Key="ButtonBackground">#2C2F38</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#363A44</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonBackgroundPressed">#40444F</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonBackgroundDisabled">#23262D</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonBorderBrush">#454952</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">#565B66</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonBorderBrushPressed">#656B77</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonBorderBrushDisabled">#33363E</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonForeground">#E8EAED</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonForegroundPointerOver">#E8EAED</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonForegroundPressed">#E8EAED</SolidColorBrush>
-        <SolidColorBrush x:Key="ButtonForegroundDisabled">#6B7280</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackground">#2C2F38</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#363A44</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#40444F</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundDisabled">#23262D</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrush">#454952</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">#565B66</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">#656B77</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushDisabled">#33363E</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonForeground">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonForegroundPointerOver">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonForegroundPressed">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonForegroundDisabled">#6B7280</SolidColorBrush>
 
-        <SolidColorBrush x:Key="TextControlBackground">#23262D</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlBackgroundPointerOver">#262930</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlBackgroundFocused">#23262D</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlBackgroundDisabled">#1E2127</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlBorderBrush">#454952</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver">#565B66</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlBorderBrushFocused">#4FA3D1</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlBorderBrushDisabled">#33363E</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlForeground">#E8EAED</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlForegroundPointerOver">#E8EAED</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlForegroundFocused">#E8EAED</SolidColorBrush>
-        <SolidColorBrush x:Key="TextControlForegroundDisabled">#6B7280</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBackground">#23262D</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBackgroundPointerOver">#262930</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBackgroundFocused">#23262D</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBackgroundDisabled">#1E2127</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBorderBrush">#454952</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver">#565B66</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBorderBrushFocused">#4FA3D1</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBorderBrushDisabled">#33363E</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlForeground">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlForegroundPointerOver">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlForegroundFocused">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlForegroundDisabled">#6B7280</SolidColorBrush>
 
-        <SolidColorBrush x:Key="ComboBoxBackground">#23262D</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxBackgroundUnfocused">#23262D</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver">#2C2F38</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxBackgroundPressed">#363A44</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxBackgroundDisabled">#1E2127</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxBorderBrush">#454952</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">#565B66</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxBorderBrushPressed">#4FA3D1</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled">#33363E</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxForeground">#E8EAED</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxForegroundDisabled">#6B7280</SolidColorBrush>
-        <SolidColorBrush x:Key="ComboBoxDropDownBackground">#23262D</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBackground">#23262D</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundUnfocused">#23262D</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver">#2C2F38</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundPressed">#363A44</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundDisabled">#1E2127</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrush">#454952</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">#565B66</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrushPressed">#4FA3D1</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled">#33363E</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxForeground">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxForegroundDisabled">#6B7280</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxDropDownBackground">#23262D</SolidColorBrush>
 
-        <SolidColorBrush x:Key="MenuFlyoutPresenterBackground">#23262D</SolidColorBrush>
-        <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush">#33363E</SolidColorBrush>
-        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver">#2C2F38</SolidColorBrush>
-        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed">#363A44</SolidColorBrush>
-        <SolidColorBrush x:Key="MenuFlyoutItemForeground">#E8EAED</SolidColorBrush>
-        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver">#E8EAED</SolidColorBrush>
-        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutPresenterBackground">#23262D</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush">#33363E</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver">#2C2F38</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed">#363A44</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutItemForeground">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed">#E8EAED</SolidColorBrush>
 
-        <!-- Rounds corners on Button/TextBox/ComboBox/CheckBox/etc. app-wide from one place. -->
-        <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
-        <CornerRadius x:Key="OverlayCornerRadius">10</CornerRadius>
+                    <!-- App-level palette consumed by AppTheme.axaml Styles -->
+                    <SolidColorBrush x:Key="AppPageBackground">#1A1D23</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppSurfaceBackground">#23262D</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppSurfaceBorder">#33363E</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppBorder">#454952</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppTextPrimary">#E8EAED</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppTextSecondary">#A7ADB8</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppTextTertiary">#6B7280</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppDanger">#FF6B6B</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppSuccess">#5FD68C</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppInfo">#6FB6DB</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppWarning">#FFA94D</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppAccentFill">#3D82AA</SolidColorBrush>
+                </ResourceDictionary>
+
+                <ResourceDictionary x:Key="Light">
+                    <!-- Light aesthetic styled after HardwareTemplateBuilder.Lookup: neutral
+                         grays/white with dark text, same accent hue toned down slightly. -->
+                    <Color x:Key="SystemAccentColor">#3D82AA</Color>
+                    <Color x:Key="SystemAccentColorLight1">#4FA3D1</Color>
+                    <Color x:Key="SystemAccentColorLight2">#6FB6DB</Color>
+                    <Color x:Key="SystemAccentColorLight3">#8FC9E5</Color>
+                    <Color x:Key="SystemAccentColorDark1">#2B6183</Color>
+                    <Color x:Key="SystemAccentColorDark2">#19405C</Color>
+                    <Color x:Key="SystemAccentColorDark3">#0F2E42</Color>
+
+                    <SolidColorBrush x:Key="ButtonBackground">#F0F0F0</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#E4E4E4</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#D6D6D6</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundDisabled">#F5F5F5</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrush">#808080</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">#606060</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">#404040</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushDisabled">#C0C0C0</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonForeground">#1A1A1A</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonForegroundPointerOver">#1A1A1A</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonForegroundPressed">#1A1A1A</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonForegroundDisabled">#A0A0A0</SolidColorBrush>
+
+                    <SolidColorBrush x:Key="TextControlBackground">#FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBackgroundPointerOver">#FAFAFA</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBackgroundFocused">#FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBackgroundDisabled">#F0F0F0</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBorderBrush">#808080</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver">#606060</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBorderBrushFocused">#3D82AA</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlBorderBrushDisabled">#C0C0C0</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlForeground">#1A1A1A</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlForegroundPointerOver">#1A1A1A</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlForegroundFocused">#1A1A1A</SolidColorBrush>
+                    <SolidColorBrush x:Key="TextControlForegroundDisabled">#A0A0A0</SolidColorBrush>
+
+                    <SolidColorBrush x:Key="ComboBoxBackground">#FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundUnfocused">#FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver">#F0F0F0</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundPressed">#E4E4E4</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBackgroundDisabled">#F5F5F5</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrush">#808080</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver">#606060</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrushPressed">#3D82AA</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxBorderBrushDisabled">#C0C0C0</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxForeground">#1A1A1A</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxForegroundDisabled">#A0A0A0</SolidColorBrush>
+                    <SolidColorBrush x:Key="ComboBoxDropDownBackground">#FFFFFF</SolidColorBrush>
+
+                    <SolidColorBrush x:Key="MenuFlyoutPresenterBackground">#F3F3F3</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush">#C0C0C0</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver">#E4E4E4</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed">#D6D6D6</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutItemForeground">#1A1A1A</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver">#1A1A1A</SolidColorBrush>
+                    <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed">#1A1A1A</SolidColorBrush>
+
+                    <!-- App-level palette consumed by AppTheme.axaml Styles -->
+                    <SolidColorBrush x:Key="AppPageBackground">#F3F3F3</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppSurfaceBackground">#FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppSurfaceBorder">#C0C0C0</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppBorder">#808080</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppTextPrimary">#1A1A1A</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppTextSecondary">#606060</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppTextTertiary">#808080</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppDanger">#800000</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppSuccess">#1F7A3D</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppInfo">#2B6183</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppWarning">#A05A00</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppAccentFill">#3D82AA</SolidColorBrush>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <!-- Rounds corners on Button/TextBox/ComboBox/CheckBox/etc. app-wide from one place. -->
+            <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
+            <CornerRadius x:Key="OverlayCornerRadius">10</CornerRadius>
+        </ResourceDictionary>
     </Application.Resources>
 
     <Application.Styles>

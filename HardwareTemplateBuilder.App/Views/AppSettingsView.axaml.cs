@@ -34,6 +34,13 @@ public partial class AppSettingsView : UserControl
         var context = DatabaseInitializer.CreateContext();
         _repo = new AppSettingRepository(context);
 
+        var savedTheme = _repo.GetValue(Helpers.ThemeService.SettingKey);
+        var isLight = string.Equals(savedTheme, Helpers.ThemeService.Light, System.StringComparison.OrdinalIgnoreCase);
+        LightThemeRadio.IsChecked = isLight;
+        DarkThemeRadio.IsChecked = !isLight;
+        LightThemeRadio.IsCheckedChanged += (_, _) => ApplyThemeSelection();
+        DarkThemeRadio.IsCheckedChanged += (_, _) => ApplyThemeSelection();
+
         StorageLocationBox.Text  = _repo.GetValue("TemplateStorageLocation");
         CurrentDbPathLabel.Text  = DatabaseInitializer.GetConnectionString();
         PointerFilePathLabel.Text = DatabaseLocationService.GetActivePointerFilePath();
@@ -48,6 +55,13 @@ public partial class AppSettingsView : UserControl
         RequestedFromManufacturerPdfPathBox.Text = _repo.GetValue("RequestedFromManufacturerPdfPath");
         BrowseRequestedFromManufacturerPdfButton.Click += async (_, _) => await BrowseRequestedFromManufacturerPdfAsync();
         SaveRequestedFromManufacturerButton.Click += (_, _) => SaveRequestedFromManufacturer();
+    }
+
+    private void ApplyThemeSelection()
+    {
+        if (_repo == null) return;
+        var variant = LightThemeRadio.IsChecked == true ? Helpers.ThemeService.Light : Helpers.ThemeService.Dark;
+        Helpers.ThemeService.SetAndApply(_repo, variant);
     }
 
     private async Task BrowseRequestedFromManufacturerPdfAsync()

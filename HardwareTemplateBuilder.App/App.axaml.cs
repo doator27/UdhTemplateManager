@@ -23,6 +23,8 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        Helpers.ThemeService.ApplySaved();
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var mainWindow = new MainWindow();

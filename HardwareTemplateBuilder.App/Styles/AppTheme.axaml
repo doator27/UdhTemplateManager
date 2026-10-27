@@ -21,13 +21,13 @@
 
     <!-- Global font and background -->
     <Style Selector="Window">
-        <Setter Property="Background" Value="#1A1D23" />
+        <Setter Property="Background" Value="{DynamicResource AppPageBackground}" />
         <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
         <Setter Property="FontSize" Value="13" />
     </Style>
 
     <Style Selector="UserControl">
-        <Setter Property="Background" Value="#1A1D23" />
+        <Setter Property="Background" Value="{DynamicResource AppPageBackground}" />
         <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
         <Setter Property="FontSize" Value="13" />
     </Style>
@@ -35,14 +35,14 @@
     <Style Selector="TextBlock">
         <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="Foreground" Value="#E8EAED" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}" />
     </Style>
 
     <!-- ── Button: flat, rounded, neutral by default ──────────────────────────── -->
     <Style Selector="Button">
-        <Setter Property="Background" Value="#2C2F38" />
-        <Setter Property="Foreground" Value="#E8EAED" />
-        <Setter Property="BorderBrush" Value="#454952" />
+        <Setter Property="Background" Value="{DynamicResource ButtonBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource ButtonForeground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Padding" Value="14,8" />
@@ -69,22 +69,22 @@
 
     <!-- ── TextBox: clean bordered field ───────────────────────────────────────── -->
     <Style Selector="TextBox">
-        <Setter Property="Background" Value="#23262D" />
-        <Setter Property="Foreground" Value="#E8EAED" />
-        <Setter Property="BorderBrush" Value="#454952" />
+        <Setter Property="Background" Value="{DynamicResource TextControlBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Padding" Value="8,6" />
         <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="CaretBrush" Value="#4FA3D1" />
-        <Setter Property="SelectionBrush" Value="#2B6183" />
+        <Setter Property="CaretBrush" Value="{DynamicResource TextControlBorderBrushFocused}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource SystemAccentColorDark2}" />
     </Style>
 
     <!-- ── ListBox: dark surface, rounded ──────────────────────────────────────── -->
     <Style Selector="ListBox">
-        <Setter Property="Background" Value="#23262D" />
-        <Setter Property="BorderBrush" Value="#454952" />
+        <Setter Property="Background" Value="{DynamicResource AppSurfaceBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppBorder}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Padding" Value="2" />
@@ -100,9 +100,9 @@
 
     <!-- ── ComboBox ─────────────────────────────────────────────────────────────── -->
     <Style Selector="ComboBox">
-        <Setter Property="Background" Value="#23262D" />
-        <Setter Property="Foreground" Value="#E8EAED" />
-        <Setter Property="BorderBrush" Value="#454952" />
+        <Setter Property="Background" Value="{DynamicResource ComboBoxBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource ComboBoxForeground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ComboBoxBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Padding" Value="8,6" />
@@ -114,13 +114,13 @@
     <Style Selector="CheckBox">
         <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="Foreground" Value="#E8EAED" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimary}" />
         <Setter Property="Cursor" Value="Hand" />
     </Style>
 
     <!-- ── Menu bar ─────────────────────────────────────────────────────────────── -->
     <Style Selector="Menu">
-        <Setter Property="Background" Value="#23262D" />
+        <Setter Property="Background" Value="{DynamicResource AppSurfaceBackground}" />
         <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif" />
         <Setter Property="FontSize" Value="13" />
     </Style>
@@ -135,8 +135,8 @@
          Slightly-raised dark card with a soft border, distinguishing it from the page
          background behind it. -->
     <Style Selector="Border.panel">
-        <Setter Property="Background" Value="#23262D" />
-        <Setter Property="BorderBrush" Value="#33363E" />
+        <Setter Property="Background" Value="{DynamicResource AppSurfaceBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppSurfaceBorder}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="14" />
@@ -149,8 +149,8 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Margin" Value="6" />
-        <Setter Property="Background" Value="#23262D" />
-        <Setter Property="BorderBrush" Value="#33363E" />
+        <Setter Property="Background" Value="{DynamicResource AppSurfaceBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppSurfaceBorder}" />
         <Setter Property="CornerRadius" Value="10" />
     </Style>
 
@@ -172,9 +172,9 @@
         <Setter Property="FontSize" Value="16" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Margin" Value="6" />
-        <Setter Property="Background" Value="#3D82AA" />
+        <Setter Property="Background" Value="{DynamicResource AppAccentFill}" />
         <Setter Property="Foreground" Value="#FFFFFF" />
-        <Setter Property="BorderBrush" Value="#3D82AA" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppAccentFill}" />
         <Setter Property="CornerRadius" Value="12" />
     </Style>
 

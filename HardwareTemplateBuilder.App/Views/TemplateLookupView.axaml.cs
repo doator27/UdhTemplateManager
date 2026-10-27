@@ -7,7 +7,9 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
@@ -16,19 +18,35 @@ using HardwareTemplateBuilder.Core.Repositories;
 using HardwareTemplateBuilder.Core.Services;
 using HardwareTemplateBuilder.Core.Services.Pdf;
 using Microsoft.EntityFrameworkCore;
+using PDFtoImage;
+using SkiaSharp;
 
 namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
-/// View that lets users search for a hardware item and generate a merged PDF of all its
-/// linked templates. Corresponds to Phase 9 of the implementation roadmap.
+/// View that lets users search for a hardware item, preview its generated/merged PDF, and
+/// generate/open it. Corresponds to Phase 9 of the implementation roadmap.
 /// </summary>
 public partial class TemplateLookupView : UserControl
 {
     private List<Manufacturer> _manufacturers = new();
     private List<DescriptionComboItem> _leafDescComboItems = new();
     private CancellationTokenSource? _cts;
-    private string _currentSearchText = string.Empty;
+
+    // Maps every searchable label (custom job labels and hardware item model numbers) to the
+    // hardware item it resolves to, deduplicated case-insensitively so suggestions and exact
+    // lookup search the same combined set.
+    private Dictionary<string, int> _searchableLabels = new(StringComparer.OrdinalIgnoreCase);
+
+    // Guards against re-entrant cascading refreshes while combo ItemsSource is being swapped.
+    private bool _suppressCascade;
+
+    // PDF preview state.
+    private byte[]? _previewPdfBytes;
+    private string? _previewPdfPath;
+    private int _previewPageCount;
+    private int _previewPageIndex;
+    private int? _previewItemId;
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event Action<string>? NavigationRequested;
@@ -62,49 +80,82 @@ public partial class TemplateLookupView : UserControl
             .ToHashSet();
         _leafDescComboItems = DescriptionHelper.BuildSelectableComboItems(allDescriptions, descIdsInUse, activeOnly: true);
 
-        MfrList.ItemsSource = _manufacturers;
-        MfrList.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
+        // Build the combined searchable label set: unique custom labels actually typed on a
+        // job (first occurrence wins, later duplicates skipped) take priority, then hardware
+        // item model numbers fill in any remaining entries not already covered by a label.
+        // Labels pointing at an inactive/missing hardware item are broken links (e.g. the
+        // item was later deactivated or removed) and are filtered out so they never surface
+        // as a "no exact match" result.
+        var activeItemIds = context.HardwareItems
+            .Where(h => h.IsActive && h.Description.IsActive)
+            .Select(h => h.Id)
+            .ToHashSet();
 
-        MfrList.SelectionChanged += (_, _) => { RefreshDescList(); RefreshModelList(); };
-        DescList.SelectionChanged += (_, _) => RefreshModelList();
-        ModelList.SelectionChanged += (_, _) => OnModelSelected();
+        var searchableLabels = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var jh in context.JobHardware.Where(jh => jh.CustomDescription != null).OrderBy(jh => jh.Id))
+        {
+            if (!activeItemIds.Contains(jh.HardwareItemId)) continue;
+
+            var label = jh.CustomDescription!.Trim();
+            if (label.Length > 0 && !searchableLabels.ContainsKey(label))
+                searchableLabels[label] = jh.HardwareItemId;
+        }
+        foreach (var h in context.HardwareItems.Where(h => h.IsActive && h.Description.IsActive))
+        {
+            if (!string.IsNullOrWhiteSpace(h.ModelNumber) && !searchableLabels.ContainsKey(h.ModelNumber))
+                searchableLabels[h.ModelNumber] = h.Id;
+        }
+        _searchableLabels = searchableLabels;
+
+        MfrCombo.ItemsSource = _manufacturers;
+        MfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
+
+        MfrCombo.SelectionChanged += (_, _) => { if (!_suppressCascade) { RefreshDescCombo(); RefreshModelCombo(); } };
+        DescCombo.SelectionChanged += (_, _) => { if (!_suppressCascade) RefreshModelCombo(); };
+        ModelCombo.SelectionChanged += (_, _) => { if (!_suppressCascade) OnModelSelected(); };
+
         GenerateButton.Click += async (_, e) => await OnGenerateClickedAsync(e);
-        SearchBox.TextChanged += (_, _) => OnSearchTextChanged();
-        ClearSearchButton.Click += (_, _) => ClearSearch();
+        LookupButton.Click += async (_, _) => await OnLookupClickedAsync();
+        ClearButton.Click += (_, _) => ClearAll();
+        PrevPageButton.Click += (_, _) => ChangePreviewPage(-1);
+        NextPageButton.Click += (_, _) => ChangePreviewPage(1);
+        LabelLookupBox.KeyDown += async (_, e) =>
+        {
+            if (e.Key == Key.Enter) await OnLookupClickedAsync();
+        };
+        LabelLookupBox.TextChanged += (_, _) => RefreshLabelSuggestions();
+        LabelSuggestionsList.SelectionChanged += (_, _) =>
+        {
+            if (LabelSuggestionsList.SelectedItem is string suggestion)
+            {
+                LabelLookupBox.Text = suggestion;
+                LabelLookupBox.CaretIndex = suggestion.Length;
+                LabelSuggestionsList.IsVisible = false;
+            }
+        };
 
-        // Show every description/model on first load; selections narrow both from there.
-        RefreshDescList();
-        RefreshModelList();
+        PdfScrollViewer.SizeChanged += (_, _) => FitPreviewImageToViewportWidth();
+
+        // Show every description/model on first load with nothing selected; selections narrow
+        // both from there.
+        RefreshDescCombo();
+        RefreshModelCombo(autoSelectFirst: false);
     }
 
-    // ---------- Search ----------
-
-    private void OnSearchTextChanged()
-    {
-        _currentSearchText = SearchBox.Text?.Trim() ?? string.Empty;
-        RefreshDescList();
-        RefreshModelList();
-    }
-
-    private void ClearSearch()
-    {
-        SearchBox.Text = string.Empty;
-        _currentSearchText = string.Empty;
-        RefreshDescList();
-        RefreshModelList();
-    }
+    // ---------- Cascading combo logic ----------
 
     /// <summary>
-    /// Repopulates the Description list to show only leaf descriptions that have at least one
-    /// active hardware item under any of the currently selected manufacturers (all leaf
-    /// descriptions if none are selected).
+    /// Repopulates the Description combo to show only leaf descriptions that have at least one
+    /// active hardware item under the currently selected manufacturer (all leaf descriptions if
+    /// none is selected).
     /// </summary>
-    private void RefreshDescList()
+    private void RefreshDescCombo()
     {
-        var mfrIds = SelectedIds(MfrList, (Manufacturer m) => m.Id);
+        var mfrId = (MfrCombo.SelectedItem as Manufacturer)?.Id;
+        var previouslySelected = (DescCombo.SelectedItem as DescriptionComboItem)?.Id;
 
         List<DescriptionComboItem> items;
-        if (mfrIds.Count == 0)
+        if (mfrId is null)
         {
             items = _leafDescComboItems;
         }
@@ -112,33 +163,29 @@ public partial class TemplateLookupView : UserControl
         {
             using var ctx = DatabaseInitializer.CreateContext();
             var descIds = ctx.HardwareItems
-                .Where(h => h.IsActive && h.Description.IsActive && mfrIds.Contains(h.ManufacturerId))
+                .Where(h => h.IsActive && h.Description.IsActive && h.ManufacturerId == mfrId)
                 .Select(h => h.DescriptionId)
                 .Distinct()
                 .ToHashSet();
             items = _leafDescComboItems.Where(d => descIds.Contains(d.Id)).ToList();
         }
 
-        if (!string.IsNullOrWhiteSpace(_currentSearchText))
-        {
-            items = items.Where(d => d.DisplayText.Contains(_currentSearchText, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
-
-        DescList.ItemsSource = items;
-        DescList.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+        _suppressCascade = true;
+        DescCombo.ItemsSource = items;
+        DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
+        DescCombo.SelectedItem = items.FirstOrDefault(d => d.Id == previouslySelected);
+        _suppressCascade = false;
     }
 
     /// <summary>
-    /// Repopulates the Model # list with every hardware item matching the currently selected
-    /// Manufacturers and Descriptions — a match is any item whose manufacturer is among the
-    /// selected manufacturers (if any are selected) AND whose description is among the selected
-    /// descriptions (if any are selected). With nothing selected in either list, every item is
+    /// Repopulates the Model # combo with every hardware item matching the currently selected
+    /// Manufacturer and Description — with nothing selected in either combo, every item is
     /// shown, narrowing only as selections are made.
     /// </summary>
-    private void RefreshModelList()
+    private void RefreshModelCombo(bool autoSelectFirst = true)
     {
-        var mfrIds  = SelectedIds(MfrList, (Manufacturer m) => m.Id);
-        var descIds = SelectedIds(DescList, (DescriptionComboItem d) => d.Id);
+        var mfrId = (MfrCombo.SelectedItem as Manufacturer)?.Id;
+        var descId = (DescCombo.SelectedItem as DescriptionComboItem)?.Id;
 
         using var ctx = DatabaseInitializer.CreateContext();
         var query = ctx.HardwareItems
@@ -147,40 +194,38 @@ public partial class TemplateLookupView : UserControl
             .Where(h => h.IsActive && h.Description.IsActive)
             .AsQueryable();
 
-        if (mfrIds.Count > 0) query = query.Where(h => mfrIds.Contains(h.ManufacturerId));
-        if (descIds.Count > 0) query = query.Where(h => descIds.Contains(h.DescriptionId));
-
-        if (!string.IsNullOrWhiteSpace(_currentSearchText))
-        {
-            query = query.Where(h => 
-                h.Manufacturer!.ManufacturerName.Contains(_currentSearchText) ||
-                h.Description!.DescriptionText.Contains(_currentSearchText) ||
-                h.ModelNumber.Contains(_currentSearchText));
-        }
+        if (mfrId is not null) query = query.Where(h => h.ManufacturerId == mfrId);
+        if (descId is not null) query = query.Where(h => h.DescriptionId == descId);
 
         var results = query
             .OrderByDescending(h => h.Frequency)
             .ThenBy(h => h.ModelNumber)
             .ToList();
 
-        ModelList.ItemsSource = results;
-        ModelList.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
+        _suppressCascade = true;
+        ModelCombo.ItemsSource = results;
+        ModelCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
+        _suppressCascade = false;
 
-        if (results.Count > 0)
-            ModelList.SelectedIndex = 0;
+        if (results.Count > 0 && autoSelectFirst)
+            ModelCombo.SelectedIndex = 0;
         else
             OnModelSelected();
     }
 
     private void OnModelSelected()
     {
-        if (ModelList.SelectedItem is HardwareItem item)
+        if (ModelCombo.SelectedItem is HardwareItem item)
         {
             SelectedMfrLabel.Text   = $"Manufacturer: {item.Manufacturer?.ManufacturerName}";
-            SelectedDescLabel.Text  = $"Type: {item.Description?.DescriptionText}";
-            SelectedModelLabel.Text = $"Model: {item.ModelNumber}";
-            SelectedFreqLabel.Text  = $"Frequency: {item.Frequency}";
+            SelectedDescLabel.Text  = $"Description: {item.Description?.DescriptionText}";
+            SelectedModelLabel.Text = $"Model #: {item.ModelNumber}";
+            SelectedFreqLabel.Text  = $"Used {item.Frequency} time(s)";
             GenerateButton.IsEnabled = true;
+
+            // Generate the preview as soon as an item is selected; "Generate PDF" then just
+            // opens the already-rendered file externally instead of regenerating it.
+            _ = GeneratePreviewAsync(item);
         }
         else
         {
@@ -189,62 +234,178 @@ public partial class TemplateLookupView : UserControl
             SelectedModelLabel.Text = string.Empty;
             SelectedFreqLabel.Text  = string.Empty;
             GenerateButton.IsEnabled = false;
+            _previewItemId = null;
+            ClearPreview();
         }
     }
 
-    /// <summary>Returns the IDs of the currently selected items in a multi-select ListBox.</summary>
-    private static HashSet<int> SelectedIds<T>(ListBox listBox, Func<T, int> idSelector) =>
-        listBox.SelectedItems?.Cast<T>().Select(idSelector).ToHashSet() ?? new HashSet<int>();
+    // ---------- Label suggestions ----------
+
+    /// <summary>
+    /// Repopulates <see cref="LabelSuggestionsList"/> with known job labels and hardware item
+    /// model numbers that contain the currently typed text (case-insensitive substring match),
+    /// hiding the list when the box is empty or there are no matches.
+    /// </summary>
+    private void RefreshLabelSuggestions()
+    {
+        var text = LabelLookupBox.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            LabelSuggestionsList.ItemsSource = null;
+            LabelSuggestionsList.IsVisible = false;
+            return;
+        }
+
+        var matches = _searchableLabels.Keys
+            .Where(l => l.Contains(text, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(l => l, StringComparer.OrdinalIgnoreCase)
+            .Take(20)
+            .ToList();
+
+        LabelSuggestionsList.ItemsSource = matches;
+        LabelSuggestionsList.IsVisible = matches.Count > 0;
+    }
+
+    // ---------- Label lookup ----------
+
+    /// <summary>
+    /// Looks up a hardware item by an exact (case-insensitive) match against any custom label
+    /// that has ever been used for it on a job, selects the matching combos, and generates its
+    /// PDF preview.
+    /// </summary>
+    private async Task OnLookupClickedAsync()
+    {
+        var label = LabelLookupBox.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            StatusLabel.Text = "Enter a label to look up.";
+            return;
+        }
+
+        HardwareItem? match;
+        using (var ctx = DatabaseInitializer.CreateContext())
+        {
+            int? hardwareItemId = _searchableLabels.TryGetValue(label, out var id)
+                ? id
+                : null;
+
+            match = hardwareItemId is null
+                ? null
+                : ctx.HardwareItems
+                    .Include(h => h.Manufacturer)
+                    .Include(h => h.Description)
+                    .FirstOrDefault(h => h.Id == hardwareItemId && h.IsActive && h.Description.IsActive);
+        }
+
+        if (match is null)
+        {
+            StatusLabel.Text = $"No exact match found for label \"{label}\".";
+            return;
+        }
+
+        StatusLabel.Text = string.Empty;
+
+        // Select the matching Manufacturer/Description/Model # so the cascading combos reflect
+        // the resolved item.
+        _suppressCascade = true;
+        MfrCombo.SelectedItem = _manufacturers.FirstOrDefault(m => m.Id == match.ManufacturerId);
+        _suppressCascade = false;
+        RefreshDescCombo();
+        _suppressCascade = true;
+        DescCombo.SelectedItem = (DescCombo.ItemsSource as IEnumerable<DescriptionComboItem>)?
+            .FirstOrDefault(d => d.Id == match.DescriptionId);
+        _suppressCascade = false;
+        RefreshModelCombo();
+
+        var resolved = (ModelCombo.ItemsSource as IEnumerable<HardwareItem>)?
+            .FirstOrDefault(h => h.Id == match.Id);
+        ModelCombo.SelectedItem = resolved;
+        OnModelSelected();
+    }
+
+    private void ClearAll()
+    {
+        LabelLookupBox.Text = string.Empty;
+        LabelSuggestionsList.ItemsSource = null;
+        LabelSuggestionsList.IsVisible = false;
+
+        _suppressCascade = true;
+        MfrCombo.SelectedItem = null;
+        _suppressCascade = false;
+
+        RefreshDescCombo();
+        RefreshModelCombo(autoSelectFirst: false);
+        ClearPreview();
+    }
 
     // ---------- Generate PDF ----------
 
+    /// <summary>
+    /// Opens the already-rendered preview PDF with the OS default viewer (regenerating it first
+    /// if it isn't up to date with the currently selected item), and increments the item's usage
+    /// frequency — unlike preview generation, which happens automatically on every selection and
+    /// should not affect frequency.
+    /// </summary>
     private async Task OnGenerateClickedAsync(RoutedEventArgs e)
     {
-        if (ModelList.SelectedItem is not HardwareItem item)
+        if (ModelCombo.SelectedItem is not HardwareItem item)
         {
             StatusLabel.Text = "Please select a hardware item first.";
             return;
         }
 
-        // Overwrite check: resolve expected output path and confirm if it already exists.
+        if (_previewItemId != item.Id || _previewPdfPath is null || !File.Exists(_previewPdfPath))
+            await GeneratePreviewAsync(item);
+
+        if (_previewPdfPath is null || !File.Exists(_previewPdfPath))
         {
-            string saveLocationForCheck;
-            using (var context = DatabaseInitializer.CreateContext())
-            {
-                saveLocationForCheck = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
-                if (string.IsNullOrWhiteSpace(saveLocationForCheck))
-                    saveLocationForCheck = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            }
-
-            var expectedPath = Path.Combine(
-                saveLocationForCheck,
-                QuickMergeService.BuildOutputFileName(item));
-
-            if (File.Exists(expectedPath))
-            {
-                var win = TopLevel.GetTopLevel(this) as Window;
-                if (win != null)
-                {
-                    var overwrite = await DialogHelper.ConfirmAsync(win,
-                        $"A file already exists:\n{Path.GetFileName(expectedPath)}\n\nOverwrite it?",
-                        "File Already Exists");
-                    if (!overwrite) return;
-                }
-            }
+            StatusLabel.Text = "Could not generate the PDF.";
+            return;
         }
 
+        // Increment frequency only when the user actually opens the file, not on every preview.
+        using (var ctx = DatabaseInitializer.CreateContext())
+        {
+            var freshItem = ctx.HardwareItems.Find(item.Id);
+            if (freshItem != null)
+                new FrequencyService(ctx).IncrementFrequency(freshItem);
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(_previewPdfPath) { UseShellExecute = true });
+        }
+        catch
+        {
+            // Non-fatal: file exists but couldn't be auto-opened.
+        }
+
+        StatusLabel.Text = $"Opened: {Path.GetFileName(_previewPdfPath)}";
+
+        // Refresh results so updated frequency ordering is reflected.
+        RefreshModelCombo();
+    }
+
+    /// <summary>
+    /// Generates (or regenerates) the merged PDF for <paramref name="item"/> and loads its first
+    /// page into the in-app previewer. Does not open an external viewer or touch usage
+    /// frequency — called automatically whenever a hardware item is selected.
+    /// </summary>
+    private async Task GeneratePreviewAsync(HardwareItem item)
+    {
         // Cancel any in-progress generation.
         _cts?.Cancel();
         _cts = new CancellationTokenSource();
+        var ct = _cts.Token;
 
-        GenerateButton.IsEnabled = false;
+        LookupButton.IsEnabled = false;
         GenerateProgress.IsVisible = true;
-        StatusLabel.Text = "Starting...";
+        StatusLabel.Text = "Generating preview...";
 
         string outputPath;
         try
         {
-            outputPath = await GeneratePdfAsync(item, _cts.Token);
+            outputPath = await GeneratePdfAsync(item, ct);
         }
         catch (OperationCanceledException)
         {
@@ -258,32 +419,13 @@ public partial class TemplateLookupView : UserControl
         }
         finally
         {
-            GenerateButton.IsEnabled = true;
+            LookupButton.IsEnabled = true;
             GenerateProgress.IsVisible = false;
         }
 
-        // Increment frequency on success.
-        using (var ctx = DatabaseInitializer.CreateContext())
-        {
-            var freshItem = ctx.HardwareItems.Find(item.Id);
-            if (freshItem != null)
-                new FrequencyService(ctx).IncrementFrequency(freshItem);
-        }
-
-        // Open with OS default PDF viewer.
-        try
-        {
-            Process.Start(new ProcessStartInfo(outputPath) { UseShellExecute = true });
-        }
-        catch
-        {
-            // Non-fatal: file was generated but couldn't be auto-opened.
-        }
-
-        StatusLabel.Text = $"Saved: {Path.GetFileName(outputPath)}";
-
-        // Refresh results so updated frequency ordering is reflected.
-        RefreshModelList();
+        _previewItemId = item.Id;
+        StatusLabel.Text = string.Empty;
+        LoadPreview(outputPath);
     }
 
     /// <summary>
@@ -309,6 +451,79 @@ public partial class TemplateLookupView : UserControl
         var progress = new Progress<string>(PostStatus);
         var service = new QuickMergeService(mergeContext, httpClient);
         return await service.GenerateAsync(item, saveLocation, "htb", progress, ct);
+    }
+
+    // ---------- PDF preview ----------
+
+    /// <summary>Loads the PDF at <paramref name="pdfPath"/> and renders its first page.</summary>
+    private void LoadPreview(string pdfPath)
+    {
+        try
+        {
+            _previewPdfPath = pdfPath;
+            _previewPdfBytes = File.ReadAllBytes(pdfPath);
+            _previewPageCount = Conversion.GetPageCount(_previewPdfBytes);
+            _previewPageIndex = 0;
+            RenderPreviewPage();
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = $"Could not preview PDF: {ex.Message}";
+            ClearPreview();
+        }
+    }
+
+    private void ClearPreview()
+    {
+        _previewPdfBytes = null;
+        _previewPdfPath = null;
+        _previewPageCount = 0;
+        _previewPageIndex = 0;
+        PdfPreviewImage.Source = null;
+        PageLabel.Text = "No document loaded";
+        PrevPageButton.IsEnabled = false;
+        NextPageButton.IsEnabled = false;
+    }
+
+    private void ChangePreviewPage(int delta)
+    {
+        if (_previewPdfBytes is null) return;
+
+        var newIndex = _previewPageIndex + delta;
+        if (newIndex < 0 || newIndex >= _previewPageCount) return;
+
+        _previewPageIndex = newIndex;
+        RenderPreviewPage();
+    }
+
+    private void RenderPreviewPage()
+    {
+        if (_previewPdfBytes is null) return;
+
+        using SKBitmap skBitmap = Conversion.ToImage(_previewPdfBytes, new Index(_previewPageIndex));
+        using var data = skBitmap.Encode(SKEncodedImageFormat.Png, 100);
+        using var stream = new MemoryStream(data.ToArray());
+        PdfPreviewImage.Source = new Bitmap(stream);
+
+        PageLabel.Text = $"Page {_previewPageIndex + 1} of {_previewPageCount}";
+        PrevPageButton.IsEnabled = _previewPageIndex > 0;
+        NextPageButton.IsEnabled = _previewPageIndex < _previewPageCount - 1;
+
+        FitPreviewImageToViewportWidth();
+    }
+
+    /// <summary>
+    /// Constrains the preview image to the scroll viewport's width (letting height grow
+    /// proportionally) so the page defaults to fitting the available width; pages taller than
+    /// the viewport simply continue scrolling vertically instead of being shrunk to fit.
+    /// </summary>
+    private void FitPreviewImageToViewportWidth()
+    {
+        if (PdfPreviewImage.Source is null) return;
+
+        var viewportWidth = PdfScrollViewer.Viewport.Width;
+        if (viewportWidth > 0)
+            PdfPreviewImage.Width = viewportWidth;
     }
 
     // ---------- Helpers ----------

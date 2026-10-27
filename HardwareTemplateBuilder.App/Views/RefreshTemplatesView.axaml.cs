@@ -117,7 +117,33 @@ public partial class RefreshTemplatesView : UserControl
 
         _timingReportPath = WriteTimingReport(saveLocation, result);
 
+        var lookupExportError = ExportLookupData();
+
         ShowResults(result);
+
+        if (lookupExportError != null)
+            StatusLabel.Text = $"{StatusLabel.Text}\nWarning: could not export Lookup data snapshot: {lookupExportError}".Trim();
+    }
+
+    /// <summary>
+    /// Re-exports the standalone Lookup app's <c>data.json</c> snapshot so it reflects the
+    /// template metadata/local paths that were just refreshed. Returns a non-null error message
+    /// on failure (surfaced as a warning — the refresh itself already succeeded).
+    /// </summary>
+    private string? ExportLookupData()
+    {
+        try
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var path = new LookupDataExportService(ctx).Export();
+            Debug.WriteLine($"Exported Lookup data snapshot to {path}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to export Lookup data snapshot: {ex.Message}");
+            return ex.Message;
+        }
     }
 
     private Task<RefreshResult> RunRefreshAsync(string saveLocation, CancellationToken ct)

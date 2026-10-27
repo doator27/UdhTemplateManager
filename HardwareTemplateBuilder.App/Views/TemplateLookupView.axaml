@@ -7,67 +7,78 @@
             <TextBlock Text="Individual Template Lookup" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>
 
-        <!-- Search bar -->
-        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Right" 
-                    Name="ClearSearchButton"
-                    Content="Clear"
-                    Width="60"
-                    Margin="4,0,0,0"/>
-            <TextBox Name="SearchBox" 
-                     Watermark="Search by manufacturer, description, or model number..."
-                     VerticalContentAlignment="Center"/>
-        </DockPanel>
-
         <!-- Progress + status (docked bottom) -->
         <ProgressBar DockPanel.Dock="Bottom" Name="GenerateProgress"
                      IsIndeterminate="True" IsVisible="False"
                      Height="14" Margin="0,8,0,4"/>
         <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Foreground="#FF6B6B" TextWrapping="Wrap"/>
 
-        <!-- Manufacturer / Description / Model# (cascading, multi-select) + Selected Item panel -->
-        <Grid ColumnDefinitions="*,Auto,*,Auto,*,Auto,220">
+        <!-- Lookup controls (left) + PDF previewer (right), resizable via splitter -->
+        <Grid ColumnDefinitions="340,8,*">
 
-            <DockPanel Grid.Column="0" MinWidth="120" Margin="0,0,0,0">
-                <TextBlock DockPanel.Dock="Top" Text="Manufacturer" FontWeight="Bold" Margin="0,0,0,4"/>
-                <ListBox Name="MfrList" SelectionMode="Multiple"/>
-            </DockPanel>
+            <!-- Left: lookup controls -->
+            <DockPanel Grid.Column="0">
+                <StackPanel DockPanel.Dock="Top" Spacing="8">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Manufacturer" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <ComboBox Name="MfrCombo" HorizontalAlignment="Stretch"/>
+                    </DockPanel>
 
-            <GridSplitter Grid.Column="1" Width="6" Background="#454952" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Description" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <ComboBox Name="DescCombo" HorizontalAlignment="Stretch"/>
+                    </DockPanel>
 
-            <DockPanel Grid.Column="2" MinWidth="120" Margin="0,0,0,0">
-                <TextBlock DockPanel.Dock="Top" Text="Description" FontWeight="Bold" Margin="0,0,0,4"/>
-                <ListBox Name="DescList" SelectionMode="Multiple"/>
-            </DockPanel>
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Model #" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <ComboBox Name="ModelCombo" HorizontalAlignment="Stretch"/>
+                    </DockPanel>
 
-            <GridSplitter Grid.Column="3" Width="6" Background="#454952" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                        <Button Name="ClearButton" Content="Clear" Width="100"/>
+                    </StackPanel>
 
-            <DockPanel Grid.Column="4" MinWidth="120" Margin="0,0,0,0">
-                <TextBlock DockPanel.Dock="Top" Text="Model #" FontWeight="Bold" Margin="0,0,0,4"/>
-                <ListBox Name="ModelList"/>
-            </DockPanel>
+                    <Border BorderBrush="#454952" BorderThickness="1" Padding="8" Margin="0,8,0,0">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Hardware Description:" FontWeight="Bold"/>
+                            <TextBox Name="LabelLookupBox" Watermark="Enter exact label used on a job..." VerticalContentAlignment="Center"/>
+                            <ListBox Name="LabelSuggestionsList" MaxHeight="140" IsVisible="False"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                                <Button Name="LookupButton" Content="Lookup" Width="100"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
-            <GridSplitter Grid.Column="5" Width="6" Background="#454952" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
-
-            <!-- Selected item + action panel -->
-            <Border Grid.Column="6"
-                    Margin="8,0,0,0"
-                    BorderBrush="#454952" BorderThickness="1"
-                    Padding="8">
-                <StackPanel>
-                    <TextBlock Text="Selected Item" FontWeight="Bold" Margin="0,0,0,6"/>
-                    <TextBlock Name="SelectedMfrLabel"  TextWrapping="Wrap" Margin="0,0,0,2"/>
-                    <TextBlock Name="SelectedDescLabel" TextWrapping="Wrap" Margin="0,0,0,2"/>
-                    <TextBlock Name="SelectedModelLabel" TextWrapping="Wrap" Margin="0,0,0,2"/>
-                    <TextBlock Name="SelectedFreqLabel" Foreground="#A7ADB8" Margin="0,0,0,12"/>
-
-                    <Button Name="GenerateButton"
-                            Content="Generate PDF"
-                            IsEnabled="False"
-                            HorizontalAlignment="Stretch"/>
+                    <Border BorderBrush="#454952" BorderThickness="1" Padding="8">
+                        <StackPanel>
+                            <TextBlock Name="SelectedMfrLabel" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                            <TextBlock Name="SelectedDescLabel" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                            <TextBlock Name="SelectedModelLabel" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                            <TextBlock Name="SelectedFreqLabel" Foreground="#A7ADB8" Margin="0,0,0,8"/>
+                            <Button Name="GenerateButton"
+                                    Content="Generate PDF"
+                                    IsEnabled="False"
+                                    HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
-            </Border>
+            </DockPanel>
 
+            <GridSplitter Grid.Column="1" Width="8" Background="#454952" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+
+            <!-- Right: PDF previewer fills the rest of the page -->
+            <Border Grid.Column="2" BorderBrush="#454952" BorderThickness="1" Padding="4">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,4" Spacing="8">
+                        <Button Name="PrevPageButton" Content="&lt; Prev" IsEnabled="False"/>
+                        <TextBlock Name="PageLabel" VerticalAlignment="Center" Text="No document loaded"/>
+                        <Button Name="NextPageButton" Content="Next &gt;" IsEnabled="False"/>
+                    </StackPanel>
+                    <ScrollViewer Name="PdfScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                        <Image Name="PdfPreviewImage" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
         </Grid>
     </DockPanel>
 </UserControl>
