@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
+using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 
 namespace HardwareTemplateBuilder.Core.Services.Pdf;
@@ -52,11 +53,18 @@ public class FileAcquirer
         Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
 
         // --- Try local copy first ---
-        if (!string.IsNullOrWhiteSpace(template.LocalLink) && File.Exists(template.LocalLink))
+        // Resolve a mapped drive letter to its UNC equivalent: LocalLink may have been stored
+        // using a drive letter mapped on whichever machine performed the download, which may
+        // not be mapped (or mapped to something else) on this machine.
+        var localLink = string.IsNullOrWhiteSpace(template.LocalLink)
+            ? template.LocalLink
+            : NetworkPathResolver.ResolveToUnc(template.LocalLink);
+
+        if (!string.IsNullOrWhiteSpace(localLink) && File.Exists(localLink))
         {
             try
             {
-                File.Copy(template.LocalLink, destPath, overwrite: true);
+                File.Copy(localLink, destPath, overwrite: true);
 
                 // Validate the copied file is actually a PDF (guards against a previously
                 // corrupt download that was saved to LocalLink as HTML).

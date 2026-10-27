@@ -127,6 +127,11 @@ public class TemplateRefreshService
         IProgress<RefreshProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // Normalize to a UNC path (when the configured location is a mapped network drive) so
+        // the LocalLink values persisted below resolve correctly for every user/machine,
+        // regardless of that user's own drive-letter mappings.
+        saveLocation = NetworkPathResolver.ResolveToUnc(saveLocation);
+
         var templates = await _context.IndividualTemplates
             .Include(t => t.Manufacturer)
             .Where(t => t.OnlineLink != null && t.OnlineLink != string.Empty)
@@ -224,6 +229,8 @@ public class TemplateRefreshService
         string saveLocation,
         CancellationToken cancellationToken = default)
     {
+        saveLocation = NetworkPathResolver.ResolveToUnc(saveLocation);
+
         var template = _context.IndividualTemplates
             .Include(t => t.Manufacturer)
             .FirstOrDefault(t => t.Id == templateId);

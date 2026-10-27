@@ -840,9 +840,13 @@ public partial class BulkHardwareEntryView : UserControl
     {
         try
         {
-            if (!string.IsNullOrWhiteSpace(template.LocalLink) && File.Exists(template.LocalLink))
+            var localLink = string.IsNullOrWhiteSpace(template.LocalLink)
+                ? template.LocalLink
+                : HardwareTemplateBuilder.Core.Data.NetworkPathResolver.ResolveToUnc(template.LocalLink);
+
+            if (!string.IsNullOrWhiteSpace(localLink) && File.Exists(localLink))
             {
-                Process.Start(new ProcessStartInfo(template.LocalLink) { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(localLink) { UseShellExecute = true });
                 return true;
             }
 
