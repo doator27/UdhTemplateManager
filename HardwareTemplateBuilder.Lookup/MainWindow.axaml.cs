@@ -111,15 +111,38 @@ public partial class MainWindow : Window
         MfrCombo.ItemsSource = _data.Manufacturers;
         MfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
 
-        MfrCombo.SelectionChanged += (_, _) => { if (!_suppressCascade) { RefreshDescCombo(); RefreshModelCombo(); } };
-        DescCombo.SelectionChanged += (_, _) => { if (!_suppressCascade) RefreshModelCombo(); };
+        MfrCombo.SelectionChanged += (_, _) =>
+        {
+            if (_suppressCascade) return;
+
+            var cleared = MfrCombo.SelectedItem is null;
+            if (cleared)
+            {
+                // Clearing the Manufacturer combo clears every combo below it rather than
+                // just re-filtering them while keeping their current selections.
+                _suppressCascade = true;
+                DescCombo.SelectedItem = null;
+                _suppressCascade = false;
+            }
+
+            RefreshDescCombo(preserveSelection: !cleared);
+            RefreshModelCombo(autoSelectFirst: !cleared);
+        };
+        DescCombo.SelectionChanged += (_, _) =>
+        {
+            if (_suppressCascade) return;
+
+            // Clearing the Description combo clears the Model # combo instead of leaving its
+            // current selection in place.
+            RefreshModelCombo(autoSelectFirst: DescCombo.SelectedItem is not null);
+        };
         ModelCombo.SelectionChanged += (_, _) => { if (!_suppressCascade) OnModelSelected(); };
 
         GenerateButton.Click += async (_, _) => await OnGenerateClickedAsync();
         LookupButton.Click += async (_, _) => await OnLookupClickedAsync();
         ClearButton.Click += (_, _) => ClearAll();
-        PrevPageButton.Click += (_, _) => ChangePreviewPage(-1);
-        NextPageButton.Click += (_, _) => ChangePreviewPage(1);
+        PrevPageButton.Click += async (_, _) => await ChangePreviewPageAsync(-1);
+        NextPageButton.Click += async (_, _) => await ChangePreviewPageAsync(1);
         LabelLookupBox.KeyDown += async (_, e) =>
         {
             if (e.Key == Key.Enter) await OnLookupClickedAsync();
@@ -150,12 +173,12 @@ public partial class MainWindow : Window
     /// active hardware item under the currently selected manufacturer (all leaf descriptions if
     /// none is selected).
     /// </summary>
-    private void RefreshDescCombo()
+    private void RefreshDescCombo(bool preserveSelection = true)
     {
         if (!_dataAvailable) return;
 
         var mfrId = (MfrCombo.SelectedItem as Manufacturer)?.Id;
-        var previouslySelected = (DescCombo.SelectedItem as DescriptionComboItem)?.Id;
+        var previouslySelected = preserveSelection ? (DescCombo.SelectedItem as DescriptionComboItem)?.Id : null;
 
         List<DescriptionComboItem> items;
         if (mfrId is null)
@@ -175,7 +198,7 @@ public partial class MainWindow : Window
         _suppressCascade = true;
         DescCombo.ItemsSource = items;
         DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-        DescCombo.SelectedItem = items.FirstOrDefault(d => d.Id == previouslySelected);
+        DescCombo.SelectedItem = previouslySelected is null ? null : items.FirstOrDefault(d => d.Id == previouslySelected);
         _suppressCascade = false;
     }
 
@@ -206,6 +229,7 @@ public partial class MainWindow : Window
         _suppressCascade = true;
         ModelCombo.ItemsSource = results;
         ModelCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
+        ModelCombo.SelectedItem = null;
         _suppressCascade = false;
 
         if (results.Count > 0 && autoSelectFirst)
@@ -316,9 +340,10 @@ public partial class MainWindow : Window
 
         _suppressCascade = true;
         MfrCombo.SelectedItem = null;
+        DescCombo.SelectedItem = null;
         _suppressCascade = false;
 
-        RefreshDescCombo();
+        RefreshDescCombo(preserveSelection: false);
         RefreshModelCombo(autoSelectFirst: false);
         ClearPreview();
     }
@@ -370,7 +395,7 @@ public partial class MainWindow : Window
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
 
-        LookupButton.IsEnabled = false;
+        GenerateButton.IsEnabled = false;
         GenerateProgress.IsVisible = true;
         StatusLabel.Text = "Generating preview...";
 
@@ -391,7 +416,7 @@ public partial class MainWindow : Window
         }
         finally
         {
-            LookupButton.IsEnabled = true;
+            GenerateButton.IsEnabled = true;
             GenerateProgress.IsVisible = false;
         }
 
@@ -429,7 +454,7 @@ public partial class MainWindow : Window
     // ---------- PDF preview ----------
 
     /// <summary>Loads the PDF at <paramref name="pdfPath"/> and renders its first page.</summary>
-    private void LoadPreview(string pdfPath)
+    private async void LoadPreview(string pdfPath)
     {
         try
         {
@@ -437,7 +462,7 @@ public partial class MainWindow : Window
             _previewPdfBytes = File.ReadAllBytes(pdfPath);
             _previewPageCount = Conversion.GetPageCount(_previewPdfBytes);
             _previewPageIndex = 0;
-            RenderPreviewPage();
+            await RenderPreviewPageAsync();
         }
         catch (Exception ex)
         {
@@ -458,7 +483,7 @@ public partial class MainWindow : Window
         NextPageButton.IsEnabled = false;
     }
 
-    private void ChangePreviewPage(int delta)
+    private async Task ChangePreviewPageAsync(int delta)
     {
         if (_previewPdfBytes is null) return;
 
@@ -466,16 +491,26 @@ public partial class MainWindow : Window
         if (newIndex < 0 || newIndex >= _previewPageCount) return;
 
         _previewPageIndex = newIndex;
-        RenderPreviewPage();
+        await RenderPreviewPageAsync();
     }
 
-    private void RenderPreviewPage()
+    private async Task RenderPreviewPageAsync()
     {
         if (_previewPdfBytes is null) return;
 
-        using SKBitmap skBitmap = Conversion.ToImage(_previewPdfBytes, new Index(_previewPageIndex));
-        using var data = skBitmap.Encode(SKEncodedImageFormat.Png, 100);
-        using var stream = new MemoryStream(data.ToArray());
+        var pdfBytes = _previewPdfBytes;
+        var pageIndex = _previewPageIndex;
+
+        // Rasterizing a PDF page is CPU-heavy; run it on a background thread so the UI thread
+        // (and button clicks) stay responsive instead of freezing for the duration.
+        var pngBytes = await Task.Run(() =>
+        {
+            using SKBitmap skBitmap = Conversion.ToImage(pdfBytes, new Index(pageIndex));
+            using var data = skBitmap.Encode(SKEncodedImageFormat.Png, 100);
+            return data.ToArray();
+        });
+
+        using var stream = new MemoryStream(pngBytes);
         PdfPreviewImage.Source = new Bitmap(stream);
 
         PageLabel.Text = $"Page {_previewPageIndex + 1} of {_previewPageCount}";

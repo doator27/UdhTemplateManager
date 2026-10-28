@@ -55,12 +55,12 @@ public partial class TemplateLookupView : UserControl
     public TemplateLookupView()
     {
         InitializeComponent();
-        Loaded += (_, _) => Initialize();
+        Loaded += async (_, _) => await InitializeAsync();
     }
 
     // ---------- Initialization ----------
 
-    private void Initialize()
+    private async Task InitializeAsync()
     {
         using var context = DatabaseInitializer.CreateContext();
 
@@ -110,15 +110,39 @@ public partial class TemplateLookupView : UserControl
         MfrCombo.ItemsSource = _manufacturers;
         MfrCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ManufacturerName");
 
-        MfrCombo.SelectionChanged += (_, _) => { if (!_suppressCascade) { RefreshDescCombo(); RefreshModelCombo(); } };
-        DescCombo.SelectionChanged += (_, _) => { if (!_suppressCascade) RefreshModelCombo(); };
+        MfrCombo.SelectionChanged += async (_, _) =>
+        {
+            if (_suppressCascade) return;
+
+            var cleared = MfrCombo.SelectedItem is null;
+            if (cleared)
+            {
+                // Clearing the Manufacturer combo clears every combo below it rather than
+                // just re-filtering them while keeping their current selections.
+                _suppressCascade = true;
+                DescCombo.SelectedItem = null;
+                _suppressCascade = false;
+            }
+
+            await RefreshDescComboAsync(preserveSelection: !cleared);
+            await RefreshModelComboAsync(autoSelectFirst: !cleared);
+        };
+        DescCombo.SelectionChanged += async (_, _) =>
+        {
+            if (_suppressCascade) return;
+
+            // Clearing the Description combo clears the Model # combo instead of leaving its
+            // current selection in place.
+            await RefreshModelComboAsync(autoSelectFirst: DescCombo.SelectedItem is not null);
+        };
         ModelCombo.SelectionChanged += (_, _) => { if (!_suppressCascade) OnModelSelected(); };
 
         GenerateButton.Click += async (_, e) => await OnGenerateClickedAsync(e);
         LookupButton.Click += async (_, _) => await OnLookupClickedAsync();
-        ClearButton.Click += (_, _) => ClearAll();
-        PrevPageButton.Click += (_, _) => ChangePreviewPage(-1);
-        NextPageButton.Click += (_, _) => ChangePreviewPage(1);
+        ClearButton.Click += async (_, _) => await ClearAllAsync();
+        ExportLookupDataButton.Click += async (_, _) => await ExportLookupDataAsync();
+        PrevPageButton.Click += async (_, _) => await ChangePreviewPageAsync(-1);
+        NextPageButton.Click += async (_, _) => await ChangePreviewPageAsync(1);
         LabelLookupBox.KeyDown += async (_, e) =>
         {
             if (e.Key == Key.Enter) await OnLookupClickedAsync();
@@ -138,8 +162,8 @@ public partial class TemplateLookupView : UserControl
 
         // Show every description/model on first load with nothing selected; selections narrow
         // both from there.
-        RefreshDescCombo();
-        RefreshModelCombo(autoSelectFirst: false);
+        await RefreshDescComboAsync();
+        await RefreshModelComboAsync(autoSelectFirst: false);
     }
 
     // ---------- Cascading combo logic ----------
@@ -149,10 +173,10 @@ public partial class TemplateLookupView : UserControl
     /// active hardware item under the currently selected manufacturer (all leaf descriptions if
     /// none is selected).
     /// </summary>
-    private void RefreshDescCombo()
+    private async Task RefreshDescComboAsync(bool preserveSelection = true)
     {
         var mfrId = (MfrCombo.SelectedItem as Manufacturer)?.Id;
-        var previouslySelected = (DescCombo.SelectedItem as DescriptionComboItem)?.Id;
+        var previouslySelected = preserveSelection ? (DescCombo.SelectedItem as DescriptionComboItem)?.Id : null;
 
         List<DescriptionComboItem> items;
         if (mfrId is null)
@@ -162,10 +186,11 @@ public partial class TemplateLookupView : UserControl
         else
         {
             using var ctx = DatabaseInitializer.CreateContext();
-            var descIds = ctx.HardwareItems
+            var descIds = (await ctx.HardwareItems
                 .Where(h => h.IsActive && h.Description.IsActive && h.ManufacturerId == mfrId)
                 .Select(h => h.DescriptionId)
                 .Distinct()
+                .ToListAsync())
                 .ToHashSet();
             items = _leafDescComboItems.Where(d => descIds.Contains(d.Id)).ToList();
         }
@@ -173,7 +198,7 @@ public partial class TemplateLookupView : UserControl
         _suppressCascade = true;
         DescCombo.ItemsSource = items;
         DescCombo.DisplayMemberBinding = new Avalonia.Data.Binding("DisplayText");
-        DescCombo.SelectedItem = items.FirstOrDefault(d => d.Id == previouslySelected);
+        DescCombo.SelectedItem = previouslySelected is null ? null : items.FirstOrDefault(d => d.Id == previouslySelected);
         _suppressCascade = false;
     }
 
@@ -182,7 +207,7 @@ public partial class TemplateLookupView : UserControl
     /// Manufacturer and Description — with nothing selected in either combo, every item is
     /// shown, narrowing only as selections are made.
     /// </summary>
-    private void RefreshModelCombo(bool autoSelectFirst = true)
+    private async Task RefreshModelComboAsync(bool autoSelectFirst = true)
     {
         var mfrId = (MfrCombo.SelectedItem as Manufacturer)?.Id;
         var descId = (DescCombo.SelectedItem as DescriptionComboItem)?.Id;
@@ -197,14 +222,15 @@ public partial class TemplateLookupView : UserControl
         if (mfrId is not null) query = query.Where(h => h.ManufacturerId == mfrId);
         if (descId is not null) query = query.Where(h => h.DescriptionId == descId);
 
-        var results = query
+        var results = await query
             .OrderByDescending(h => h.Frequency)
             .ThenBy(h => h.ModelNumber)
-            .ToList();
+            .ToListAsync();
 
         _suppressCascade = true;
         ModelCombo.ItemsSource = results;
         ModelCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
+        ModelCombo.SelectedItem = null;
         _suppressCascade = false;
 
         if (results.Count > 0 && autoSelectFirst)
@@ -291,10 +317,10 @@ public partial class TemplateLookupView : UserControl
 
             match = hardwareItemId is null
                 ? null
-                : ctx.HardwareItems
+                : await ctx.HardwareItems
                     .Include(h => h.Manufacturer)
                     .Include(h => h.Description)
-                    .FirstOrDefault(h => h.Id == hardwareItemId && h.IsActive && h.Description.IsActive);
+                    .FirstOrDefaultAsync(h => h.Id == hardwareItemId && h.IsActive && h.Description.IsActive);
         }
 
         if (match is null)
@@ -310,12 +336,12 @@ public partial class TemplateLookupView : UserControl
         _suppressCascade = true;
         MfrCombo.SelectedItem = _manufacturers.FirstOrDefault(m => m.Id == match.ManufacturerId);
         _suppressCascade = false;
-        RefreshDescCombo();
+        await RefreshDescComboAsync();
         _suppressCascade = true;
         DescCombo.SelectedItem = (DescCombo.ItemsSource as IEnumerable<DescriptionComboItem>)?
             .FirstOrDefault(d => d.Id == match.DescriptionId);
         _suppressCascade = false;
-        RefreshModelCombo();
+        await RefreshModelComboAsync();
 
         var resolved = (ModelCombo.ItemsSource as IEnumerable<HardwareItem>)?
             .FirstOrDefault(h => h.Id == match.Id);
@@ -323,7 +349,7 @@ public partial class TemplateLookupView : UserControl
         OnModelSelected();
     }
 
-    private void ClearAll()
+    private async Task ClearAllAsync()
     {
         LabelLookupBox.Text = string.Empty;
         LabelSuggestionsList.ItemsSource = null;
@@ -331,11 +357,44 @@ public partial class TemplateLookupView : UserControl
 
         _suppressCascade = true;
         MfrCombo.SelectedItem = null;
+        DescCombo.SelectedItem = null;
         _suppressCascade = false;
 
-        RefreshDescCombo();
-        RefreshModelCombo(autoSelectFirst: false);
+        await RefreshDescComboAsync(preserveSelection: false);
+        await RefreshModelComboAsync(autoSelectFirst: false);
         ClearPreview();
+    }
+
+    // ---------- Lookup data export ----------
+
+    /// <summary>
+    /// Re-exports the standalone Lookup app's <c>data.json</c> snapshot from the current
+    /// database state, without requiring a full "Refresh Templates" run. Runs the DB query and
+    /// file write on a background thread so the UI stays responsive while exporting.
+    /// </summary>
+    private async Task ExportLookupDataAsync()
+    {
+        ExportLookupDataButton.IsEnabled = false;
+        StatusLabel.Text = "Updating Lookup app data...";
+
+        try
+        {
+            var path = await Task.Run(() =>
+            {
+                using var ctx = DatabaseInitializer.CreateContext();
+                return new LookupDataExportService(ctx).Export();
+            });
+
+            StatusLabel.Text = $"Lookup app data updated: {path}";
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = $"Failed to update Lookup app data: {ex.Message}";
+        }
+        finally
+        {
+            ExportLookupDataButton.IsEnabled = true;
+        }
     }
 
     // ---------- Generate PDF ----------
@@ -383,7 +442,7 @@ public partial class TemplateLookupView : UserControl
         StatusLabel.Text = $"Opened: {Path.GetFileName(_previewPdfPath)}";
 
         // Refresh results so updated frequency ordering is reflected.
-        RefreshModelCombo();
+        await RefreshModelComboAsync();
     }
 
     /// <summary>
@@ -398,7 +457,7 @@ public partial class TemplateLookupView : UserControl
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
 
-        LookupButton.IsEnabled = false;
+        GenerateButton.IsEnabled = false;
         GenerateProgress.IsVisible = true;
         StatusLabel.Text = "Generating preview...";
 
@@ -419,7 +478,7 @@ public partial class TemplateLookupView : UserControl
         }
         finally
         {
-            LookupButton.IsEnabled = true;
+            GenerateButton.IsEnabled = true;
             GenerateProgress.IsVisible = false;
         }
 
@@ -456,7 +515,7 @@ public partial class TemplateLookupView : UserControl
     // ---------- PDF preview ----------
 
     /// <summary>Loads the PDF at <paramref name="pdfPath"/> and renders its first page.</summary>
-    private void LoadPreview(string pdfPath)
+    private async void LoadPreview(string pdfPath)
     {
         try
         {
@@ -464,7 +523,7 @@ public partial class TemplateLookupView : UserControl
             _previewPdfBytes = File.ReadAllBytes(pdfPath);
             _previewPageCount = Conversion.GetPageCount(_previewPdfBytes);
             _previewPageIndex = 0;
-            RenderPreviewPage();
+            await RenderPreviewPageAsync();
         }
         catch (Exception ex)
         {
@@ -485,7 +544,7 @@ public partial class TemplateLookupView : UserControl
         NextPageButton.IsEnabled = false;
     }
 
-    private void ChangePreviewPage(int delta)
+    private async Task ChangePreviewPageAsync(int delta)
     {
         if (_previewPdfBytes is null) return;
 
@@ -493,16 +552,26 @@ public partial class TemplateLookupView : UserControl
         if (newIndex < 0 || newIndex >= _previewPageCount) return;
 
         _previewPageIndex = newIndex;
-        RenderPreviewPage();
+        await RenderPreviewPageAsync();
     }
 
-    private void RenderPreviewPage()
+    private async Task RenderPreviewPageAsync()
     {
         if (_previewPdfBytes is null) return;
 
-        using SKBitmap skBitmap = Conversion.ToImage(_previewPdfBytes, new Index(_previewPageIndex));
-        using var data = skBitmap.Encode(SKEncodedImageFormat.Png, 100);
-        using var stream = new MemoryStream(data.ToArray());
+        var pdfBytes = _previewPdfBytes;
+        var pageIndex = _previewPageIndex;
+
+        // Rasterizing a PDF page is CPU-heavy; run it on a background thread so the UI thread
+        // (and button clicks) stay responsive instead of freezing for the duration.
+        var pngBytes = await Task.Run(() =>
+        {
+            using SKBitmap skBitmap = Conversion.ToImage(pdfBytes, new Index(pageIndex));
+            using var data = skBitmap.Encode(SKEncodedImageFormat.Png, 100);
+            return data.ToArray();
+        });
+
+        using var stream = new MemoryStream(pngBytes);
         PdfPreviewImage.Source = new Bitmap(stream);
 
         PageLabel.Text = $"Page {_previewPageIndex + 1} of {_previewPageCount}";
