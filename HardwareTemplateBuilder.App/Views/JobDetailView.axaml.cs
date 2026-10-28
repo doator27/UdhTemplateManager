@@ -499,19 +499,25 @@ public partial class JobDetailView : UserControl
         var hardwareItemsById = context.HardwareItems
             .Include(h => h.Manufacturer)
             .Where(h => hardwareIds.Contains(h.Id))
+            .AsNoTracking()
             .ToDictionary(h => h.Id);
+
+        // Single batched query for all items' template links instead of one query per item.
+        var templatesByItemId = context.HardwareItemTemplates
+            .Include(hit => hit.IndividualTemplate)
+                .ThenInclude(t => t.Manufacturer)
+            .Where(hit => hardwareIds.Contains(hit.HardwareItemId) &&
+                          (hit.JobId == null || hit.JobId == _jobId))
+            .AsNoTracking()
+            .ToList()
+            .GroupBy(hit => hit.HardwareItemId)
+            .ToDictionary(g => g.Key, g => g.Select(hit => hit.IndividualTemplate).ToList());
 
         var problems = new List<string>();
 
         foreach (var hwId in hardwareIds)
         {
-            var templates = context.HardwareItemTemplates
-                .Include(hit => hit.IndividualTemplate)
-                    .ThenInclude(t => t.Manufacturer)
-                .Where(hit => hit.HardwareItemId == hwId &&
-                              (hit.JobId == null || hit.JobId == _jobId))
-                .Select(hit => hit.IndividualTemplate)
-                .ToList();
+            var templates = templatesByItemId.TryGetValue(hwId, out var found) ? found : new List<IndividualTemplate>();
 
             if (templates.Count == 0)
             {

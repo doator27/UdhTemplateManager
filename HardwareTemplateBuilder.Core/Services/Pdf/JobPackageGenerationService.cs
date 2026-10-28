@@ -105,22 +105,36 @@ public class JobPackageGenerationService
             .Include(h => h.Manufacturer)
             .Include(h => h.Description)
             .Where(h => allItemIds.Contains(h.Id))
+            .AsNoTracking()
             .ToDictionary(h => h.Id);
+
+        // Fetch every visible template link for all hardware items in a single round trip
+        // (instead of one query per item) and group them by HardwareItemId. Querying one item
+        // at a time via a shared, tracked DbContext risks the EF Core identity map returning a
+        // stale/incomplete IndividualTemplate instance if an earlier iteration in this same
+        // loop already materialized that template (templates can be shared across items); a
+        // single AsNoTracking query sidesteps that entirely.
+        var templatesByItemId = context.HardwareItemTemplates
+            .Include(hit => hit.IndividualTemplate)
+                .ThenInclude(t => t.Manufacturer)
+            .Include(hit => hit.IndividualTemplate)
+                .ThenInclude(t => t.Description)
+            .Where(hit => allItemIds.Contains(hit.HardwareItemId) &&
+                          (hit.JobId == null || hit.JobId == jobId))
+            .AsNoTracking()
+            .ToList()
+            .GroupBy(hit => hit.HardwareItemId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<IndividualTemplate>)g.Select(hit => hit.IndividualTemplate).ToList());
 
         var hardware = orderedItems
             .Where(x => hardwareDict.ContainsKey(x.HardwareItemId))
             .Select(x =>
             {
-                var templates = context.HardwareItemTemplates
-                    .Include(hit => hit.IndividualTemplate)
-                        .ThenInclude(t => t.Manufacturer)
-                    .Include(hit => hit.IndividualTemplate)
-                        .ThenInclude(t => t.Description)
-                    .Where(hit => hit.HardwareItemId == x.HardwareItemId &&
-                                  (hit.JobId == null || hit.JobId == jobId))
-                    .Select(hit => hit.IndividualTemplate)
-                    .ToList()
-                    .AsReadOnly();
+                var templates = templatesByItemId.TryGetValue(x.HardwareItemId, out var found)
+                    ? found
+                    : Array.Empty<IndividualTemplate>();
 
                 return new HardwareWithTemplates
                 {

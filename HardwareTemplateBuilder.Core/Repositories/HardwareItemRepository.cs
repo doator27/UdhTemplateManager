@@ -1,6 +1,7 @@
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Models;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -15,11 +16,24 @@ public class HardwareItemRepository : RepositoryBase<HardwareItem>, IHardwareIte
     public HardwareItemRepository(AppDbContext context) : base(context) { }
 
     /// <inheritdoc/>
-    protected override HardwareItem? FindDuplicate(HardwareItem entity) =>
-        _context.HardwareItems.FirstOrDefault(h =>
-            h.ManufacturerId == entity.ManufacturerId &&
-            h.DescriptionId == entity.DescriptionId &&
-            h.ModelNumber == entity.ModelNumber);
+    /// <remarks>
+    /// Compares <see cref="HardwareItem.ModelNumber"/> case-insensitively and trimmed so that
+    /// whitespace or casing differences (e.g. "L9000" vs "l9000 ") don't create a second,
+    /// visually-identical <see cref="HardwareItem"/> row. Without this, a duplicate row with no
+    /// linked templates can end up alongside the real one with templates, and whichever row a
+    /// search picks up (e.g. by frequency ordering) determines whether templates are found.
+    /// </remarks>
+    protected override HardwareItem? FindDuplicate(HardwareItem entity)
+    {
+        var normalizedModelNumber = entity.ModelNumber?.Trim() ?? string.Empty;
+        return _context.HardwareItems
+            .Where(h =>
+                h.ManufacturerId == entity.ManufacturerId &&
+                h.DescriptionId == entity.DescriptionId)
+            .AsEnumerable()
+            .FirstOrDefault(h =>
+                string.Equals(h.ModelNumber?.Trim(), normalizedModelNumber, StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <inheritdoc/>
     public IEnumerable<HardwareItem> Search(string? manufacturerName, int? descriptionId, string? modelNumber)

@@ -78,23 +78,23 @@ try
 {
     // Order does not matter while FK checks are disabled, but tables are listed
     // roughly in dependency order for readability.
-    await CopyTableAsync<UserProfile>(source, target, "UserProfiles");
-    await CopyTableAsync<Customer>(source, target, "Customers");
-    await CopyTableAsync<Manufacturer>(source, target, "Manufacturers");
-    await CopyTableAsync<Description>(source, target, "Descriptions");
-    await CopyTableAsync<DoorMaterial>(source, target, "DoorMaterials");
-    await CopyTableAsync<AppSetting>(source, target, "AppSettings");
-    await CopyTableAsync<ProjectManager>(source, target, "ProjectManagers");
-    await CopyTableAsync<Job>(source, target, "Jobs");
-    await CopyTableAsync<HardwareItem>(source, target, "HardwareItems");
-    await CopyTableAsync<IndividualTemplate>(source, target, "IndividualTemplates");
-    await CopyTableAsync<HardwareItemTemplate>(source, target, "HardwareItemTemplates");
-    await CopyTableAsync<JobRelease>(source, target, "JobReleases");
-    await CopyTableAsync<JobHardware>(source, target, "JobHardware");
-    await CopyTableAsync<JobTemplateSnapshot>(source, target, "JobTemplateSnapshots");
-    await CopyTableAsync<JobAttachment>(source, target, "JobAttachments");
-    await CopyBulkAddDraftsAsync(source, target);
-    await CopyTableAsync<IgnoredTemplateDuplicate>(source, target, "IgnoredTemplateDuplicates");
+    await CopyTableAsync<UserProfile>(source, target, "UserProfiles", provider);
+    await CopyTableAsync<Customer>(source, target, "Customers", provider);
+    await CopyTableAsync<Manufacturer>(source, target, "Manufacturers", provider);
+    await CopyTableAsync<Description>(source, target, "Descriptions", provider);
+    await CopyTableAsync<DoorMaterial>(source, target, "DoorMaterials", provider);
+    await CopyTableAsync<AppSetting>(source, target, "AppSettings", provider);
+    await CopyTableAsync<ProjectManager>(source, target, "ProjectManagers", provider);
+    await CopyTableAsync<Job>(source, target, "Jobs", provider);
+    await CopyTableAsync<HardwareItem>(source, target, "HardwareItems", provider);
+    await CopyTableAsync<IndividualTemplate>(source, target, "IndividualTemplates", provider);
+    await CopyTableAsync<HardwareItemTemplate>(source, target, "HardwareItemTemplates", provider);
+    await CopyTableAsync<JobRelease>(source, target, "JobReleases", provider);
+    await CopyTableAsync<JobHardware>(source, target, "JobHardware", provider);
+    await CopyTableAsync<JobTemplateSnapshot>(source, target, "JobTemplateSnapshots", provider);
+    await CopyTableAsync<JobAttachment>(source, target, "JobAttachments", provider);
+    await CopyBulkAddDraftsAsync(source, target, provider);
+    await CopyTableAsync<IgnoredTemplateDuplicate>(source, target, "IgnoredTemplateDuplicates", provider);
 }
 finally
 {
@@ -112,7 +112,7 @@ finally
 Console.WriteLine("Migration completed successfully.");
 return 0;
 
-static async Task CopyTableAsync<TEntity>(AppDbContext source, AppDbContext target, string tableName)
+static async Task CopyTableAsync<TEntity>(AppDbContext source, AppDbContext target, string tableName, string provider)
     where TEntity : class
 {
     Console.Write($"Copying {tableName}... ");
@@ -127,8 +127,26 @@ static async Task CopyTableAsync<TEntity>(AppDbContext source, AppDbContext targ
     // Remove any existing rows in the target table so the tool can be re-run safely.
     await target.Set<TEntity>().ExecuteDeleteAsync();
 
-    await target.Set<TEntity>().AddRangeAsync(rows);
-    await target.SaveChangesAsync();
+    // Without IDENTITY_INSERT, SQL Server silently discards the explicit Id values on
+    // these rows and assigns its own sequential identities instead. Every foreign key
+    // elsewhere that was copied verbatim as the old numeric id (e.g. JobHardware.
+    // HardwareItemId, HardwareItemTemplates.HardwareItemId/IndividualTemplateId) then
+    // points at the wrong row - which is why migrated data can look fine but intermittently
+    // report things like "no templates linked" for the wrong/renumbered hardware item.
+    bool useIdentityInsert = provider == "sqlserver";
+    if (useIdentityInsert)
+        await target.Database.ExecuteSqlRawAsync($"SET IDENTITY_INSERT [{tableName}] ON;");
+
+    try
+    {
+        await target.Set<TEntity>().AddRangeAsync(rows);
+        await target.SaveChangesAsync();
+    }
+    finally
+    {
+        if (useIdentityInsert)
+            await target.Database.ExecuteSqlRawAsync($"SET IDENTITY_INSERT [{tableName}] OFF;");
+    }
 
     // Detach so the next table's query/save isn't affected by stale tracked entries.
     target.ChangeTracker.Clear();
@@ -136,7 +154,7 @@ static async Task CopyTableAsync<TEntity>(AppDbContext source, AppDbContext targ
     Console.WriteLine($"{rows.Count} rows.");
 }
 
-static async Task CopyBulkAddDraftsAsync(AppDbContext source, AppDbContext target)
+static async Task CopyBulkAddDraftsAsync(AppDbContext source, AppDbContext target, string provider)
 {
     const string tableName = "BulkAddDrafts";
     Console.Write($"Copying {tableName}... ");
@@ -203,8 +221,21 @@ static async Task CopyBulkAddDraftsAsync(AppDbContext source, AppDbContext targe
     }
 
     await target.Set<BulkAddDraft>().ExecuteDeleteAsync();
-    await target.Set<BulkAddDraft>().AddRangeAsync(drafts);
-    await target.SaveChangesAsync();
+
+    bool useIdentityInsert = provider == "sqlserver";
+    if (useIdentityInsert)
+        await target.Database.ExecuteSqlRawAsync($"SET IDENTITY_INSERT [{tableName}] ON;");
+
+    try
+    {
+        await target.Set<BulkAddDraft>().AddRangeAsync(drafts);
+        await target.SaveChangesAsync();
+    }
+    finally
+    {
+        if (useIdentityInsert)
+            await target.Database.ExecuteSqlRawAsync($"SET IDENTITY_INSERT [{tableName}] OFF;");
+    }
     target.ChangeTracker.Clear();
 
     var suffix = skipped > 0 ? $" ({skipped} skipped)" : string.Empty;
