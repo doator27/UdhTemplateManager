@@ -155,6 +155,8 @@ public partial class MainWindow : Window
                 LabelLookupBox.Text = suggestion;
                 LabelLookupBox.CaretIndex = suggestion.Length;
                 LabelSuggestionsList.IsVisible = false;
+                LabelSuggestionsList.SelectedItem = null;
+                LabelLookupBox.Focus();
             }
         };
 

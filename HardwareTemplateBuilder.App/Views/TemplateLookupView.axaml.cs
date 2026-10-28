@@ -155,6 +155,8 @@ public partial class TemplateLookupView : UserControl
                 LabelLookupBox.Text = suggestion;
                 LabelLookupBox.CaretIndex = suggestion.Length;
                 LabelSuggestionsList.IsVisible = false;
+                LabelSuggestionsList.SelectedItem = null;
+                LabelLookupBox.Focus();
             }
         };
 
