@@ -75,6 +75,7 @@
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8" Spacing="6">
                             <ComboBox Name="ManufacturerFilterComboBox" Width="220" PlaceholderText="Select manufacturer…"/>
+                            <Button Name="FilterDescriptionsButton" Content="Filter Descriptions…"/>
                             <Button Name="GenerateForManufacturerButton" Content="Generate Cover Sheet for Manufacturer"/>
                         </StackPanel>
                         <ProgressBar Name="PackageProgress"

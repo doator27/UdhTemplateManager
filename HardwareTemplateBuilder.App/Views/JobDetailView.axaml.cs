@@ -35,6 +35,12 @@ public partial class JobDetailView : UserControl
     private List<Manufacturer> _manufacturers = new();
     private List<DescriptionComboItem> _descComboItems = new();
 
+    /// <summary>
+    /// Per-manufacturer description filter selected via <see cref="FilterDescriptionsButton"/>.
+    /// Absence of a key means no filter is applied (all descriptions included).
+    /// </summary>
+    private readonly Dictionary<string, HashSet<string>> _manufacturerDescriptionFilters = new();
+
     /// <summary>The release currently selected in the release selector; null = base hardware list.</summary>
     private int? _currentReleaseId;
 
@@ -127,6 +133,7 @@ public partial class JobDetailView : UserControl
         RemoveHardwareButton.Click                += (_, _) => RemoveHardwareFromJob();
         GeneratePackageButton.Click               += async (_, _) => await OnGeneratePackageAsync();
         GenerateForManufacturerButton.Click       += async (_, _) => await OnGenerateCoverSheetForManufacturerAsync();
+        FilterDescriptionsButton.Click             += async (_, _) => await OnFilterDescriptionsAsync();
         MissingTemplatesButton.Click              += async (_, _) => await OnGenerateMissingTemplatesCoverSheetAsync();
         OpenCurrentPackageButton.Click     += (_, _) => OpenCurrentPackage();
         BrowseOldVersionsButton.Click      += (_, _) => BrowseOldVersions();
@@ -989,6 +996,50 @@ public partial class JobDetailView : UserControl
     // --- Per-manufacturer cover sheet ---
 
     /// <summary>
+    /// Opens <see cref="DescriptionFilterDialog"/> listing every description used by the hardware
+    /// items belonging to the manufacturer selected in <see cref="ManufacturerFilterComboBox"/>,
+    /// and stores the chosen subset to be applied the next time the cover sheet is generated for
+    /// that manufacturer.
+    /// </summary>
+    private async Task OnFilterDescriptionsAsync()
+    {
+        if (ManufacturerFilterComboBox.SelectedItem is not string manufacturerName)
+        {
+            PackageStatusLabel.Text = "Select a manufacturer first.";
+            return;
+        }
+
+        var descriptions = _linkedHardware
+            .Where(jh => jh.HardwareItem?.Manufacturer?.ManufacturerName == manufacturerName)
+            .Select(jh => jh.HardwareItem?.Description?.DescriptionText)
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Select(d => d!)
+            .Distinct()
+            .OrderBy(d => d)
+            .ToList();
+
+        if (descriptions.Count == 0)
+        {
+            PackageStatusLabel.Text = "No hardware items found for the selected manufacturer.";
+            return;
+        }
+
+        var win = TopLevel.GetTopLevel(this) as Window;
+        if (win == null) return;
+
+        _manufacturerDescriptionFilters.TryGetValue(manufacturerName, out var currentFilter);
+
+        var dialog = new DescriptionFilterDialog(descriptions, currentFilter);
+        var result = await dialog.ShowDialog<HashSet<string>?>(win);
+        if (result == null) return;
+
+        if (result.Count == descriptions.Count)
+            _manufacturerDescriptionFilters.Remove(manufacturerName);
+        else
+            _manufacturerDescriptionFilters[manufacturerName] = result;
+    }
+
+    /// <summary>
     /// Generates a standalone cover sheet PDF containing only the hardware items belonging to the
     /// manufacturer selected in <see cref="ManufacturerFilterComboBox"/>. No template PDFs are
     /// merged; page numbers are left blank.
@@ -1004,6 +1055,13 @@ public partial class JobDetailView : UserControl
         var filteredHardware = _linkedHardware
             .Where(jh => jh.HardwareItem?.Manufacturer?.ManufacturerName == manufacturerName)
             .ToList();
+
+        if (_manufacturerDescriptionFilters.TryGetValue(manufacturerName, out var descriptionFilter))
+        {
+            filteredHardware = filteredHardware
+                .Where(jh => jh.HardwareItem?.Description?.DescriptionText is { } d && descriptionFilter.Contains(d))
+                .ToList();
+        }
 
         if (filteredHardware.Count == 0)
         {
@@ -1051,12 +1109,14 @@ public partial class JobDetailView : UserControl
                 {
                     if (!hardwareDict.TryGetValue(jh.HardwareItemId, out var item)) continue;
 
-                    var templateNumbers = context.HardwareItemTemplates
-                        .Include(hit => hit.IndividualTemplate)
-                        .Where(hit => hit.HardwareItemId == jh.HardwareItemId &&
-                                      (hit.JobId == null || hit.JobId == _jobId))
-                        .Select(hit => hit.IndividualTemplate.TemplateNumber)
-                        .ToList();
+                    var templateNumbers = descriptionFilter != null
+                        ? new List<string>()
+                        : context.HardwareItemTemplates
+                            .Include(hit => hit.IndividualTemplate)
+                            .Where(hit => hit.HardwareItemId == jh.HardwareItemId &&
+                                          (hit.JobId == null || hit.JobId == _jobId))
+                            .Select(hit => hit.IndividualTemplate.TemplateNumber)
+                            .ToList();
 
                     var calloutRemark = !string.IsNullOrWhiteSpace(jh.CalloutRemarks) ? jh.CalloutRemarks : jh.Remarks;
                     string? combinedRemarks = (item.Remarks, calloutRemark) switch
@@ -1096,7 +1156,7 @@ public partial class JobDetailView : UserControl
                 Directory.CreateDirectory(jobDir);
                 var outPath = Path.Combine(jobDir, $"Cover Sheet - {safeName}.pdf");
 
-                new CoverSheetBuilder().Build(coverData, outPath);
+                new CoverSheetBuilder().Build(coverData, outPath, fillableTemplateBox: true);
 
                 if (jobLocation.SecondaryRoot != null)
                 {
