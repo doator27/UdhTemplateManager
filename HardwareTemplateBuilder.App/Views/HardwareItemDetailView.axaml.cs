@@ -28,6 +28,7 @@ public partial class HardwareItemDetailView : UserControl
     private int _editingTemplateId;
     private List<DescriptionComboItem> _descComboItems = new();
     private List<DoorMaterial> _doorMaterials = new();
+    private List<HardwareItem> _importSourceItems = new();
 
     /// <summary>Raised when the user requests navigation to a named view.</summary>
     public event System.Action<string>? NavigationRequested;
@@ -89,6 +90,7 @@ public partial class HardwareItemDetailView : UserControl
 
         LoadLinkedTemplates();
         SearchTemplates();
+        LoadImportSourceItems();
 
         BackButton.Click           += (_, _) => NavigationRequested?.Invoke(_returnRoute ?? "HardwareItems");
         RemoveTemplateButton.Click += (_, _) => RemoveTemplate();
@@ -98,10 +100,17 @@ public partial class HardwareItemDetailView : UserControl
         SearchDescCombo.SelectionChanged += (_, _) => SearchTemplates();
         SearchTemplateNumBox.TextChanged  += (_, _) => SearchTemplates();
         LinkButton.Click += (_, _) => LinkSearchResult();
+        TemplateSearchList.SelectionChanged += async (_, _) =>
+            await SearchPreviewPanel.LoadTemplateAsync(TemplateSearchList.SelectedItem as IndividualTemplate);
 
         LinkedTemplatesList.SelectionChanged += (_, _) => OnLinkedTemplateSelected();
         SaveTemplateChangesButton.Click += (_, _) => SaveTemplateChanges();
         CancelEditButton.Click += (_, _) => CancelEdit();
+
+        ImportSourceItemCombo.SelectionChanged += (_, _) => LoadImportCandidateTemplates();
+        ImportTemplatesList.SelectionChanged += async (_, _) =>
+            await ImportPreviewPanel.LoadTemplateAsync(ImportTemplatesList.SelectedItem as IndividualTemplate);
+        ImportSelectedButton.Click += (_, _) => ImportSelectedTemplates();
     }
 
     /// <summary>
@@ -468,6 +477,100 @@ public partial class HardwareItemDetailView : UserControl
             ? $"Linked: {t.TemplateNumber}"
             : $"Already linked: {t.TemplateNumber}";
 
+        LoadLinkedTemplates();
+    }
+
+    // --- Import templates from another hardware item ---
+
+    /// <summary>
+    /// Populates <see cref="ImportSourceItemCombo"/> with other active hardware items that share
+    /// this item's manufacturer and description, excluding this item itself.
+    /// </summary>
+    private void LoadImportSourceItems()
+    {
+        using var context = DatabaseInitializer.CreateContext();
+        _importSourceItems = context.HardwareItems
+            .Where(h => h.Id != _itemId
+                && h.IsActive
+                && h.ManufacturerId == _itemManufacturerId
+                && h.DescriptionId == _itemDescriptionId)
+            .OrderBy(h => h.ModelNumber)
+            .ToList();
+
+        ImportSourceItemCombo.ItemsSource = _importSourceItems;
+        ImportSourceItemCombo.DisplayMemberBinding = new Avalonia.Data.Binding("ModelNumber");
+        ImportSourceItemCombo.SelectedItem = null;
+        ImportTemplatesList.ItemsSource = null;
+        ImportStatusLabel.Text = _importSourceItems.Count == 0
+            ? "No other hardware items with the same manufacturer and description were found."
+            : string.Empty;
+    }
+
+    /// <summary>Loads the templates linked to the selected import source item.</summary>
+    private void LoadImportCandidateTemplates()
+    {
+        _ = ImportPreviewPanel.LoadTemplateAsync(null);
+
+        if (ImportSourceItemCombo.SelectedItem is not HardwareItem sourceItem)
+        {
+            ImportTemplatesList.ItemsSource = null;
+            return;
+        }
+
+        using var context = DatabaseInitializer.CreateContext();
+        var templates = context.HardwareItemTemplates
+            .Include(hit => hit.IndividualTemplate)
+            .Where(hit => hit.HardwareItemId == sourceItem.Id)
+            .Select(hit => hit.IndividualTemplate)
+            .OrderBy(t => t.TemplateNumber)
+            .ToList();
+
+        ImportTemplatesList.ItemsSource = templates;
+        ImportTemplatesList.DisplayMemberBinding = new Avalonia.Data.Binding("TemplateNumber");
+    }
+
+    /// <summary>
+    /// Clones each selected template into a brand-new, independent <see cref="IndividualTemplate"/>
+    /// row (bypassing the repository's dedup-by-Manufacturer+Number+DoorMaterial check, which
+    /// would otherwise just hand back the source item's own row) and links the clones to this
+    /// hardware item, so subsequent edits never affect the source item's templates.
+    /// </summary>
+    private void ImportSelectedTemplates()
+    {
+        var selected = ImportTemplatesList.SelectedItems?.OfType<IndividualTemplate>().ToList();
+        if (selected == null || selected.Count == 0)
+        {
+            ImportStatusLabel.Text = "Select at least one template to import.";
+            return;
+        }
+
+        using var context = DatabaseInitializer.CreateContext();
+        var hitRepo = new HardwareItemTemplateRepository(context);
+        var importedCount = 0;
+
+        foreach (var source in selected)
+        {
+            var clone = new IndividualTemplate
+            {
+                ManufacturerId    = source.ManufacturerId,
+                DescriptionId     = source.DescriptionId,
+                DoorMaterialId    = source.DoorMaterialId,
+                TemplateNumber    = source.TemplateNumber,
+                PagesToPrint      = source.PagesToPrint,
+                NumPages          = source.NumPages,
+                PagesToRotate     = source.PagesToRotate,
+                RotationDirection = source.RotationDirection,
+                OnlineLink        = source.OnlineLink,
+                LocalLink         = source.LocalLink,
+            };
+            context.IndividualTemplates.Add(clone);
+            context.SaveChanges();
+
+            hitRepo.Add(new HardwareItemTemplate { HardwareItemId = _itemId, IndividualTemplateId = clone.Id });
+            importedCount++;
+        }
+
+        ImportStatusLabel.Text = $"Imported {importedCount} template(s) as independent copies.";
         LoadLinkedTemplates();
     }
 }

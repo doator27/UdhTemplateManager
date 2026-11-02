@@ -1,79 +1,93 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="HardwareTemplateBuilder.App.Views.HardwareItemDetailView">
-    <DockPanel Margin="8">
-        <!-- Top: nav buttons + item title -->
-        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Left" Name="BackButton" Content="← Back to Hardware" Margin="0,0,12,0"/>
-            <TextBlock Name="ItemTitleLabel" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
-        </DockPanel>
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 xmlns:views="using:HardwareTemplateBuilder.App.Views"
+			 x:Class="HardwareTemplateBuilder.App.Views.HardwareItemDetailView">
+	<DockPanel Margin="8">
+		<!-- Top: nav buttons + item title -->
+		<DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+			<Button DockPanel.Dock="Left" Name="BackButton" Content="&#8592; Back to Hardware" Margin="0,0,12,0"/>
+			<TextBlock Name="ItemTitleLabel" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+		</DockPanel>
 
-        <ScrollViewer>
-            <StackPanel>
+		<!-- Linked Templates list (fixed, always visible) -->
+		<Border DockPanel.Dock="Top" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+			<StackPanel>
+				<TextBlock Text="Linked Templates" FontWeight="Bold" Margin="0,0,0,6"/>
+				<TextBlock Text="Select a template below to edit its fields, or remove it." FontSize="11" Foreground="#A7ADB8" Margin="0,0,0,4"/>
+				<ListBox Name="LinkedTemplatesList" Height="110" Margin="0,0,0,8"/>
+				<Button Name="RemoveTemplateButton" Content="Remove Selected" HorizontalAlignment="Left"/>
+				<TextBlock Name="RemoveStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
+			</StackPanel>
+		</Border>
 
-                <!-- Linked Templates list -->
-                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10" Margin="0,0,0,8">
-                    <StackPanel>
-                        <TextBlock Text="Linked Templates" FontWeight="Bold" Margin="0,0,0,6"/>
-                        <TextBlock Text="Select a template below to edit its fields, or remove it." FontSize="11" Foreground="#A7ADB8" Margin="0,0,0,4"/>
-                        <ListBox Name="LinkedTemplatesList" Height="120" Margin="0,0,0,8"/>
-                        <Button Name="RemoveTemplateButton" Content="Remove Selected" HorizontalAlignment="Left"/>
-                        <TextBlock Name="RemoveStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
-                    </StackPanel>
-                </Border>
+		<!-- Three ways to add a template, as tabs so the PDF previews get real room to breathe -->
+		<TabControl Name="AddTemplateTabs">
+			<TabItem Header="Add Template">
+				<ScrollViewer>
+					<StackPanel Margin="0,8,0,0">
+						<TextBlock Name="AddPanelHeader" Text="Add Template" FontWeight="Bold" Margin="0,0,0,8"/>
+						<Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+							<TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Text="Template #:" Margin="0,0,0,2"/>
+							<TextBox   Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Name="AddTemplateNumBox" Margin="0,0,8,8"/>
+							<TextBlock Grid.Row="2" Grid.Column="0" Text="Description:" Margin="0,0,8,2"/>
+							<TextBlock Grid.Row="2" Grid.Column="1" Text="Door Material:" Margin="0,0,0,2"/>
+							<ComboBox  Grid.Row="3" Grid.Column="0" Name="AddDescCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
+							<ComboBox  Grid.Row="3" Grid.Column="1" Name="AddDoorMatCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
+							<TextBlock Grid.Row="4" Grid.Column="0" Text="Num Pages:" Margin="0,0,8,2"/>
+							<TextBlock Grid.Row="4" Grid.Column="1" Text="Pages To Print:" Margin="0,0,8,2"/>
+							<TextBox   Grid.Row="5" Grid.Column="0" Name="AddNumPagesBox" Text="1" Margin="0,0,8,8"/>
+							<TextBox   Grid.Row="5" Grid.Column="1" Name="AddPagesToPrintBox" Text="1" Margin="0,0,8,8"/>
+							<TextBlock Grid.Row="6" Grid.Column="0" Text="Pages To Rotate (optional):" Margin="0,0,0,2"/>
+							<TextBlock Grid.Row="6" Grid.Column="1" Text="Rotation Direction (degrees):" Margin="0,0,8,2"/>
+							<TextBox   Grid.Row="7" Grid.Column="0" Name="AddPagesToRotateBox" Watermark="e.g. 1,3-5" Margin="0,0,8,8"/>
+							<TextBox   Grid.Row="7" Grid.Column="1" Name="AddRotationDirectionBox" Text="0" Margin="0,0,8,8"/>
+							<TextBlock Grid.Row="8" Grid.Column="0" Text="Online Link (optional):" Margin="0,0,0,2"/>
+							<TextBlock Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="2" Text="Local File (optional):" Margin="0,0,0,2"/>
+							<TextBox   Grid.Row="9" Grid.Column="0" Name="AddOnlineLinkBox" Watermark="https://..." Margin="0,0,8,8"/>
+							<Grid Grid.Row="9" Grid.Column="1" ColumnDefinitions="*,Auto">
+								<TextBox Grid.Column="0" Name="AddLocalLinkBox" Watermark="Path to PDF..." Margin="0,0,8,8" />
+								<Button Grid.Column="1" Name="BrowseLocalLinkButton" Content="Browse..." HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,8,8"/>
+							</Grid>
+						</Grid>
+						<StackPanel Orientation="Horizontal" Margin="0,8,0,0" Spacing="8">
+							<Button Name="AddTemplateButton" Content="Add / Link Template" HorizontalAlignment="Left"/>
+							<Button Name="SaveTemplateChangesButton" Content="Save Changes" HorizontalAlignment="Left" IsVisible="False"/>
+							<Button Name="CancelEditButton" Content="Cancel Edit" HorizontalAlignment="Left" IsVisible="False"/>
+							<Button Name="RequestedFromManufacturerButton" Content="Requested from Manufacturer" HorizontalAlignment="Left"/>
+						</StackPanel>
+						<TextBlock Name="AddStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
+					</StackPanel>
+				</ScrollViewer>
+			</TabItem>
 
-                <!-- Quick-Add / Edit Template (primary) -->
-                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10" Margin="0,0,0,8">
-                    <StackPanel>
-                        <TextBlock Name="AddPanelHeader" Text="Add Template" FontWeight="Bold" Margin="0,0,0,8"/>
-                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Text="Template #:" Margin="0,0,0,2"/>
-                            <TextBox   Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Name="AddTemplateNumBox" Margin="0,0,8,8"/>
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Description:" Margin="0,0,8,2"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Door Material:" Margin="0,0,0,2"/>
-                            <ComboBox  Grid.Row="3" Grid.Column="0" Name="AddDescCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
-                            <ComboBox  Grid.Row="3" Grid.Column="1" Name="AddDoorMatCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Num Pages:" Margin="0,0,8,2"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Pages To Print:" Margin="0,0,8,2"/>
-                            <TextBox   Grid.Row="5" Grid.Column="0" Name="AddNumPagesBox" Text="1" Margin="0,0,8,8"/>
-                            <TextBox   Grid.Row="5" Grid.Column="1" Name="AddPagesToPrintBox" Text="1" Margin="0,0,8,8"/>
-                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Pages To Rotate (optional):" Margin="0,0,0,2"/>
-                            <TextBlock Grid.Row="6" Grid.Column="1" Text="Rotation Direction (degrees):" Margin="0,0,8,2"/>
-                            <TextBox   Grid.Row="7" Grid.Column="0" Name="AddPagesToRotateBox" Watermark="e.g. 1,3-5" Margin="0,0,8,8"/>
-                            <TextBox   Grid.Row="7" Grid.Column="1" Name="AddRotationDirectionBox" Text="0" Margin="0,0,8,8"/>
-                            <TextBlock Grid.Row="8" Grid.Column="0" Text="Online Link (optional):" Margin="0,0,0,2"/>
-                            <TextBlock Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="2" Text="Local File (optional):" Margin="0,0,0,2"/>
-                            <TextBox   Grid.Row="9" Grid.Column="0" Name="AddOnlineLinkBox" Watermark="https://..." Margin="0,0,8,8"/>
-                            <Grid Grid.Row="9" Grid.Column="1" ColumnDefinitions="*,Auto">
-                                <TextBox Grid.Column="0" Name="AddLocalLinkBox" Watermark="Path to PDF..." Margin="0,0,8,8" />
-                                <Button Grid.Column="1" Name="BrowseLocalLinkButton" Content="Browse..." HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,8,8"/>
-                            </Grid>
-                        </Grid>
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0" Spacing="8">
-                            <Button Name="AddTemplateButton" Content="Add / Link Template" HorizontalAlignment="Left"/>
-                            <Button Name="SaveTemplateChangesButton" Content="Save Changes" HorizontalAlignment="Left" IsVisible="False"/>
-                            <Button Name="CancelEditButton" Content="Cancel Edit" HorizontalAlignment="Left" IsVisible="False"/>
-                            <Button Name="RequestedFromManufacturerButton" Content="Requested from Manufacturer" HorizontalAlignment="Left"/>
-                        </StackPanel>
-                        <TextBlock Name="AddStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
-                    </StackPanel>
-                </Border>
+			<TabItem Header="Search Existing Templates">
+				<Grid RowDefinitions="Auto,*,Auto,Auto" Margin="0,8,0,0">
+					<Grid Grid.Row="0" ColumnDefinitions="*,*" Margin="0,0,0,8">
+						<ComboBox Grid.Column="0" Name="SearchDescCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
+						<TextBox  Grid.Column="1" Name="SearchTemplateNumBox" Watermark="Template #"/>
+					</Grid>
+					<Grid Grid.Row="1" ColumnDefinitions="*,8,*" Margin="0,0,0,8">
+						<ListBox Grid.Column="0" Name="TemplateSearchList"/>
+						<views:TemplatePreviewPanel Grid.Column="2" Name="SearchPreviewPanel"/>
+					</Grid>
+					<Button Grid.Row="2" Name="LinkButton" Content="Link Selected" HorizontalAlignment="Left"/>
+					<TextBlock Grid.Row="3" Name="LinkStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
+				</Grid>
+			</TabItem>
 
-                <!-- Search and Link (secondary) -->
-                <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
-                    <StackPanel>
-                        <TextBlock Text="Search Existing Templates to Link" FontWeight="Bold" Margin="0,0,0,8"/>
-                        <Grid ColumnDefinitions="*,*" Margin="0,0,0,4">
-                            <ComboBox Grid.Column="0" Name="SearchDescCombo" HorizontalAlignment="Stretch" Margin="0,0,4,0"/>
-                            <TextBox  Grid.Column="1" Name="SearchTemplateNumBox" Watermark="Template #"/>
-                        </Grid>
-                        <ListBox Name="TemplateSearchList" Height="120" Margin="0,4,0,8"/>
-                        <Button Name="LinkButton" Content="Link Selected" HorizontalAlignment="Left"/>
-                        <TextBlock Name="LinkStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
-                    </StackPanel>
-                </Border>
-
-            </StackPanel>
-        </ScrollViewer>
-    </DockPanel>
+			<TabItem Header="Import From Another Item">
+				<Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,8,0,0">
+					<TextBlock Grid.Row="0" Text="Pick another hardware item with the same manufacturer and description, select templates below, then import copies into this item. Imported copies are independent and can be edited without affecting the source item."
+							   FontSize="11" Foreground="#A7ADB8" TextWrapping="Wrap" Margin="0,0,0,8"/>
+					<ComboBox Grid.Row="1" Name="ImportSourceItemCombo" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+					<Grid Grid.Row="2" ColumnDefinitions="*,8,*" Margin="0,0,0,8">
+						<ListBox Grid.Column="0" Name="ImportTemplatesList" SelectionMode="Multiple"/>
+						<views:TemplatePreviewPanel Grid.Column="2" Name="ImportPreviewPanel"/>
+					</Grid>
+					<Button Grid.Row="3" Name="ImportSelectedButton" Content="Import Selected" HorizontalAlignment="Left"/>
+					<TextBlock Grid.Row="4" Name="ImportStatusLabel" Margin="0,8,0,0" Foreground="#FF6B6B"/>
+				</Grid>
+			</TabItem>
+		</TabControl>
+	</DockPanel>
 </UserControl>

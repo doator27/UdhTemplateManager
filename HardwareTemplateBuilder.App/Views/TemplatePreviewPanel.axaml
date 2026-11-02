@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 x:Class="HardwareTemplateBuilder.App.Views.TemplatePreviewPanel">
+	<Border BorderBrush="#454952" BorderThickness="1" Padding="4">
+		<DockPanel>
+			<StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,4" Spacing="8">
+				<Button Name="PrevPageButton" Content="&lt; Prev" IsEnabled="False"/>
+				<TextBlock Name="PageLabel" VerticalAlignment="Center" Text="No template selected"/>
+				<Button Name="NextPageButton" Content="Next &gt;" IsEnabled="False"/>
+			</StackPanel>
+			<ScrollViewer Name="PdfScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+				<Image Name="PdfPreviewImage" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+			</ScrollViewer>
+		</DockPanel>
+	</Border>
+</UserControl>

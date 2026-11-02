@@ -71,6 +71,8 @@ public partial class TemplateResolutionWizardView : UserControl
         StageSearchResultButton.Click += (_, _) => StageSearchResult();
         SearchTplNumBox.TextChanged   += (_, _) => RunTemplateSearch();
         SearchTplDescCombo.SelectionChanged += (_, _) => RunTemplateSearch();
+        SearchTplResultsList.SelectionChanged += async (_, _) =>
+            await SearchTplPreviewPanel.LoadTemplateAsync(SearchTplResultsList.SelectedItem as IndividualTemplate);
 
         ShowItem(0);
     }

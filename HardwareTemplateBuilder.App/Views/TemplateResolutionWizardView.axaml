@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:HardwareTemplateBuilder.App.Views"
              x:Class="HardwareTemplateBuilder.App.Views.TemplateResolutionWizardView">
     <DockPanel Margin="8">
         <!-- Header -->
@@ -115,7 +116,10 @@
                                     <TextBlock Grid.Column="2" Text="Description:" VerticalAlignment="Center" Margin="8,0,6,0"/>
                                     <ComboBox  Grid.Column="3" Name="SearchTplDescCombo" HorizontalAlignment="Stretch"/>
                                 </Grid>
-                                <ListBox Name="SearchTplResultsList" Height="100" Margin="0,0,0,6"/>
+                                <Grid ColumnDefinitions="*,8,*" Margin="0,0,0,6">
+                                    <ListBox Grid.Column="0" Name="SearchTplResultsList" Height="140"/>
+                                    <views:TemplatePreviewPanel Grid.Column="2" Name="SearchTplPreviewPanel" Height="140"/>
+                                </Grid>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button Name="StageSearchResultButton" Content="Stage Selected"/>
                                 </StackPanel>
