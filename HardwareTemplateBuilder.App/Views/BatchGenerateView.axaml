@@ -48,6 +48,7 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Name="RelinkButton" Content="Relink Hardware &amp; Generate" Margin="0,0,8,0"/>
                 <Button Name="StartButton" Content="Generate Selected" Margin="0,0,8,0"/>
                 <Button Name="CancelButton" Content="Cancel" IsEnabled="False"/>
             </StackPanel>

@@ -88,6 +88,7 @@ public partial class BatchGenerateView : UserControl
         SelectAllButton.Click += (_, _) => SetSelection(_currentRows.Select(r => r.Job.Id), selected: true);
         SelectNoneButton.Click += (_, _) => SetSelection(_currentRows.Select(r => r.Job.Id), selected: false);
         StartButton.Click += async (_, _) => await OnStartBatchAsync();
+        RelinkButton.Click += async (_, _) => await OnRelinkAndGenerateAsync();
         CancelButton.Click += (_, _) => _batchCts?.Cancel();
 
         LoadUserProfiles();
@@ -246,6 +247,87 @@ public partial class BatchGenerateView : UserControl
         LoadJobList();
     }
 
+    private async Task OnRelinkAndGenerateAsync()
+    {
+        if (_selectedJobIds.Count == 0)
+        {
+            StatusLabel.Text = "Select at least one job first.";
+            return;
+        }
+
+        var win = TopLevel.GetTopLevel(this) as Window;
+        if (win != null)
+        {
+            var confirmed = await DialogHelper.ConfirmAsync(
+                win,
+                "This removes and recreates all base hardware links for each selected job " +
+                "(fixing stale template links), then generates its package. " +
+                "A bulk-add draft is auto-saved first if one doesn't already exist. Continue?",
+                "Relink Hardware & Generate");
+            if (!confirmed) return;
+        }
+
+        var jobIds = _selectedJobIds.ToList();
+
+        _batchCts?.Cancel();
+        _batchCts = new CancellationTokenSource();
+        var ct = _batchCts.Token;
+
+        SetRunningState(running: true);
+        StatusLabel.Text = string.Empty;
+        ResultsBorder.IsVisible = false;
+        var resultRows = new List<string>();
+        ResultsList.ItemsSource = resultRows;
+
+        var progress = new Progress<BatchGenerationProgress>(p => Dispatcher.UIThread.Post(() =>
+        {
+            ProgressText.Text = $"Job {p.CurrentIndex} of {p.TotalJobs} — {p.JobNumber}: {p.StatusMessage}";
+            BatchProgressBar.Maximum = p.TotalJobs;
+            BatchProgressBar.Value = p.CurrentIndex;
+
+            if (p.CompletedJob is { } job)
+            {
+                resultRows.Add(job.Success
+                    ? $"✓ {job.JobNumber} — {job.JobName}"
+                    : $"✗ {job.JobNumber} — {job.JobName}: {job.ErrorMessage}");
+                ResultsList.ItemsSource = null;
+                ResultsList.ItemsSource = resultRows;
+                ResultsBorder.IsVisible = true;
+            }
+        }));
+
+        BatchGenerationResult result;
+        try
+        {
+            var socketsHandler = new System.Net.Http.SocketsHttpHandler();
+            socketsHandler.SslOptions.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+            using var httpClient = new HttpClient(socketsHandler);
+            var service = new BatchRelinkAndGenerateService(DatabaseInitializer.CreateContext, httpClient);
+
+            result = await Task.Run(() => service.RunBatchAsync(jobIds, progress, ct), ct);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusLabel.Text = "Batch cancelled.";
+            SetRunningState(running: false);
+            return;
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = $"Unexpected error: {ex.Message}";
+            SetRunningState(running: false);
+            return;
+        }
+
+        SetRunningState(running: false);
+        StatusLabel.Text = $"{result.SuccessCount} of {result.TotalJobs} job(s) relinked and generated successfully.";
+
+        if (win != null)
+            await DialogHelper.ShowScrollableInfoAsync(win, BuildSummaryReport(result), "Relink & Generate — Summary");
+
+        LoadJobList();
+    }
+
     private static string BuildSummaryReport(BatchGenerationResult result)
     {
         var sb = new System.Text.StringBuilder();
@@ -278,6 +360,7 @@ public partial class BatchGenerateView : UserControl
     private void SetRunningState(bool running)
     {
         StartButton.IsEnabled = !running;
+        RelinkButton.IsEnabled = !running;
         CancelButton.IsEnabled = running;
         ProgressPanel.IsVisible = running;
         IncludeInactiveCheck.IsEnabled = !running;

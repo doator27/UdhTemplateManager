@@ -71,6 +71,7 @@ public partial class MainWindow : Window
         _router.Register("UserProfiles",     () => { var v = new UserProfilesView();     v.NavigationRequested += NavigateTo; return v; });
         _router.Register("AppSettings",      () => { var v = new AppSettingsView();      v.NavigationRequested += NavigateTo; return v; });
         _router.Register("BatchGenerate",        () => { var v = new BatchGenerateView();        v.NavigationRequested += NavigateTo; return v; });
+        _router.Register("TransferJob",           () => { var v = new TransferJobView();           v.NavigationRequested += NavigateTo; return v; });
         _router.Register("RefreshTemplates",     () => { var v = new RefreshTemplatesView();     v.NavigationRequested += NavigateTo; return v; });
         _router.Register("DeduplicateHardware", () => { var v = new DeduplicateHardwareView(); v.NavigationRequested += NavigateTo; return v; });
         _router.Register("JobImportWizard", () => { var v = new JobImportWizardView(); v.NavigationRequested += NavigateTo; return v; });
@@ -107,6 +108,7 @@ public partial class MainWindow : Window
         MenuFileExit.Click += (_, _) => Close();
         MenuJobs.Click += (_, _) => NavigateTo("Jobs");
         MenuBatchGenerate.Click += (_, _) => NavigateTo("BatchGenerate");
+        MenuTransferJob.Click += (_, _) => NavigateTo("TransferJob");
         MenuTemplateLookup.Click += (_, _) => NavigateTo("TemplateLookup");
         MenuRefreshTemplates.Click     += (_, _) => NavigateTo("RefreshTemplates");
         MenuDeduplicateHardware.Click  += (_, _) => NavigateTo("DeduplicateHardware");

@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+			 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			 x:Class="HardwareTemplateBuilder.App.Views.TransferJobView">
+	<DockPanel Margin="8">
+
+		<TextBlock DockPanel.Dock="Top" Text="Transfer Job" FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
+
+		<!-- Status line -->
+		<TextBlock DockPanel.Dock="Bottom"
+				   Name="StatusLabel"
+				   Foreground="#FF6B6B"
+				   TextWrapping="Wrap"
+				   Margin="0,6,0,0"/>
+
+		<!-- Filter / selection / transfer controls -->
+		<StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+
+			<Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
+				<TextBlock Grid.Column="0" Text="Search:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+				<TextBox Grid.Column="1" Name="FilterBox" Watermark="Search job number, job name, customer, project manager, owner, or notes..."/>
+			</Grid>
+
+			<StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
+				<CheckBox Name="IncludeInactiveCheck" Content="Include inactive jobs" Margin="0,0,16,0"/>
+				<TextBlock Text="Owner:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+				<ComboBox Name="OwnerFilterCombo" PlaceholderText="(Any)" MinWidth="140" Margin="0,0,16,0"/>
+				<Button Name="SelectAllButton" Content="Select All" Margin="0,0,4,0"/>
+				<Button Name="SelectNoneButton" Content="Select None" Margin="0,0,16,0"/>
+				<TextBlock Name="SelectedCountLabel" VerticalAlignment="Center" Foreground="#A7ADB8"/>
+			</StackPanel>
+
+			<Grid ColumnDefinitions="Auto,*,Auto">
+				<TextBlock Grid.Column="0" Text="Transfer to:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+				<ComboBox Grid.Column="1" Name="TransferToCombo" PlaceholderText="Select destination user..." HorizontalAlignment="Left" MinWidth="200"/>
+				<Button Grid.Column="2" Name="TransferButton" Content="Transfer Selected Job(s)" Margin="16,0,0,0"/>
+			</Grid>
+
+		</StackPanel>
+
+		<!-- Job list, checkbox per row -->
+		<Border BorderBrush="#454952" BorderThickness="1">
+			<ListBox Name="JobList"/>
+		</Border>
+
+	</DockPanel>
+</UserControl>

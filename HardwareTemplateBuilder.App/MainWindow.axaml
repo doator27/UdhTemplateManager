@@ -22,6 +22,7 @@
             <MenuItem Header="_Template Lookup" Name="MenuTemplateLookup" />
             <MenuItem Header="_Maintenance">
                 <MenuItem Header="_Batch Generate..."        Name="MenuBatchGenerate" />
+                <MenuItem Header="_Transfer Job..."          Name="MenuTransferJob" />
                 <MenuItem Header="_Refresh Templates"        Name="MenuRefreshTemplates" />
                 <MenuItem Header="_Deduplicate Hardware..."  Name="MenuDeduplicateHardware" />
                 <MenuItem Header="_Relink Templates..."      Name="MenuRelinkTemplates" />
