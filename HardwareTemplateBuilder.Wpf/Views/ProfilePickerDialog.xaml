@@ -16,7 +16,7 @@
         <GroupBox DockPanel.Dock="Top" Header="Existing profiles" Margin="0,0,0,8">
             <StackPanel>
                 <ListBox x:Name="ProfileList" Height="120" Margin="0,0,0,8"/>
-                <Button x:Name="SelectButton" Content="_Select Profile" HorizontalAlignment="Left" IsDefault="True"/>
+                <Button x:Name="SelectButton" Content="Select Profile" HorizontalAlignment="Left" IsDefault="True"/>
                 <TextBlock x:Name="SelectStatus" Foreground="{StaticResource DangerBrush}" Margin="0,4,0,0"/>
             </StackPanel>
         </GroupBox>
@@ -25,7 +25,7 @@
             <StackPanel>
                 <TextBlock Text="Name:" Margin="0,0,0,2"/>
                 <TextBox x:Name="NewNameBox" Margin="0,0,0,8"/>
-                <Button x:Name="CreateButton" Content="_Create &amp; Select" HorizontalAlignment="Left"/>
+                <Button x:Name="CreateButton" Content="Create &amp; Select" HorizontalAlignment="Left"/>
                 <TextBlock x:Name="CreateStatus" Foreground="{StaticResource DangerBrush}" Margin="0,4,0,0"/>
             </StackPanel>
         </GroupBox>

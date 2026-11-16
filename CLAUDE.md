@@ -156,9 +156,9 @@ make the same change in the matching Wpf view** (and vice versa).
   Page titles are navy `CaptionBar` borders; the App's `Border.panel` frames are `GroupBox` (when they
   had a bold title) or `ContentControl Style="{StaticResource Etched}"`. Lists draw their own sunken
   frame. There is no Light/Dark setting in this frontend.
-- **Shell:** `MainWindow` uses a Start-menu style sidebar (navy gradient banner, grouped items) instead
-  of the App's menu bar; every menu command is there under the same group names (Maintenance, Admin,
-  File items at the bottom). Status bar = thin sunken fields (status, user, clock).
+- **Shell:** `MainWindow` has the same menu bar as the App (File, Jobs, Template Lookup, Maintenance,
+  Admin), Win95-styled; menu items with a `Tag` navigate to that route via `Nav_Click`, the rest run a
+  command. Status bar = thin sunken fields (status, user, clock). No access-key underscores in labels.
 - **Avalonia shims in `Ui/`** keep ported code close to the original: `ui:GridEx.Columns/Rows`
   (compact `"Auto,*"` grid specs), `ui:Stack` (StackPanel with `Spacing`), `ui:Watermark.Text`
   (placeholder for TextBox/ComboBox, drawn by the theme templates), `Win95Window` (dialog base with

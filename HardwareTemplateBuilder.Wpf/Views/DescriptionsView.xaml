@@ -6,7 +6,7 @@
         <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}">
             <TextBlock Text="Descriptions" Style="{StaticResource CaptionText}"/>
         </Border>
-        <CheckBox DockPanel.Dock="Top" x:Name="ShowInactiveCheck" Content="Show _Inactive" Margin="0,6,0,6" HorizontalAlignment="Left"/>
+        <CheckBox DockPanel.Dock="Top" x:Name="ShowInactiveCheck" Content="Show Inactive" Margin="0,6,0,6" HorizontalAlignment="Left"/>
         <Grid ui:GridEx.Columns="300,Auto,*">
             <!-- Left: tree + reorder buttons -->
             <DockPanel Grid.Column="0" MinWidth="180" Margin="0,0,0,0">

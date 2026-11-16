@@ -8,13 +8,51 @@
         Style="{StaticResource Win95Window}">
 
     <!--
-        Same shell as SpecialJobLookup: a Start-menu style sidebar on the left (navy gradient
-        banner + grouped items), the active view in the middle, and a status bar of thin sunken
-        fields along the bottom. The sidebar replaces the Avalonia app's File/Jobs/Maintenance/
-        Admin menu bar; every menu command is here under the same group names.
+        Same shell as the Avalonia app: a persistent menu bar (File, Jobs, Template Lookup,
+        Maintenance, Admin), the active view in the middle, and a status bar along the bottom.
+        Menu items with a Tag navigate to that route; the rest run a command.
     -->
     <DockPanel>
-        <!-- Status bar -->
+        <!-- Top menu bar -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="File">
+                <MenuItem Header="About" Click="About_Click"/>
+                <Separator/>
+                <MenuItem Header="Change User Profile" Click="ChangeUser_Click"/>
+                <MenuItem Header="Database Location..." Click="DatabaseLocation_Click"/>
+                <Separator/>
+                <MenuItem Header="Exit" Click="Exit_Click"/>
+            </MenuItem>
+            <MenuItem Header="Jobs" Tag="Jobs" Click="Nav_Click"/>
+            <MenuItem Header="Template Lookup" Tag="TemplateLookup" Click="Nav_Click"/>
+            <MenuItem Header="Maintenance">
+                <MenuItem Header="Batch Generate..." Tag="BatchGenerate" Click="Nav_Click"/>
+                <MenuItem Header="Transfer Job..." Tag="TransferJob" Click="Nav_Click"/>
+                <MenuItem Header="Refresh Templates" Tag="RefreshTemplates" Click="Nav_Click"/>
+                <MenuItem Header="Deduplicate Hardware..." Tag="DeduplicateHardware" Click="Nav_Click"/>
+                <MenuItem Header="Relink Templates..." Click="RelinkTemplates_Click"/>
+                <Separator/>
+                <MenuItem Header="Dump Database..." Click="DumpDatabase_Click"/>
+                <MenuItem Header="Export SQL Server Script..." Click="ExportSqlServerScript_Click"/>
+                <Separator/>
+                <MenuItem Header="Import Legacy Database..." Click="ImportLegacyDatabase_Click"/>
+                <MenuItem Header="Import Jobs Wizard..." Tag="JobImportWizard" Click="Nav_Click"/>
+            </MenuItem>
+            <MenuItem Header="Admin">
+                <MenuItem Header="Hardware Items" Tag="HardwareItems" Click="Nav_Click"/>
+                <MenuItem Header="Templates" Tag="Templates" Click="Nav_Click"/>
+                <Separator/>
+                <MenuItem Header="App Settings" Tag="AppSettings" Click="Nav_Click"/>
+                <Separator/>
+                <MenuItem Header="Customers" Tag="Customers" Click="Nav_Click"/>
+                <MenuItem Header="Manufacturers" Tag="Manufacturers" Click="Nav_Click"/>
+                <MenuItem Header="Descriptions" Tag="Descriptions" Click="Nav_Click"/>
+                <MenuItem Header="Project Managers" Tag="ProjectManagers" Click="Nav_Click"/>
+                <MenuItem Header="User Profiles" Tag="UserProfiles" Click="Nav_Click"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Status bar: thin sunken fields -->
         <Grid DockPanel.Dock="Bottom" Margin="2,0,2,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -32,75 +70,8 @@
             </ContentControl>
         </Grid>
 
-        <!-- Sidebar, styled like the Start menu -->
-        <ContentControl DockPanel.Dock="Left" Style="{StaticResource Raised}" Width="220" Margin="2,2,0,2">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="24"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                            <GradientStop Color="#1084D0" Offset="0"/>
-                            <GradientStop Color="#000080" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Border.Background>
-                    <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,8"
-                               Foreground="White" FontSize="14">
-                        <TextBlock.LayoutTransform>
-                            <RotateTransform Angle="-90"/>
-                        </TextBlock.LayoutTransform>
-                        <Run Text="Template" FontWeight="Bold"/><Run Text="Builder 95"/>
-                    </TextBlock>
-                </Border>
-
-                <DockPanel Grid.Column="1">
-                    <!-- File menu items live at the bottom, where Start had Settings / Shut Down -->
-                    <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,2">
-                        <Separator Margin="4,4,4,2"/>
-                        <Button Style="{StaticResource NavActionButton}" Content="Change _User Profile..." Click="ChangeUser_Click"/>
-                        <Button Style="{StaticResource NavActionButton}" Content="_Database Location..." Click="DatabaseLocation_Click"/>
-                        <Button Style="{StaticResource NavActionButton}" Content="_About..." Click="About_Click"/>
-                        <Separator Margin="4,2"/>
-                        <Button Style="{StaticResource NavActionButton}" Content="E_xit" Click="Exit_Click"/>
-                    </StackPanel>
-
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel x:Name="NavPanel" Margin="0,2,0,2">
-                            <RadioButton Style="{StaticResource NavButton}" Tag="Jobs" Content="_Jobs" FontWeight="Bold"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="TemplateLookup" Content="_Template Lookup"/>
-
-                            <Separator Margin="4,4,4,0"/>
-                            <TextBlock Text="Maintenance" Style="{StaticResource SidebarHeader}"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="BatchGenerate" Content="_Batch Generate"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="TransferJob" Content="Transfer Job"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="RefreshTemplates" Content="_Refresh Templates"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="DeduplicateHardware" Content="Deduplicate Hardware"/>
-                            <Button Style="{StaticResource NavActionButton}" Content="Relink Templates..." Click="RelinkTemplates_Click"/>
-                            <Button Style="{StaticResource NavActionButton}" Content="Dump Database..." Click="DumpDatabase_Click"/>
-                            <Button Style="{StaticResource NavActionButton}" Content="Export SQL Server Script..." Click="ExportSqlServerScript_Click"/>
-                            <Button Style="{StaticResource NavActionButton}" Content="Import Legacy Database..." Click="ImportLegacyDatabase_Click"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="JobImportWizard" Content="Import Jobs Wizard"/>
-
-                            <Separator Margin="4,4,4,0"/>
-                            <TextBlock Text="Admin" Style="{StaticResource SidebarHeader}"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="HardwareItems" Content="_Hardware Items"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="Templates" Content="Templates"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="AppSettings" Content="App _Settings"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="Customers" Content="_Customers"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="Manufacturers" Content="_Manufacturers"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="Descriptions" Content="Descriptions"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="ProjectManagers" Content="_Project Managers"/>
-                            <RadioButton Style="{StaticResource NavButton}" Tag="UserProfiles" Content="User Profiles"/>
-                        </StackPanel>
-                    </ScrollViewer>
-                </DockPanel>
-            </Grid>
-        </ContentControl>
-
-        <!-- Main content area: views are swapped in here -->
+        <!-- Etched line under the menu bar, then the content area where views are swapped in -->
+        <Separator DockPanel.Dock="Top" Margin="0,0,0,2"/>
         <ContentControl x:Name="ContentArea" Margin="2" Focusable="False"/>
     </DockPanel>
 </Window>

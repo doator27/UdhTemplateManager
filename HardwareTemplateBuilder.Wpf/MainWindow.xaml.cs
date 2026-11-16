@@ -16,17 +16,14 @@ using HardwareTemplateBuilder.Wpf.Views;
 namespace HardwareTemplateBuilder.Wpf;
 
 /// <summary>
-/// The application's main window: Start-menu style sidebar, navigation content area and
-/// status bar. Routing matches the Avalonia app's <c>MainWindow</c> exactly (same route names,
+/// The application's main window: menu bar, navigation content area and status bar.
+/// Routing matches the Avalonia app's <c>MainWindow</c> exactly (same route names,
 /// same <c>"ViewName:{id}"</c> parameterized routes).
 /// </summary>
 public partial class MainWindow : Window
 {
     /// <summary>The view router managing content area navigation.</summary>
     private readonly ViewRouter _router;
-
-    /// <summary>Sidebar items keyed by the route they open, for keeping the highlight in sync.</summary>
-    private readonly Dictionary<string, RadioButton> _navByRoute = new();
 
     /// <summary>Ticks the status-bar clock, like the Win95 taskbar tray.</summary>
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(15) };
@@ -37,7 +34,6 @@ public partial class MainWindow : Window
         InitializeComponent();
         _router = new ViewRouter(ContentArea);
         RegisterViews();
-        WireSidebar();
 
         _clock.Tick += (_, _) => ClockText.Text = DateTime.Now.ToString("h:mm tt");
         ClockText.Text = DateTime.Now.ToString("h:mm tt");
@@ -78,15 +74,11 @@ public partial class MainWindow : Window
         _router.Register("JobImportWizard",     () => { var v = new JobImportWizardView();     v.NavigationRequested += NavigateTo; return v; });
     }
 
-    /// <summary>Hooks every sidebar item whose Tag names a route up to navigation.</summary>
-    private void WireSidebar()
+    /// <summary>Menu items whose Tag names a route navigate to it.</summary>
+    private void Nav_Click(object sender, RoutedEventArgs e)
     {
-        foreach (var nav in NavPanel.Children.OfType<RadioButton>())
-        {
-            if (nav.Tag is not string route) continue;
-            _navByRoute[route] = nav;
-            nav.Click += (_, _) => NavigateTo(route);
-        }
+        if (sender is MenuItem { Tag: string route })
+            NavigateTo(route);
     }
 
     private async void About_Click(object sender, RoutedEventArgs e)
@@ -131,7 +123,6 @@ public partial class MainWindow : Window
         if (TryNavigateParameterized(viewName)) return;
 
         _router.NavigateTo(viewName);
-        HighlightNav(viewName);
         SetStatusWithUser(viewName == "Dashboard" ? "Ready" : SplitWords(viewName));
     }
 
@@ -140,27 +131,26 @@ public partial class MainWindow : Window
     {
         UserControl? view = null;
         string? status = null;
-        string? highlight = null;
 
         if (TryParseId(viewName, "JobDetail:", out var jobId))
         {
             var v = new JobDetailView(jobId); v.NavigationRequested += NavigateTo;
-            (view, status, highlight) = (v, "Job Detail", "Jobs");
+            (view, status) = (v, "Job Detail");
         }
         else if (TryParseId(viewName, "BulkManufacturerSession:", out var sessionJobId))
         {
             var v = new BulkManufacturerSessionView(sessionJobId); v.NavigationRequested += NavigateTo;
-            (view, status, highlight) = (v, "Bulk Hardware Entry", "Jobs");
+            (view, status) = (v, "Bulk Hardware Entry");
         }
         else if (TryParseId(viewName, "BulkManufacturerSelection:", out var bmsJobId))
         {
             var v = new BulkManufacturerSelectionView(bmsJobId); v.NavigationRequested += NavigateTo;
-            (view, status, highlight) = (v, "Bulk Add — Select Manufacturers", "Jobs");
+            (view, status) = (v, "Bulk Add — Select Manufacturers");
         }
         else if (TryParseId(viewName, "BulkJobHub:", out var hubJobId))
         {
             var v = new BulkJobHubView(hubJobId); v.NavigationRequested += NavigateTo;
-            (view, status, highlight) = (v, "Bulk Add — Hub", "Jobs");
+            (view, status) = (v, "Bulk Add — Hub");
         }
         else if (viewName.StartsWith("BulkHardwareEntry:"))
         {
@@ -168,13 +158,13 @@ public partial class MainWindow : Window
             if (parts.Length == 2 && int.TryParse(parts[0], out var bulkJobId) && int.TryParse(parts[1], out var bulkMfrId))
             {
                 var v = new BulkHardwareEntryView(bulkJobId, bulkMfrId); v.NavigationRequested += NavigateTo;
-                (view, status, highlight) = (v, "Bulk Add — Items", "Jobs");
+                (view, status) = (v, "Bulk Add — Items");
             }
         }
         else if (TryParseId(viewName, "TemplateResolutionWizard:", out var wizJobId))
         {
             var v = new TemplateResolutionWizardView(wizJobId); v.NavigationRequested += NavigateTo;
-            (view, status, highlight) = (v, "Template Resolution Wizard", "Jobs");
+            (view, status) = (v, "Template Resolution Wizard");
         }
         else if (viewName.StartsWith("HardwareItemDetail:"))
         {
@@ -186,14 +176,13 @@ public partial class MainWindow : Window
             if (int.TryParse(idPart, out var itemId))
             {
                 var v = new HardwareItemDetailView(itemId, returnRoute); v.NavigationRequested += NavigateTo;
-                (view, status, highlight) = (v, "Hardware Item Detail", "HardwareItems");
+                (view, status) = (v, "Hardware Item Detail");
             }
         }
 
         if (view == null) return false;
 
         ContentArea.Content = view;
-        HighlightNav(highlight);
         SetStatusWithUser(status!);
         return true;
     }
@@ -207,16 +196,6 @@ public partial class MainWindow : Window
     /// <summary>"DeduplicateHardware" → "Deduplicate Hardware" for the status bar.</summary>
     private static string SplitWords(string name)
         => string.Concat(name.Select((c, i) => i > 0 && char.IsUpper(c) && !char.IsUpper(name[i - 1]) ? " " + c : c.ToString()));
-
-    private void HighlightNav(string? route)
-    {
-        foreach (var nav in _navByRoute.Values) nav.IsChecked = false;
-        if (route != null && _navByRoute.TryGetValue(route, out var match))
-        {
-            match.IsChecked = true;
-            match.BringIntoView();
-        }
-    }
 
     private void SetStatusWithUser(string text) => StatusText.Text = text;
 

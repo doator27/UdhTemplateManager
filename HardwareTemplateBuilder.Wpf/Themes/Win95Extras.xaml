@@ -73,31 +73,6 @@
         </Setter>
     </Style>
 
-    <!-- Sidebar item that runs a command (opens a dialog) rather than showing a page.
-         Looks exactly like Win95.xaml's NavButton but never stays checked. -->
-    <Style x:Key="NavActionButton" TargetType="Button">
-        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Padding" Value="10,3"/>
-        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-        <Setter Property="HorizontalContentAlignment" Value="Left"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" RecognizesAccessKey="True"/>
-                    </Border>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{StaticResource SelectionBrush}"/>
-                <Setter Property="Foreground" Value="{StaticResource SelectionTextBrush}"/>
-            </Trigger>
-        </Style.Triggers>
-    </Style>
-
     <!-- ===== Radio button (round, sunken) ===== -->
     <Style TargetType="RadioButton">
         <Setter Property="Template">
@@ -167,29 +142,38 @@
 
     <Style TargetType="Menu">
         <Setter Property="Background" Value="{StaticResource FaceBrush}"/>
+        <Setter Property="Padding" Value="1"/>
         <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
         <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
         <Setter Property="FontSize" Value="12"/>
     </Style>
 
+    <!-- Menu items: navy highlight. Top-level items (the menu bar) drop their popup below; items
+         with a submenu show the Marlett arrow; checkable items show a check mark. -->
     <Style TargetType="MenuItem">
         <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
         <Setter Property="Padding" Value="18,3,18,3"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <Grid>
+                    <Grid SnapsToDevicePixels="True">
                         <Border x:Name="Bd" Background="Transparent" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                            <DockPanel>
+                                <TextBlock x:Name="Check" DockPanel.Dock="Left" Text="a" FontFamily="Marlett" FontSize="11"
+                                           Margin="-14,0,4,0" Width="10" VerticalAlignment="Center" Visibility="Collapsed"/>
+                                <TextBlock x:Name="Arrow" DockPanel.Dock="Right" Text="4" FontFamily="Marlett" FontSize="11"
+                                           Margin="16,0,-12,0" VerticalAlignment="Center" Visibility="Collapsed"/>
+                                <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                            </DockPanel>
                         </Border>
-                        <Popup x:Name="PART_Popup" Placement="Right" IsOpen="{TemplateBinding IsSubmenuOpen}"
+                        <Popup x:Name="PART_Popup" Placement="Right" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
                                AllowsTransparency="False" PopupAnimation="None" Focusable="False">
                             <Border BorderBrush="{StaticResource DarkShadowBrush}" BorderThickness="0,0,1,1">
                                 <Border BorderBrush="{StaticResource LightBrush}" BorderThickness="1,1,0,0">
                                     <Border BorderBrush="{StaticResource ShadowBrush}" BorderThickness="0,0,1,1">
                                         <Border BorderBrush="{StaticResource HighlightBrush}" BorderThickness="1,1,0,0"
-                                                Background="{StaticResource FaceBrush}" Padding="1">
-                                            <StackPanel IsItemsHost="True"/>
+                                                Background="{StaticResource FaceBrush}" Padding="1" MinWidth="140">
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
                                         </Border>
                                     </Border>
                                 </Border>
@@ -197,6 +181,19 @@
                         </Popup>
                     </Grid>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="Role" Value="TopLevelHeader">
+                            <Setter TargetName="PART_Popup" Property="Placement" Value="Bottom"/>
+                            <Setter TargetName="Bd" Property="Padding" Value="7,2"/>
+                        </Trigger>
+                        <Trigger Property="Role" Value="TopLevelItem">
+                            <Setter TargetName="Bd" Property="Padding" Value="7,2"/>
+                        </Trigger>
+                        <Trigger Property="Role" Value="SubmenuHeader">
+                            <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+                        </Trigger>
                         <Trigger Property="IsHighlighted" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectionBrush}"/>
                             <Setter Property="Foreground" Value="{StaticResource SelectionTextBrush}"/>
@@ -223,6 +220,9 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- WPF gives separators inside menus this key instead of the implicit Separator style -->
+    <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator" BasedOn="{StaticResource {x:Type Separator}}"/>
 
     <!-- ===== Tree view (sunken white field, +/- boxes, navy header selection) ===== -->
     <Style TargetType="TreeView">

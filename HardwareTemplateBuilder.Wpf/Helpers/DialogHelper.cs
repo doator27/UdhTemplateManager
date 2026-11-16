@@ -58,8 +58,8 @@ public static class DialogHelper
     public static async Task<bool> ConfirmAsync(Window? owner, string message, string title = "Confirm")
     {
         var dialog = CreateDialog(title, 400, 190);
-        var yes = MakeButton("_Yes", isDefault: true, isCancel: false);
-        var no = MakeButton("_No", isDefault: false, isCancel: true);
+        var yes = MakeButton("Yes", isDefault: true, isCancel: false);
+        var no = MakeButton("No", isDefault: false, isCancel: true);
         yes.Click += (_, _) => dialog.CloseWith(true);
         no.Click += (_, _) => dialog.CloseWith(false);
         dialog.Content = Layout(MessageArea(message, monospace: false, Glyph.Question), yes, no);

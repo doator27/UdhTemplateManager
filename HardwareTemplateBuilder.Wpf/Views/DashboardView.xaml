@@ -11,8 +11,8 @@
 
                 <GroupBox Header="Work" Style="{StaticResource PanelGroup}">
                     <WrapPanel>
-                        <Button x:Name="BtnJobs"           Style="{StaticResource DashboardPrimaryButton}" Content="_Jobs" Margin="0,0,6,6"/>
-                        <Button x:Name="BtnTemplateLookup" Style="{StaticResource DashboardPrimaryButton}" Content="_Template Lookup" Margin="0,0,6,6"/>
+                        <Button x:Name="BtnJobs"           Style="{StaticResource DashboardPrimaryButton}" Content="Jobs" Margin="0,0,6,6"/>
+                        <Button x:Name="BtnTemplateLookup" Style="{StaticResource DashboardPrimaryButton}" Content="Template Lookup" Margin="0,0,6,6"/>
                     </WrapPanel>
                 </GroupBox>
 

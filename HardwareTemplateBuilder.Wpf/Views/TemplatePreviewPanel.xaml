@@ -4,9 +4,9 @@
              xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui">
     <DockPanel>
         <ui:Stack DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,4" Spacing="8">
-            <Button x:Name="PrevPageButton" Content="&lt; _Prev" IsEnabled="False"/>
+            <Button x:Name="PrevPageButton" Content="&lt; Prev" IsEnabled="False"/>
             <TextBlock x:Name="PageLabel" VerticalAlignment="Center" Text="No template selected"/>
-            <Button x:Name="NextPageButton" Content="_Next &gt;" IsEnabled="False"/>
+            <Button x:Name="NextPageButton" Content="Next &gt;" IsEnabled="False"/>
         </ui:Stack>
         <!-- Pages render on the dark-gray "viewer" background, inside a sunken frame -->
         <ContentControl Style="{StaticResource Sunken}" Background="{StaticResource ShadowBrush}">

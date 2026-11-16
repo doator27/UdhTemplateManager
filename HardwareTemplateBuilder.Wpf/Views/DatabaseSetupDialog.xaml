@@ -30,7 +30,7 @@
                            Text="Example: Server=localhost;Port=3306;Database=hardware_templates;Uid=root;Pwd=secret;"/>
                 <TextBox x:Name="ConnectionStringBox" AcceptsReturn="False" Margin="0,0,0,8"
                          ui:Watermark.Text="Server=...;Port=3306;Database=...;Uid=...;Pwd=...;"/>
-                <Button x:Name="ConnectButton" Content="_Connect" HorizontalAlignment="Left" IsDefault="True"/>
+                <Button x:Name="ConnectButton" Content="Connect" HorizontalAlignment="Left" IsDefault="True"/>
                 <TextBlock x:Name="ConnectStatusLabel" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
             </StackPanel>
         </GroupBox>
