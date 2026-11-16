@@ -65,8 +65,11 @@ internal static class Program
         }
     }
 
-    /// <summary>Taskbar identity, kept separate from the Avalonia app so both can be pinned.</summary>
-    private const string AppUserModelId = "HardwareTemplateBuilder.Wpf";
+    /// <summary>
+    /// Taskbar identity, kept separate from the Avalonia app so both can be pinned. Set on the
+    /// process here and on the main window (see <c>WindowsTaskbar.SetRelaunchInfo</c>).
+    /// </summary>
+    internal const string AppUserModelId = "HardwareTemplateBuilder.Wpf";
 
     /// <summary>
     /// Creates a Start Menu shortcut for this application on first run so that

@@ -5,8 +5,10 @@ using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using HardwareTemplateBuilder.Core.Data;
+using HardwareTemplateBuilder.Core.Platform;
 using HardwareTemplateBuilder.Core.Services;
 using HardwareTemplateBuilder.Wpf.Helpers;
 using HardwareTemplateBuilder.Wpf.Navigation;
@@ -33,6 +35,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _router = new ViewRouter(ContentArea);
+
+        // Lets Windows offer "Pin to taskbar" without relying on the Start Menu shortcut.
+        // SourceInitialized is the first point the window has a handle, before it is shown.
+        SourceInitialized += (_, _) => WindowsTaskbar.SetRelaunchInfo(
+            new WindowInteropHelper(this).Handle, Program.AppUserModelId, "Hardware Template Builder 95");
         RegisterViews();
 
         _clock.Tick += (_, _) => ClockText.Text = DateTime.Now.ToString("h:mm tt");

@@ -22,6 +22,12 @@ class Program
     private const string SingleInstanceMutexName = "HardwareTemplateBuilder_SingleInstance";
     private static Mutex? _singleInstanceMutex;
 
+    /// <summary>
+    /// The app's Windows taskbar identity. Set on the process here and on the main window
+    /// (see <c>MainWindow</c> / <c>WindowsTaskbar.SetRelaunchInfo</c>) so it can be pinned.
+    /// </summary>
+    internal const string AppUserModelId = "HardwareTemplateBuilder.App";
+
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
@@ -43,7 +49,7 @@ class Program
 
         if (OperatingSystem.IsWindows())
         {
-            SetCurrentProcessExplicitAppUserModelID("HardwareTemplateBuilder.App");
+            SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
             CreateStartMenuShortcutIfNeeded();
         }
 
@@ -134,7 +140,7 @@ class Program
 
             // Set AppUserModelID on the shortcut file itself using PropertyStore
             // This is critical for single-file published apps to pin correctly
-            SetShortcutAppUserModelId(shortcutPath, "HardwareTemplateBuilder.App");
+            SetShortcutAppUserModelId(shortcutPath, AppUserModelId);
         }
         catch
         {
