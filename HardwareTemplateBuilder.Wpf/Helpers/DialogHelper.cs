@@ -13,7 +13,7 @@ namespace HardwareTemplateBuilder.Wpf.Helpers;
 public static class DialogHelper
 {
     /// <summary>The icon drawn at the left of a message box.</summary>
-    private enum Glyph { Info, Question }
+    private enum Glyph { Info, Question, Error }
 
     /// <summary>Shows an informational dialog with an OK button.</summary>
     /// <param name="owner">The parent window.</param>
@@ -25,6 +25,19 @@ public static class DialogHelper
         var ok = MakeButton("OK", isDefault: true, isCancel: true);
         ok.Click += (_, _) => dialog.Close();
         dialog.Content = Layout(MessageArea(message, monospace: false, Glyph.Info), ok);
+        return dialog.ShowDialogAsync(owner);
+    }
+
+    /// <summary>Shows an error dialog (red Win95 "X" icon) with an OK button.</summary>
+    /// <param name="owner">The parent window, or null to center on screen.</param>
+    /// <param name="message">The message to display.</param>
+    /// <param name="title">The dialog title.</param>
+    public static Task ShowErrorAsync(Window? owner, string message, string title = "Error")
+    {
+        var dialog = CreateDialog(title, 440, 220);
+        var ok = MakeButton("OK", isDefault: true, isCancel: true);
+        ok.Click += (_, _) => dialog.Close();
+        dialog.Content = Layout(MessageArea(message, monospace: false, Glyph.Error), ok);
         return dialog.ShowDialogAsync(owner);
     }
 
@@ -153,9 +166,31 @@ public static class DialogHelper
         return grid;
     }
 
-    /// <summary>The classic round "i" (white on blue) or "?" (white speech balloon) icon.</summary>
+    /// <summary>The classic round "i" (white on blue), "?" (white balloon) or error "X" (white on red) icon.</summary>
     private static FrameworkElement MakeIcon(Glyph glyph)
     {
+        if (glyph == Glyph.Error)
+        {
+            return new Border
+            {
+                Width = 32,
+                Height = 32,
+                CornerRadius = new CornerRadius(16),
+                Background = UiExtensions.Brush("#FF0000"),
+                BorderBrush = UiExtensions.Brush("#800000"),
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 0, 12, 0),
+                VerticalAlignment = VerticalAlignment.Top,
+                Child = new System.Windows.Shapes.Path
+                {
+                    Data = Geometry.Parse("M0,2 L2,0 L7,5 L12,0 L14,2 L9,7 L14,12 L12,14 L7,9 L2,14 L0,12 L5,7 Z"),
+                    Fill = Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
+            };
+        }
+
         var circle = new Border
         {
             Width = 32,

@@ -28,10 +28,18 @@ public partial class App : Application
         DispatcherUnhandledException += (_, args) =>
         {
             CrashLogger.Log(args.Exception, isTerminating: false);
-            MessageBox.Show(
-                $"An unexpected error occurred and has been recorded in CrashReports.txt.\n\n{args.Exception.Message}",
-                "Hardware Template Builder", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
+            var message = $"An unexpected error occurred and has been recorded in CrashReports.txt.\n\n{args.Exception.Message}";
+            try
+            {
+                var owner = MainWindow is { IsLoaded: true } main ? main : null;
+                _ = DialogHelper.ShowErrorAsync(owner, message, "Hardware Template Builder");
+            }
+            catch
+            {
+                // If the styled dialog can't be shown, still tell the user.
+                MessageBox.Show(message, "Hardware Template Builder", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         };
 
         var mainWindow = new MainWindow();
