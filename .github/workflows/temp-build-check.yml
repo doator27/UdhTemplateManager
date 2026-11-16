@@ -10,6 +10,5 @@ jobs:
       - run: dotnet build HardwareTemplateBuilder.sln -c Release
       - run: dotnet test HardwareTemplateBuilder.Tests -c Release --no-build
       - run: dotnet run --project ci-smoke/Smoke.csproj -c Release
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: { name: shots, path: shots }
+      - shell: pwsh
+        run: Get-ChildItem shots/*.png | ForEach-Object { "SHOT:$($_.BaseName):" + [Convert]::ToBase64String([IO.File]::ReadAllBytes($_.FullName)) }
