@@ -1,0 +1,15 @@
+name: temp-build-check
+on: push
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - run: dotnet build HardwareTemplateBuilder.sln -c Release
+      - run: dotnet test HardwareTemplateBuilder.Tests -c Release --no-build
+      - run: dotnet run --project ci-smoke/Smoke.csproj -c Release
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: shots, path: shots }

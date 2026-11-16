@@ -7,6 +7,7 @@ using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Repositories;
 using HardwareTemplateBuilder.Core.Services;
 using HardwareTemplateBuilder.Wpf.Helpers;
+using HardwareTemplateBuilder.Wpf.Ui;
 using HardwareTemplateBuilder.Wpf.Views;
 
 namespace HardwareTemplateBuilder.Wpf;
@@ -22,6 +23,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        Win95Chrome.Register();
 
         DispatcherUnhandledException += (_, args) =>
         {

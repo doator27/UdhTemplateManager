@@ -1,5 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+                    xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui">
 
     <!--
         Controls the Template Builder uses that SpecialJobLookup's theme (Win95.xaml) doesn't cover:
@@ -17,6 +19,40 @@
     <SolidColorBrush x:Key="TooltipBrush" Color="#FFFFE1"/>
 
     <!-- ===== Windows ===== -->
+    <!--
+        Custom Windows 95 title bar. Win95Window (below) replaces the Windows 10/11 title bar with
+        WindowChrome and draws its own: navy caption (gray when inactive), icon (click = system
+        menu), bold white title, and bevelled minimize / maximize-restore / close buttons, inside a
+        raised 3D window frame. Dragging, double-click-to-maximize, snapping, resizing and the
+        right-click system menu are still handled by Windows. Ui/Win95Chrome.cs supplies the button
+        commands, square corners on Windows 11 and the maximized-window margin.
+    -->
+    <Style x:Key="CaptionButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="14"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+    </Style>
+
+    <Style x:Key="CaptionIconButton" TargetType="Button">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="ClickMode" Value="Press"/>
+        <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent"><ContentPresenter/></Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="Win95Window" TargetType="Window">
         <Setter Property="Background" Value="{StaticResource FaceBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
@@ -26,6 +62,115 @@
         <Setter Property="SnapsToDevicePixels" Value="True"/>
         <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
         <Setter Property="TextOptions.TextRenderingMode" Value="Aliased"/>
+        <Setter Property="shell:WindowChrome.WindowChrome">
+            <Setter.Value>
+                <shell:WindowChrome CaptionHeight="22" ResizeBorderThickness="4" GlassFrameThickness="0"
+                                    CornerRadius="0" UseAeroCaptionButtons="False"/>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Window">
+                    <Border x:Name="PART_Win95Root" Background="{StaticResource FaceBrush}">
+                        <!-- Raised 3D window frame -->
+                        <Border x:Name="Frame1" BorderBrush="{StaticResource DarkShadowBrush}" BorderThickness="0,0,1,1">
+                            <Border x:Name="Frame2" BorderBrush="{StaticResource LightBrush}" BorderThickness="1,1,0,0">
+                                <Border x:Name="Frame3" BorderBrush="{StaticResource ShadowBrush}" BorderThickness="0,0,1,1">
+                                    <Border x:Name="Frame4" BorderBrush="{StaticResource HighlightBrush}" BorderThickness="1,1,0,0" Padding="2">
+                                        <DockPanel>
+                                            <!-- Title bar -->
+                                            <Border x:Name="Caption" DockPanel.Dock="Top" Height="18" Margin="0,0,0,1"
+                                                    Background="{StaticResource CaptionBrush}">
+                                                <DockPanel Margin="2,0,2,0">
+                                                    <Button x:Name="IconButton" DockPanel.Dock="Left" Style="{StaticResource CaptionIconButton}"
+                                                            Command="{x:Static ui:Win95Chrome.ShowSystemMenuCommand}"
+                                                            VerticalAlignment="Center" ToolTip="Window menu">
+                                                        <Image Source="{TemplateBinding Icon}" Width="16" Height="16"
+                                                               RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                                    </Button>
+                                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Button x:Name="MinButton" Style="{StaticResource CaptionButton}" ToolTip="Minimize"
+                                                                Command="{x:Static SystemCommands.MinimizeWindowCommand}">
+                                                            <Path Data="M0,0 H6 V2 H0 Z" Margin="0,6,1,0"
+                                                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                        </Button>
+                                                        <Button x:Name="MaxButton" Style="{StaticResource CaptionButton}" ToolTip="Maximize"
+                                                                Command="{x:Static SystemCommands.MaximizeWindowCommand}">
+                                                            <Path Data="M0,0 H9 V9 H0 Z M1,2 H8 V8 H1 Z" FillRule="EvenOdd"
+                                                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                        </Button>
+                                                        <Button x:Name="RestoreButton" Style="{StaticResource CaptionButton}" ToolTip="Restore"
+                                                                Visibility="Collapsed"
+                                                                Command="{x:Static SystemCommands.RestoreWindowCommand}">
+                                                            <Path Data="M0,3 H6 V9 H0 Z M1,5 H5 V8 H1 Z M2,0 H8 V6 H6 V5 H7 V2 H3 V3 H2 Z" FillRule="EvenOdd"
+                                                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                        </Button>
+                                                        <Button x:Name="CloseButton" Style="{StaticResource CaptionButton}" ToolTip="Close"
+                                                                Margin="2,0,0,0"
+                                                                Command="{x:Static SystemCommands.CloseWindowCommand}">
+                                                            <Path Data="M0,0 H2 L4,2 L6,0 H8 L5,3.5 L8,7 H6 L4,5 L2,7 H0 L3,3.5 Z"
+                                                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                        </Button>
+                                                    </StackPanel>
+                                                    <TextBlock x:Name="TitleText" Text="{TemplateBinding Title}" Margin="3,0,4,0"
+                                                               VerticalAlignment="Center" FontWeight="Bold" TextTrimming="CharacterEllipsis"
+                                                               Foreground="{StaticResource HighlightBrush}"/>
+                                                </DockPanel>
+                                            </Border>
+
+                                            <!-- Window content -->
+                                            <Grid Background="{TemplateBinding Background}">
+                                                <AdornerDecorator>
+                                                    <ContentPresenter/>
+                                                </AdornerDecorator>
+                                                <ResizeGrip x:Name="Grip" Visibility="Collapsed" IsTabStop="False"
+                                                            HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                            shell:WindowChrome.ResizeGripDirection="BottomRight"
+                                                            shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                                            </Grid>
+                                        </DockPanel>
+                                    </Border>
+                                </Border>
+                            </Border>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsActive" Value="False">
+                            <Setter TargetName="Caption" Property="Background" Value="{StaticResource ShadowBrush}"/>
+                            <Setter TargetName="TitleText" Property="Foreground" Value="{StaticResource FaceBrush}"/>
+                        </Trigger>
+                        <Trigger Property="Icon" Value="{x:Null}">
+                            <Setter TargetName="IconButton" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <Trigger Property="WindowState" Value="Maximized">
+                            <Setter TargetName="MaxButton" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="RestoreButton" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Frame1" Property="BorderThickness" Value="0"/>
+                            <Setter TargetName="Frame2" Property="BorderThickness" Value="0"/>
+                            <Setter TargetName="Frame3" Property="BorderThickness" Value="0"/>
+                            <Setter TargetName="Frame4" Property="BorderThickness" Value="0"/>
+                            <Setter TargetName="Frame4" Property="Padding" Value="0"/>
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="ResizeMode" Value="CanResizeWithGrip"/>
+                                <Condition Property="WindowState" Value="Normal"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Grip" Property="Visibility" Value="Visible"/>
+                        </MultiTrigger>
+                        <!-- Dialogs (not in the taskbar) can't be minimized -->
+                        <Trigger Property="ShowInTaskbar" Value="False">
+                            <Setter TargetName="MinButton" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <Trigger Property="ResizeMode" Value="NoResize">
+                            <Setter TargetName="MinButton" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="MaxButton" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="RestoreButton" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- Bigger raised buttons on the dashboard tiles -->
