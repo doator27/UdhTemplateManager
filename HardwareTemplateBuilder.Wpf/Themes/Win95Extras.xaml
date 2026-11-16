@@ -396,6 +396,9 @@
     <!-- Read-only text block that can be selected (Avalonia's SelectableTextBlock) -->
     <Style x:Key="SelectableText" TargetType="TextBox">
         <Setter Property="IsReadOnly" Value="True"/>
+        <Setter Property="SelectionBrush" Value="{StaticResource SelectionBrush}"/>
+        <Setter Property="SelectionTextBrush" Value="{StaticResource SelectionTextBrush}"/>
+        <Setter Property="SelectionOpacity" Value="1"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="TextWrapping" Value="Wrap"/>

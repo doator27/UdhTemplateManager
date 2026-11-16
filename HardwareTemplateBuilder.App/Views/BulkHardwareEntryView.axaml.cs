@@ -417,6 +417,10 @@ public partial class BulkHardwareEntryView : UserControl
         // active entry collapses to its summary row.
         SetActiveEntry(entry);
 
+        // True while RefreshModelItems swaps the model list, so the combo's transient
+        // "nothing selected" state doesn't wipe the entry's model number.
+        bool restoringModel = false;
+
         // Initialize the model combo with all items for this manufacturer
         RefreshModelItems();
 
@@ -438,7 +442,27 @@ public partial class BulkHardwareEntryView : UserControl
                 q = q.Where(h => h.DescriptionId == entry.Description.Id);
             }
 
-            modelCombo.ItemsSource = q.OrderBy(h => h.ModelNumber).ToList();
+            // Replacing the list clears the combo's selection and text, so carry the current
+            // model across. Otherwise choosing a model first (which fills in its description
+            // and narrows this list) would leave the model box empty.
+            var currentText = modelCombo.Text;
+            var currentId = (modelCombo.SelectedItem as HardwareItem)?.Id;
+            var items = q.OrderBy(h => h.ModelNumber).ToList();
+
+            restoringModel = true;
+            try
+            {
+                modelCombo.ItemsSource = items;
+                var keep = items.FirstOrDefault(h => currentId.HasValue && h.Id == currentId.Value)
+                        ?? items.FirstOrDefault(h => h.ModelNumber == currentText?.Trim());
+                if (keep != null)
+                    modelCombo.SelectedItem = keep;
+                modelCombo.Text = currentText;
+            }
+            finally
+            {
+                restoringModel = false;
+            }
         }
 
         void SyncMatch()
@@ -623,12 +647,12 @@ public partial class BulkHardwareEntryView : UserControl
 
         modelCombo.PropertyChanged += (_, e) =>
         {
-            if (e.Property == ComboBox.TextProperty)
+            if (e.Property == ComboBox.TextProperty && !restoringModel)
             {
                 SyncMatch();
             }
         };
-        modelCombo.SelectionChanged += (_, _) => SyncMatch();
+        modelCombo.SelectionChanged += (_, _) => { if (!restoringModel) SyncMatch(); };
 
         showAllModelsCheckBox.Click += (_, _) => RefreshModelItems();
 

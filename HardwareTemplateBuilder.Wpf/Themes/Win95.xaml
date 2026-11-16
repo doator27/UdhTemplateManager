@@ -267,7 +267,9 @@
         <Setter Property="Padding" Value="2,1"/>
         <Setter Property="MinHeight" Value="22"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <!-- Navy highlight with white selected text (needs the selection-rendering switch in the .csproj) -->
         <Setter Property="SelectionBrush" Value="{StaticResource SelectionBrush}"/>
+        <Setter Property="SelectionTextBrush" Value="{StaticResource SelectionTextBrush}"/>
         <Setter Property="SelectionOpacity" Value="1"/>
         <Setter Property="SnapsToDevicePixels" Value="True"/>
         <Setter Property="HorizontalScrollBarVisibility" Value="Hidden"/>

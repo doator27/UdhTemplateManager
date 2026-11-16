@@ -37,6 +37,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Draw text selection inside the text (not as a translucent overlay) so TextBox.SelectionTextBrush
+         works: selected text is white on the Win95 navy highlight instead of black on navy. -->
+    <RuntimeHostConfigurationOption Include="System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering" Value="false" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\HardwareTemplateBuilder.Core\HardwareTemplateBuilder.Core.csproj" />
   </ItemGroup>
 </Project>
