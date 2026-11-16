@@ -166,7 +166,7 @@ make the same change in the matching Wpf view** (and vice versa).
   buttons need `WindowChrome.IsHitTestVisibleInChrome="True"`. `Ui/Win95Chrome.Register()` (called in
   `App.OnStartup`) binds the `SystemCommands` for all windows, turns off Windows 11 rounded corners and
   pads the template root (`PART_Win95Root`) when maximized. Dialogs not in the taskbar get no minimize
-  button; `NoResize` windows get only Close. `MessageBox.Show` boxes are native and keep the OS title bar.
+  button; `NoResize` windows get only Close. Use `DialogHelper` (incl. `ShowErrorAsync`) for pop-ups, not `MessageBox.Show` (native, keeps the OS title bar; only the crash handler's fallback uses it).
 - **Shell:** `MainWindow` has the same menu bar as the App (File, Jobs, Template Lookup, Maintenance,
   Admin), Win95-styled; menu items with a `Tag` navigate to that route via `Nav_Click`, the rest run a
   command. Status bar = thin sunken fields (status, user, clock). No access-key underscores in labels.
