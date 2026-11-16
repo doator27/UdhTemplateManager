@@ -206,6 +206,11 @@ public class TemplateRefreshService
 
         overallStopwatch.Stop();
 
+        // Keep the "Templates to Fix" list in step with this refresh (both apps, manual and the
+        // automatic startup refresh). Best-effort: it must never fail the refresh itself.
+        try { TemplateFixListService.Record(_context, failures); }
+        catch { /* the refresh result is still returned and shown */ }
+
         return new RefreshResult
         {
             SuccessCount        = successCount,

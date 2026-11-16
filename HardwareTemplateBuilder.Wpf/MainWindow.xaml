@@ -29,6 +29,7 @@
                 <MenuItem Header="Batch Generate..." Tag="BatchGenerate" Click="Nav_Click"/>
                 <MenuItem Header="Transfer Job..." Tag="TransferJob" Click="Nav_Click"/>
                 <MenuItem Header="Refresh Templates" Tag="RefreshTemplates" Click="Nav_Click"/>
+                <MenuItem Header="Templates to Fix..." Tag="TemplateFixList" Click="Nav_Click"/>
                 <MenuItem Header="Deduplicate Hardware..." Tag="DeduplicateHardware" Click="Nav_Click"/>
                 <MenuItem Header="Relink Templates..." Click="RelinkTemplates_Click"/>
                 <Separator/>

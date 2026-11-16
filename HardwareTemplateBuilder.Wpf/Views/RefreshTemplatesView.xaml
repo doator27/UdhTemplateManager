@@ -25,7 +25,8 @@
                 </TextBlock>
                 <StackPanel Orientation="Horizontal">
                     <Button x:Name="StartButton"  Content="Start Refresh" Margin="0,0,8,0"/>
-                    <Button x:Name="CancelButton" Content="Cancel" IsEnabled="False"/>
+                    <Button x:Name="CancelButton" Content="Cancel" IsEnabled="False" Margin="0,0,8,0"/>
+                    <Button x:Name="FixListButton" Content="Templates to Fix..." IsEnabled="False"/>
                 </StackPanel>
                 <TextBlock x:Name="EstimateLabel" Foreground="{StaticResource MutedTextBrush}" Margin="0,8,0,0"/>
             </StackPanel>

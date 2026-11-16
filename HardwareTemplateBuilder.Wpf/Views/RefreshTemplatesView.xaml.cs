@@ -48,6 +48,8 @@ public partial class RefreshTemplatesView : UserControl
         CancelButton.Click += (_, _) => _cts?.Cancel();
         OpenReportButton.Click += (_, _) => OpenReport();
         OpenTimingReportButton.Click += (_, _) => OpenTimingReport();
+        FixListButton.Click += (_, _) => NavigationRequested?.Invoke(TemplateFixListView.Route);
+        UpdateFixListButton();
     }
 
     // ---------- Refresh ----------
@@ -124,6 +126,9 @@ public partial class RefreshTemplatesView : UserControl
         var lookupExportError = ExportLookupData();
 
         ShowResults(result);
+        var fixCount = UpdateFixListButton();
+        if (fixCount > 0)
+            StatusLabel.Text = $"{StatusLabel.Text}\n{fixCount} hardware item(s) use a failed template. Click \"Templates to Fix\" to give them working templates.".Trim();
 
         if (lookupExportError != null)
             StatusLabel.Text = $"{StatusLabel.Text}\nWarning: could not export Lookup data snapshot: {lookupExportError}".Trim();
@@ -172,6 +177,27 @@ public partial class RefreshTemplatesView : UserControl
     }
 
     /// <summary>
+    /// <summary>
+    /// Updates the "Templates to Fix (N)" button from the stored fix list (see
+    /// <see cref="TemplateFixListService"/>) and returns N. Never throws.
+    /// </summary>
+    private int UpdateFixListButton()
+    {
+        try
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var count = TemplateFixListService.GetOutstanding(ctx).Count;
+            FixListButton.Content = count > 0 ? $"Templates to Fix ({count})..." : "Templates to Fix...";
+            FixListButton.IsEnabled = count > 0;
+            return count;
+        }
+        catch
+        {
+            FixListButton.IsEnabled = true;
+            return 0;
+        }
+    }
+
     // ---------- Timing / estimation ----------
 
     /// <summary>Starts a UI timer that updates <see cref="ElapsedText"/> once per second.</summary>

@@ -27,7 +27,8 @@
                 </TextBlock>
                 <StackPanel Orientation="Horizontal">
                     <Button Name="StartButton"  Content="Start Refresh" Margin="0,0,8,0"/>
-                    <Button Name="CancelButton" Content="Cancel" IsEnabled="False"/>
+                    <Button Name="CancelButton" Content="Cancel" IsEnabled="False" Margin="0,0,8,0"/>
+                    <Button Name="FixListButton" Content="Templates to Fix..." IsEnabled="False"/>
                 </StackPanel>
                 <TextBlock Name="EstimateLabel" Foreground="#A7ADB8" Margin="0,8,0,0"/>
             </StackPanel>

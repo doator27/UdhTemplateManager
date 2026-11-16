@@ -70,6 +70,7 @@ public partial class MainWindow : Window
         _router.Register("BatchGenerate",       () => { var v = new BatchGenerateView();       v.NavigationRequested += NavigateTo; return v; });
         _router.Register("TransferJob",         () => { var v = new TransferJobView();         v.NavigationRequested += NavigateTo; return v; });
         _router.Register("RefreshTemplates",    () => { var v = new RefreshTemplatesView();    v.NavigationRequested += NavigateTo; return v; });
+        _router.Register(TemplateFixListView.Route, () => { var v = new TemplateFixListView(); v.NavigationRequested += NavigateTo; return v; });
         _router.Register("DeduplicateHardware", () => { var v = new DeduplicateHardwareView(); v.NavigationRequested += NavigateTo; return v; });
         _router.Register("JobImportWizard",     () => { var v = new JobImportWizardView();     v.NavigationRequested += NavigateTo; return v; });
     }

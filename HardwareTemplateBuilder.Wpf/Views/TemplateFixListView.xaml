@@ -1,0 +1,29 @@
+<UserControl x:Class="HardwareTemplateBuilder.Wpf.Views.TemplateFixListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui">
+    <DockPanel Margin="8">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}" Margin="0,0,0,6">
+            <TextBlock Text="Templates to Fix" Style="{StaticResource CaptionText}"/>
+        </Border>
+
+        <!-- Toolbar -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+            <Button DockPanel.Dock="Left" x:Name="BackButton" Content="← Back to Refresh Templates" Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Right" x:Name="ReloadButton" Content="Reload List"/>
+            <TextBlock/>
+        </DockPanel>
+
+        <TextBlock DockPanel.Dock="Top" x:Name="IntroLabel" Style="{StaticResource Hint}" Margin="0,0,0,8"/>
+
+        <TextBlock DockPanel.Dock="Bottom" x:Name="StatusLabel" Margin="0,6,0,0"
+                   Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"/>
+
+        <!-- One card per hardware item, grouped by manufacturer (built in code-behind) -->
+        <ContentControl Style="{StaticResource Sunken}" Background="{StaticResource FaceBrush}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4">
+                <ui:Stack x:Name="ItemsPanel" Spacing="6"/>
+            </ScrollViewer>
+        </ContentControl>
+    </DockPanel>
+</UserControl>

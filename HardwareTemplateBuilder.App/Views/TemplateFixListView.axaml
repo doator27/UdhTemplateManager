@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.TemplateFixListView">
+    <DockPanel Margin="8">
+
+        <!-- Top toolbar -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left" Name="BackButton" Content="← Back to Refresh Templates" Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Right" Name="ReloadButton" Content="Reload List"/>
+            <TextBlock Text="Templates to Fix" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <TextBlock DockPanel.Dock="Top" Name="IntroLabel" TextWrapping="Wrap" Foreground="#A7ADB8" Margin="0,0,0,8"/>
+
+        <!-- Status label -->
+        <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" Margin="0,6,0,0"
+                   VerticalAlignment="Center" Foreground="#FF6B6B" TextWrapping="Wrap"/>
+
+        <!-- One card per hardware item, grouped by manufacturer (built in code-behind) -->
+        <ScrollViewer>
+            <StackPanel Name="ItemsPanel" Spacing="6"/>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>
