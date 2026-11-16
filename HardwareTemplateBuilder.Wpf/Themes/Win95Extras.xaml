@@ -96,13 +96,13 @@
                                                         </Button>
                                                         <Button x:Name="MaxButton" Style="{StaticResource CaptionButton}" ToolTip="Maximize"
                                                                 Command="{x:Static SystemCommands.MaximizeWindowCommand}">
-                                                            <Path Data="M0,0 H9 V9 H0 Z M1,2 H8 V8 H1 Z" FillRule="EvenOdd"
+                                                            <Path Data="M0,0 H9 V9 H0 Z M1,2 H8 V8 H1 Z"
                                                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                                                         </Button>
                                                         <Button x:Name="RestoreButton" Style="{StaticResource CaptionButton}" ToolTip="Restore"
                                                                 Visibility="Collapsed"
                                                                 Command="{x:Static SystemCommands.RestoreWindowCommand}">
-                                                            <Path Data="M0,3 H6 V9 H0 Z M1,5 H5 V8 H1 Z M2,0 H8 V6 H6 V5 H7 V2 H3 V3 H2 Z" FillRule="EvenOdd"
+                                                            <Path Data="M0,3 H6 V9 H0 Z M1,5 H5 V8 H1 Z M2,0 H8 V6 H6 V5 H7 V2 H3 V3 H2 Z"
                                                                   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                                                         </Button>
                                                         <Button x:Name="CloseButton" Style="{StaticResource CaptionButton}" ToolTip="Close"
