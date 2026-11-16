@@ -77,6 +77,9 @@ public partial class BulkHardwareEntryView : UserControl
 
         /// <summary>Removes this label from the UI panel; set after the row is built.</summary>
         public Action? RemoveFromUI { get; set; }
+
+        /// <summary>The label's row in its card's labels panel; set after the row is built.</summary>
+        public FrameworkElement? Row { get; set; }
     }
 
     private readonly List<ItemEntry> _items = new();
@@ -125,6 +128,7 @@ public partial class BulkHardwareEntryView : UserControl
             SaveDraft();
             StatusLabel.Text = "Saved.";
         };
+        SortLikeCoverSheetButton.Click += (_, _) => SortLikeCoverSheet();
         GenerateCoverSheetButton.Click += async (_, _) => await GenerateCoverSheetAsync();
         AddItemButton.Click += (_, _) => AddItem(null);
 
@@ -718,6 +722,7 @@ public partial class BulkHardwareEntryView : UserControl
         row.Children.Add(remarksBox);
         row.Children.Add(removeBtn);
         labelsPanel.Children.Add(row);
+        label.Row = row;
 
         label.RemoveFromUI = () =>
         {
@@ -856,6 +861,79 @@ public partial class BulkHardwareEntryView : UserControl
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Reorders the item cards (and the labels inside each card) into the order the job's
+    /// package cover sheet will list them, using <see cref="CoverSheetOrder"/>: by where each
+    /// item's templates fall in the PDF, then by label. Items without linked templates yet are
+    /// placed by their description; blank items stay at the bottom. Saves the draft afterwards
+    /// so the order sticks.
+    /// </summary>
+    private void SortLikeCoverSheet()
+    {
+        var filled = _items.Where(i => !string.IsNullOrWhiteSpace(i.ModelNumber)).ToList();
+        if (filled.Count < 2)
+        {
+            StatusLabel.Text = "Add at least two items to sort.";
+            StatusLabel.Foreground = AppColors.Muted;
+            return;
+        }
+
+        try
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var allDescriptions = ctx.Descriptions.AsNoTracking().ToDictionary(d => d.Id);
+            var templatesByItem = CoverSheetOrder.LoadTemplatesByItem(
+                ctx, filled.Where(i => i.MatchedItem != null).Select(i => i.MatchedItem!.Id), _jobId);
+
+            // Each label is its own cover sheet row; rows of one item are ordered by their text.
+            string RowText(ItemEntry item, LabelEntry? label) =>
+                !string.IsNullOrWhiteSpace(label?.CustomLabel) ? label!.CustomLabel : item.ModelNumber;
+
+            foreach (var item in filled)
+            {
+                var ordered = item.Labels
+                    .OrderBy(l => RowText(item, l), StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                item.Labels.Clear();
+                item.Labels.AddRange(ordered);
+                foreach (var label in ordered)
+                {
+                    if (label.Row?.Parent is Panel labelsPanel)
+                    {
+                        labelsPanel.Children.Remove(label.Row);
+                        labelsPanel.Children.Add(label.Row);
+                    }
+                }
+            }
+
+            var sorted = CoverSheetOrder.Sort(
+                filled,
+                item => item.MatchedItem != null && templatesByItem.TryGetValue(item.MatchedItem.Id, out var t)
+                    ? t
+                    : Enumerable.Empty<IndividualTemplate>(),
+                item => item.Description?.Id ?? item.DescriptionId,
+                item => RowText(item, item.Labels.FirstOrDefault()),
+                allDescriptions);
+
+            // Blank (no model number) cards keep their relative order at the bottom.
+            var newOrder = sorted.Concat(_items.Where(i => string.IsNullOrWhiteSpace(i.ModelNumber))).ToList();
+            _items.Clear();
+            _items.AddRange(newOrder);
+            ItemsPanel.Children.Clear();
+            foreach (var item in _items)
+                ItemsPanel.Children.Add(item.Card);
+
+            SaveDraft();
+            StatusLabel.Text = $"Sorted {filled.Count} item(s) in cover sheet order.";
+            StatusLabel.Foreground = AppColors.Success;
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = $"Could not sort: {ex.Message}";
+            StatusLabel.Foreground = AppColors.Danger;
+        }
     }
 
     private void SaveDraft()

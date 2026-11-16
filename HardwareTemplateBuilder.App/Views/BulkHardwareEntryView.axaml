@@ -7,6 +7,7 @@
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <Button DockPanel.Dock="Left"  Name="BackButton" Content="← Back to Hub" Margin="0,0,8,0"/>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                <Button Name="SortLikeCoverSheetButton" Content="Sort Like Cover Sheet"/>
                 <Button Name="GenerateCoverSheetButton" Content="Generate Cover Sheet"/>
                 <Button Name="SaveButton" Content="Save"/>
             </StackPanel>

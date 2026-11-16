@@ -8,6 +8,7 @@
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <Button DockPanel.Dock="Left"  x:Name="BackButton" Content="← Back to Hub" Margin="0,0,8,0"/>
             <ui:Stack DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                <Button x:Name="SortLikeCoverSheetButton" Content="Sort Like Cover Sheet"/>
                 <Button x:Name="GenerateCoverSheetButton" Content="Generate Cover Sheet"/>
                 <Button x:Name="SaveButton" Content="Save"/>
             </ui:Stack>

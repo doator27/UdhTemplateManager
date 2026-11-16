@@ -95,6 +95,7 @@ It does **not** write `JobTemplateSnapshot` records itself — that, along with 
 - `DynamicContext` is in `QuestPDF.Elements` (not `QuestPDF.Infrastructure`/`QuestPDF.Fluent`) — add `using QuestPDF.Elements;` if implementing `IDynamicComponent`
 - `IDynamicComponent` (non-generic) is in `QuestPDF.Infrastructure`; `IDynamicComponent<TState>` extends it with a `State` property
 - Cover sheet row ordering is by **minimum body page number** (not description path), so the Page # column always ascends in document order
+- `CoverSheetOrder` reproduces that order without building a PDF (item key = its earliest template by `WeightTemplateSortStrategy` path + template number, ties by label; items with no templates yet fall back to their own description path; nothing to place by → last). Used by the "Sort Like Cover Sheet" button on `BulkHardwareEntryView` in both apps. If `BuildCoverSheetData`'s ordering changes, update `CoverSheetOrder` to match
 
 **Duplicated pipeline logic:** `TemplateLookupView` (in both `HardwareTemplateBuilder.App` and `HardwareTemplateBuilder.Wpf`) and `HardwareTemplateBuilder.Lookup` all bypass `PdfAssemblyService` and manually re-implement steps 1–3 (`TemplateSorter` → `FileAcquirer` → `PageExtractor`/`PageRotator`/`PdfMerger`) to produce a quick merged PDF without a cover sheet or `JobTemplateSnapshot` write. Changes to those four classes' behavior/signatures must be mirrored in all three call sites, not just `PdfAssemblyService`.
 
