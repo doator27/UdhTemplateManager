@@ -79,7 +79,7 @@ public partial class BulkJobHubView : UserControl
                 Text = itemCount == 0 ? "No items yet" : $"{itemCount} item{(itemCount == 1 ? "" : "s")}",
                 Foreground = itemCount == 0 ? AppColors.Warning : AppColors.Success,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0)
+                Margin = new Thickness(8, 0, 8, 0)
             };
 
             var editBtn = new Button
@@ -105,7 +105,7 @@ public partial class BulkJobHubView : UserControl
             {
                 BorderBrush     = AppColors.Muted,
                 BorderThickness = new Thickness(1),
-                Padding         = new Thickness(10, 8),
+                Padding         = new Thickness(10, 8, 10, 8),
                 Child           = row
             };
             CardsPanel.Children.Add(card);

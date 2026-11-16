@@ -237,7 +237,7 @@ public partial class DeduplicateHardwareView : UserControl
         buttonPanel.Children.Add(mergeBtn);
         buttonPanel.Children.Add(keepBothBtn);
 
-        var content = new StackPanel { Margin = new Thickness(8, 6) };
+        var content = new StackPanel { Margin = new Thickness(8, 6, 8, 6) };
         content.Children.Add(linkLabel);
         content.Children.Add(countLabel);
         content.Children.Add(instruction);

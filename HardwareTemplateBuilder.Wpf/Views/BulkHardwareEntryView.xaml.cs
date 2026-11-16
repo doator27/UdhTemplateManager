@@ -183,8 +183,8 @@ public partial class BulkHardwareEntryView : UserControl
             FontSize = 10,
             TextWrapping = TextWrapping.Wrap
         };
-        var pickTreeBtn = new Button { Content = "⋯ Tree", FontSize = 10, Padding = new Thickness(4, 1) };
-        var newDescBtn = new Button { Content = "+ New", FontSize = 10, Padding = new Thickness(4, 1) };
+        var pickTreeBtn = new Button { Content = "⋯ Tree", FontSize = 10, Padding = new Thickness(4, 1, 4, 1) };
+        var newDescBtn = new Button { Content = "+ New", FontSize = 10, Padding = new Thickness(4, 1, 4, 1) };
         var descBtnRow = new Stack
         {
             Orientation = Orientation.Horizontal,
@@ -241,14 +241,14 @@ public partial class BulkHardwareEntryView : UserControl
             Content = "× Remove",
             FontSize = 10,
             Foreground = AppColors.Danger,
-            Padding = new Thickness(6, 2)
+            Padding = new Thickness(6, 2, 6, 2)
         };
 
         var addEditTemplateBtn = new Button
         {
             Content = "Add/Edit Template",
             FontSize = 10,
-            Padding = new Thickness(6, 2),
+            Padding = new Thickness(6, 2, 6, 2),
             Margin = new Thickness(0, 0, 4, 0)
         };
         addEditTemplateBtn.Click += (_, _) => OpenOrCreateTemplateEditorForItem(entry);
@@ -257,7 +257,7 @@ public partial class BulkHardwareEntryView : UserControl
         {
             Content = "Templates",
             FontSize = 10,
-            Padding = new Thickness(6, 2),
+            Padding = new Thickness(6, 2, 6, 2),
             Margin = new Thickness(0, 0, 4, 0)
         };
         openTemplatesBtn.Click += (_, _) => OpenTemplatesForItem(entry);
@@ -305,7 +305,7 @@ public partial class BulkHardwareEntryView : UserControl
         {
             Content = "+ Add Label",
             FontSize = 10,
-            Padding = new Thickness(6, 2)
+            Padding = new Thickness(6, 2, 6, 2)
         };
         labelsHeader.Children.Add(addLabelBtn);
         labelsPanel.Children.Add(labelsHeader);
@@ -341,7 +341,7 @@ public partial class BulkHardwareEntryView : UserControl
         {
             Content = "Add/Edit Template",
             FontSize = 10,
-            Padding = new Thickness(6, 2),
+            Padding = new Thickness(6, 2, 6, 2),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 4, 0)
         };
@@ -351,7 +351,7 @@ public partial class BulkHardwareEntryView : UserControl
         {
             Content = "Templates",
             FontSize = 10,
-            Padding = new Thickness(6, 2),
+            Padding = new Thickness(6, 2, 6, 2),
             VerticalAlignment = VerticalAlignment.Center
         };
         compactTemplatesBtn.Click += (_, _) => OpenTemplatesForItem(entry);
@@ -404,7 +404,7 @@ public partial class BulkHardwareEntryView : UserControl
             BorderBrush = AppColors.Muted,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(2),
-            Padding = new Thickness(10, 8),
+            Padding = new Thickness(10, 8, 10, 8),
             Child = cardContent
         };
         entry.Card = card;

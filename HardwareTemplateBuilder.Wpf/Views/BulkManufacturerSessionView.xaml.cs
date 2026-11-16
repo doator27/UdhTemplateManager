@@ -127,7 +127,7 @@ public partial class BulkManufacturerSessionView : UserControl
                     : $"{itemCount} item{(itemCount == 1 ? "" : "s")}, {calloutCount} line{(calloutCount == 1 ? "" : "s")}",
                 Foreground = itemCount == 0 ? AppColors.Muted : AppColors.Success,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0)
+                Margin = new Thickness(12, 0, 12, 0)
             };
 
             var editBtn = new Button
@@ -159,7 +159,7 @@ public partial class BulkManufacturerSessionView : UserControl
             {
                 Orientation = Orientation.Horizontal,
                 Spacing = 4,
-                Margin = new Thickness(0, 2)
+                Margin = new Thickness(0, 2, 0, 2)
             };
             row.Children.Add(nameLabel);
             row.Children.Add(countLabel);
@@ -171,7 +171,7 @@ public partial class BulkManufacturerSessionView : UserControl
                 BorderBrush = AppColors.Muted,
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(2),
-                Padding = new Thickness(8, 6),
+                Padding = new Thickness(8, 6, 8, 6),
                 Child = row
             };
             SessionPanel.Children.Add(border);
