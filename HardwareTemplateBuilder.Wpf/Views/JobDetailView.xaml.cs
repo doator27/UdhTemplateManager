@@ -771,17 +771,12 @@ public partial class JobDetailView : UserControl
     // --- Attachments ---
 
     /// <summary>
-    /// Resolves the App Settings shared storage dir (with My Documents fallback), the job's
-    /// resolved primary/secondary save roots, and the user profile behind them, all in one call.
+    /// Resolves the job's primary/secondary save roots from its owner's job save location
+    /// (see <see cref="JobStorageLocationResolver"/>).
     /// </summary>
     private static JobStorageLocation ResolveJobLocation(AppDbContext ctx, Job? job)
     {
-        var appSettingsDir = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
-        if (string.IsNullOrWhiteSpace(appSettingsDir))
-            appSettingsDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-
-        var profile = job != null ? ctx.UserProfiles.Find(job.UserProfileId) : null;
-        return JobStorageLocationResolver.Resolve(appSettingsDir, profile);
+        return JobStorageLocationResolver.ResolveForJob(ctx, job);
     }
 
     /// <summary>Resolves just the primary (custom, if set, else App Settings) job save root.</summary>
@@ -1088,10 +1083,7 @@ public partial class JobDetailView : UserControl
                 var displayName = release?.ReleaseLabel ?? job.JobName;
 
                 var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
-                var appSettingsDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
-                if (string.IsNullOrWhiteSpace(appSettingsDir))
-                    appSettingsDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                var jobLocation = JobStorageLocationResolver.Resolve(appSettingsDir, profile);
+                var jobLocation = JobStorageLocationResolver.ResolveForProfile(context, profile);
                 var saveDir = jobLocation.PrimaryRoot;
 
                 var allItemIds = filteredHardware.Select(jh => jh.HardwareItemId).Distinct().ToList();
@@ -1219,10 +1211,7 @@ public partial class JobDetailView : UserControl
                 var displayName = release?.ReleaseLabel ?? job.JobName;
 
                 var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
-                var appSettingsDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
-                if (string.IsNullOrWhiteSpace(appSettingsDir))
-                    appSettingsDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                var jobLocation = JobStorageLocationResolver.Resolve(appSettingsDir, profile);
+                var jobLocation = JobStorageLocationResolver.ResolveForProfile(context, profile);
                 var saveDir = jobLocation.PrimaryRoot;
 
                 var allItemIds = _linkedHardware.Select(jh => jh.HardwareItemId).Distinct().ToList();

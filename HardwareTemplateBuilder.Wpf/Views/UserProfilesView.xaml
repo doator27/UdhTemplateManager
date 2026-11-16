@@ -15,13 +15,15 @@
                 <StackPanel>
                     <TextBlock Text="User Name:" Margin="0,0,0,2" />
                     <TextBox x:Name="UserNameBox" Margin="0,0,0,10" />
-                    <TextBlock Text="Custom Job Save Location (optional):" Margin="0,0,0,2" />
-                    <TextBlock Text="Leave blank to save jobs to the shared App Settings location only. Templates always use the App Settings location." Style="{StaticResource Hint}" Margin="0,0,0,4" />
-                    <DockPanel Margin="0,0,0,10">
+                    <TextBlock Text="Job Save Location:" Margin="0,0,0,2" />
+                    <TextBlock Text="Folder where this user's jobs are saved, e.g. a folder on the server. Leave blank to use the shared App Settings location. Templates always use the App Settings location." Style="{StaticResource Hint}" Margin="0,0,0,4" />
+                    <DockPanel Margin="0,0,0,6">
                         <Button DockPanel.Dock="Right" x:Name="BrowseJobLocationButton" Content="Browse..." Margin="8,0,0,0" />
                         <Button DockPanel.Dock="Right" x:Name="ClearJobLocationButton" Content="Clear" Margin="8,0,0,0" />
-                        <TextBox x:Name="CustomJobSaveLocationBox" />
+                        <TextBox x:Name="CustomJobSaveLocationBox" ui:Watermark.Text="e.g. \\server\jobs\yourname" />
                     </DockPanel>
+                    <Button x:Name="MigrateJobsButton" Content="Move Existing Jobs Here..." HorizontalAlignment="Left" Margin="0,0,0,4" />
+                    <TextBlock Text="Moves this user's job folders that were saved on this computer (e.g. in Documents) into the job save location." Style="{StaticResource Hint}" Margin="0,0,0,10" />
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="SaveButton" Content="Save" Margin="0,0,8,0" />
                         <Button x:Name="NewButton" Content="New" Margin="0,0,8,0" />

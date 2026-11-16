@@ -148,13 +148,14 @@ public class JobPackageGenerationService
             .AsReadOnly();
 
         var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
-        var appSettingsDir = new AppSettingRepository(context).GetValue("TemplateStorageLocation");
-        if (string.IsNullOrWhiteSpace(appSettingsDir))
-            appSettingsDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
-        // Templates always use the shared App Settings location. Job output (this method's
-        // concern) may instead go to the user's custom job save location, if one is set.
-        var jobLocation = JobStorageLocationResolver.Resolve(appSettingsDir, profile);
+        // Templates always use the shared App Settings location (My Documents if unset). Job
+        // output (this method's concern) goes to the job owner's job save location when set.
+        var appSettingsDir = new AppSettingRepository(context).GetValue(JobStorageLocationResolver.SharedLocationSettingKey);
+        if (string.IsNullOrWhiteSpace(appSettingsDir))
+            appSettingsDir = JobStorageLocationResolver.FallbackRoot;
+
+        var jobLocation = JobStorageLocationResolver.ResolveForProfile(context, profile);
         var saveDir = jobLocation.PrimaryRoot;
 
         var allDescriptions = context.Descriptions.ToDictionary(d => d.Id);

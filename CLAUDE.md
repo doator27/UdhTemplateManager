@@ -68,6 +68,8 @@ dotnet ef database update --project HardwareTemplateBuilder.Core        # Apply 
 | `DescriptionPathService` | Builds hierarchical display paths for `Description` tree nodes |
 | `TemplateRefreshService` | Re-downloads or re-copies template files on demand |
 | `MissingTemplateAlertService` | Checks for hardware items missing template files at startup (best-effort, background) |
+| `JobStorageLocationResolver` | Decides where a job's folder lives: owner's `UserProfile.CustomJobSaveLocation` → App Settings `TemplateStorageLocation` → My Documents. Mirror copy to the shared location only when it is actually configured. Use `ResolveForJob`/`ResolveForProfile`; never re-implement the fallback inline |
+| `JobFolderMigrationService` | Moves a user's job folders from this computer's local fixed drives (My Documents, a local shared location, folders their attachments point at) into their job save location. Preview → confirm → Apply; never overwrites (conflicts kept as `name (moved from local drive).ext`), re-points `JobAttachment.StoredPath`, leaves `JobTemplateSnapshot` untouched. Triggered from Admin → User Profiles in both apps |
 
 ### PDF Assembly Pipeline (Core/Services/Pdf/)
 

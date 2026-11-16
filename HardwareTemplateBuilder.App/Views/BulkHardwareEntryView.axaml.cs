@@ -1023,9 +1023,9 @@ public partial class BulkHardwareEntryView : UserControl
                     throw new InvalidOperationException("Job not found.");
 
                 var profile = ctx.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
-                var saveDir = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
-                if (string.IsNullOrWhiteSpace(saveDir))
-                    saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                // Job output goes to the job owner's job save location (see JobStorageLocationResolver).
+                var jobLocation = JobStorageLocationResolver.ResolveForProfile(ctx, profile);
+                var saveDir = jobLocation.PrimaryRoot;
 
                 var rows = new List<CoverSheetRow>();
 
@@ -1093,6 +1093,10 @@ public partial class BulkHardwareEntryView : UserControl
                 var outPath = Path.Combine(jobDir, $"Bulk Entry - {safeName}.pdf");
 
                 new CoverSheetBuilder().Build(coverData, outPath);
+
+                if (jobLocation.SecondaryRoot != null)
+                    DirectoryMirrorHelper.CopyFile(outPath, Path.Combine(jobLocation.SecondaryRoot, job.JobNumber));
+
                 return outPath;
             });
         }
