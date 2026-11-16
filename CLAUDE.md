@@ -160,6 +160,13 @@ make the same change in the matching Wpf view** (and vice versa).
   Page titles are navy `CaptionBar` borders; the App's `Border.panel` frames are `GroupBox` (when they
   had a bold title) or `ContentControl Style="{StaticResource Etched}"`. Lists draw their own sunken
   frame. There is no Light/Dark setting in this frontend.
+- **Title bar:** the `Win95Window` style (Win95Extras.xaml, used by `MainWindow` and every `Win95Window`
+  dialog) replaces the Windows 10/11 title bar via `WindowChrome` with a drawn Win95 caption (navy, gray
+  when inactive; icon = system menu; bevelled min/max-restore/close) inside a raised 3D frame. Caption
+  buttons need `WindowChrome.IsHitTestVisibleInChrome="True"`. `Ui/Win95Chrome.Register()` (called in
+  `App.OnStartup`) binds the `SystemCommands` for all windows, turns off Windows 11 rounded corners and
+  pads the template root (`PART_Win95Root`) when maximized. Dialogs not in the taskbar get no minimize
+  button; `NoResize` windows get only Close. `MessageBox.Show` boxes are native and keep the OS title bar.
 - **Shell:** `MainWindow` has the same menu bar as the App (File, Jobs, Template Lookup, Maintenance,
   Admin), Win95-styled; menu items with a `Tag` navigate to that route via `Nav_Click`, the rest run a
   command. Status bar = thin sunken fields (status, user, clock). No access-key underscores in labels.
