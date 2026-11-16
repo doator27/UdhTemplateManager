@@ -7,7 +7,6 @@ using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.App.Navigation;
 using HardwareTemplateBuilder.App.Views;
 using HardwareTemplateBuilder.Core.Data;
-using HardwareTemplateBuilder.Core.Platform;
 using HardwareTemplateBuilder.Core.Services;
 
 namespace HardwareTemplateBuilder.App;
@@ -24,12 +23,6 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-
-        // Lets Windows offer "Pin to taskbar" without relying on the Start Menu shortcut.
-        WindowsTaskbar.SetRelaunchInfo(
-            TryGetPlatformHandle()?.Handle ?? System.IntPtr.Zero,
-            Program.AppUserModelId,
-            "Hardware Template Builder");
         _router = new ViewRouter(ContentArea);
         RegisterViews();
         WireMenuItems();
