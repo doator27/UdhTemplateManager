@@ -47,6 +47,12 @@ public class JobFolderMigrationPlan
     /// <summary>Gets the local folders that were searched for job folders.</summary>
     public List<string> SearchedRoots { get; init; } = new();
 
+    /// <summary>
+    /// Gets the single folder jobs are being moved out of when the plan was made for a change of
+    /// job save location (see <see cref="JobFolderMigrationService.Preview"/>), else <c>null</c>.
+    /// </summary>
+    public string? FromFolder { get; init; }
+
     /// <summary>Gets the job folders that will be moved.</summary>
     public List<JobFolderMove> Moves { get; init; } = new();
 
@@ -122,11 +128,18 @@ public class JobFolderMigrationService
     }
 
     /// <summary>
-    /// Finds every job folder owned by <paramref name="userProfileId"/> that lives in a local
-    /// folder other than the user's job save location. Reads only; changes nothing.
+    /// Finds every job folder owned by <paramref name="userProfileId"/> that lives outside the
+    /// user's job save location. Reads only; changes nothing.
     /// </summary>
+    /// <param name="userProfileId">The user whose jobs are being moved.</param>
+    /// <param name="fromFolder">
+    /// When the user's job save location was just changed, their previous location: only that
+    /// folder is searched, and it may be anywhere (including a server share). When <c>null</c>,
+    /// this computer's local drives are searched instead (My Documents, a local shared location,
+    /// folders the user's attachments point at).
+    /// </param>
     /// <exception cref="InvalidOperationException">The profile doesn't exist or has no job save location.</exception>
-    public JobFolderMigrationPlan Preview(int userProfileId)
+    public JobFolderMigrationPlan Preview(int userProfileId, string? fromFolder = null)
     {
         using var ctx = _contextFactory();
         var profile = ctx.UserProfiles.AsNoTracking().FirstOrDefault(u => u.Id == userProfileId)
@@ -140,6 +153,22 @@ public class JobFolderMigrationService
         var jobs = ctx.Jobs.AsNoTracking().Where(j => j.UserProfileId == userProfileId).ToList();
         var jobIds = jobs.Select(j => j.Id).ToList();
         var jobNumbers = jobs.Select(j => j.JobNumber).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(fromFolder))
+        {
+            var from = fromFolder.Trim().TrimEnd('\\', '/');
+            var searched = !JobStorageLocationResolver.PathsEqual(from, destination) && Directory.Exists(from)
+                ? new List<string> { from }
+                : new List<string>();
+            return new JobFolderMigrationPlan
+            {
+                UserProfileId = userProfileId,
+                DestinationRoot = destination,
+                SearchedRoots = searched,
+                FromFolder = from,
+                Moves = FindMoves(jobs, searched, destination),
+            };
+        }
 
         // Where could this user's jobs have been written on this machine?
         var candidates = new List<string> { JobStorageLocationResolver.FallbackRoot };
@@ -162,38 +191,12 @@ public class JobFolderMigrationService
             .Where(r => SafeIsLocal(r) && Directory.Exists(r))
             .ToList();
 
-        var moves = new List<JobFolderMove>();
-        foreach (var job in jobs.OrderBy(j => j.JobNumber))
-        {
-            if (string.IsNullOrWhiteSpace(job.JobNumber)) continue;
-            var destDir = Path.Combine(destination, job.JobNumber);
-
-            foreach (var root in roots)
-            {
-                var sourceDir = Path.Combine(root, job.JobNumber);
-                if (!Directory.Exists(sourceDir)) continue;
-
-                var fileCount = SafeCountFiles(sourceDir);
-                if (fileCount == 0) continue;
-
-                moves.Add(new JobFolderMove
-                {
-                    JobId = job.Id,
-                    JobNumber = job.JobNumber,
-                    SourceDir = sourceDir,
-                    DestinationDir = destDir,
-                    FileCount = fileCount,
-                    DestinationExists = Directory.Exists(destDir) || moves.Any(m => m.DestinationDir == destDir),
-                });
-            }
-        }
-
         return new JobFolderMigrationPlan
         {
             UserProfileId = userProfileId,
             DestinationRoot = destination,
             SearchedRoots = roots,
-            Moves = moves,
+            Moves = FindMoves(jobs, roots, destination),
         };
     }
 
@@ -237,15 +240,57 @@ public class JobFolderMigrationService
         return result;
     }
 
+    /// <summary>Lists each job folder (named after a job number) found under any of <paramref name="roots"/>.</summary>
+    private static List<JobFolderMove> FindMoves(List<Job> jobs, List<string> roots, string destination)
+    {
+        var moves = new List<JobFolderMove>();
+        foreach (var job in jobs.OrderBy(j => j.JobNumber))
+        {
+            if (string.IsNullOrWhiteSpace(job.JobNumber)) continue;
+            var destDir = Path.Combine(destination, job.JobNumber);
+
+            foreach (var root in roots)
+            {
+                var sourceDir = Path.Combine(root, job.JobNumber);
+                if (!Directory.Exists(sourceDir)) continue;
+
+                var fileCount = SafeCountFiles(sourceDir);
+                if (fileCount == 0) continue;
+
+                moves.Add(new JobFolderMove
+                {
+                    JobId = job.Id,
+                    JobNumber = job.JobNumber,
+                    SourceDir = sourceDir,
+                    DestinationDir = destDir,
+                    FileCount = fileCount,
+                    DestinationExists = Directory.Exists(destDir) || moves.Any(m => m.DestinationDir == destDir),
+                });
+            }
+        }
+
+        return moves;
+    }
+
     /// <summary>The confirmation text shown before <see cref="Apply"/> runs.</summary>
     public static string DescribePlan(JobFolderMigrationPlan plan, string userName)
     {
-        var lines = new List<string>
-        {
-            $"{plan.Moves.Count} job folder(s) for {userName} were found on this computer and will be moved to:",
-            plan.DestinationRoot,
-            string.Empty,
-        };
+        var lines = plan.FromFolder != null
+            ? new List<string>
+            {
+                $"{userName}'s job save location changed. Move all existing jobs from the old folder to the new one?",
+                string.Empty,
+                $"From: {plan.FromFolder}",
+                $"To:   {plan.DestinationRoot}",
+                string.Empty,
+                $"{plan.Moves.Count} job folder(s):",
+            }
+            : new List<string>
+            {
+                $"{plan.Moves.Count} job folder(s) for {userName} were found on this computer and will be moved to:",
+                plan.DestinationRoot,
+                string.Empty,
+            };
         lines.AddRange(plan.Moves.Select(m => m.Summary));
         lines.Add(string.Empty);
         lines.Add("Files are moved, not copied: the originals are removed once each file is safely in the new folder. " +
@@ -258,7 +303,9 @@ public class JobFolderMigrationService
 
     /// <summary>The message shown when <see cref="Preview"/> found nothing to move.</summary>
     public static string DescribeNothingToMove(JobFolderMigrationPlan plan, string userName) =>
-        $"No job folders for {userName} were found on this computer's local drives outside {plan.DestinationRoot}." +
+        plan.FromFolder != null
+            ? $"No job folders for {userName} were found in {plan.FromFolder}."
+            : $"No job folders for {userName} were found on this computer's local drives outside {plan.DestinationRoot}." +
         Environment.NewLine + Environment.NewLine +
         "Searched:" + Environment.NewLine +
         (plan.SearchedRoots.Count > 0 ? string.Join(Environment.NewLine, plan.SearchedRoots) : "(no local folders to search)") +

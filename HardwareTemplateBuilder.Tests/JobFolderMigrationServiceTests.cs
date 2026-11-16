@@ -210,6 +210,38 @@ public class JobFolderMigrationServiceTests : IDisposable
     }
 
     [Fact]
+    public void Preview_FromFolder_SearchesOnlyThatFolder_EvenWhenNotLocal()
+    {
+        var (userId, _, number) = SeedUserWithJob();
+        var oldServerFolder = Path.Combine(_temp, "server", "old-pat");
+        WriteFile(oldServerFolder, number, "Package.pdf", "old location");
+        WriteFile(_oldRoot, number, "Package.pdf", "local copy, not part of this move");
+
+        // Nothing counts as local: the old folder is a share, and must still be searched.
+        var service = CreateService(isLocal: _ => false);
+        var plan = service.Preview(userId, fromFolder: oldServerFolder);
+
+        Assert.Equal(oldServerFolder, plan.FromFolder);
+        Assert.Equal(Path.Combine(oldServerFolder, number), Assert.Single(plan.Moves).SourceDir);
+
+        var result = service.Apply(plan);
+        Assert.Equal(1, result.JobsMoved);
+        Assert.Equal("old location", File.ReadAllText(Path.Combine(_newRoot, number, "Package.pdf")));
+        Assert.True(File.Exists(Path.Combine(_oldRoot, number, "Package.pdf")));
+    }
+
+    [Fact]
+    public void Preview_FromFolderSameAsDestination_FindsNothing()
+    {
+        var (userId, _, number) = SeedUserWithJob();
+        WriteFile(_newRoot, number, "Package.pdf", "already there");
+
+        var plan = CreateService().Preview(userId, fromFolder: _newRoot + Path.DirectorySeparatorChar);
+
+        Assert.False(plan.HasChanges);
+    }
+
+    [Fact]
     public void Preview_RequiresJobSaveLocation()
     {
         var (userId, _, _) = SeedUserWithJob(jobLocation: "");

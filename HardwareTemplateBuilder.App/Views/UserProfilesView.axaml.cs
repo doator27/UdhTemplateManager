@@ -88,7 +88,7 @@ public partial class UserProfilesView : UserControl
         var newLocation = string.IsNullOrEmpty(customJobLocation) ? null : customJobLocation;
 
         UserProfile? saved;
-        string? previousLocation = null;
+        string? previousRoot = null;
         if (_selectedId == 0)
         {
             saved = _repo!.Add(new UserProfile
@@ -103,7 +103,10 @@ public partial class UserProfilesView : UserControl
             saved = _repo!.GetById(_selectedId);
             if (saved != null)
             {
-                previousLocation = saved.CustomJobSaveLocation;
+                // Where this user's jobs were going until now (their old location, else the
+                // shared App Settings folder, else My Documents).
+                using (var ctx = DatabaseInitializer.CreateContext())
+                    previousRoot = JobStorageLocationResolver.ResolveForProfile(ctx, saved).PrimaryRoot;
                 saved.UserName = name;
                 saved.CustomJobSaveLocation = newLocation;
                 _repo.Update(saved);
@@ -112,11 +115,12 @@ public partial class UserProfilesView : UserControl
         StatusLabel.Text = "Saved.";
         LoadList();
 
-        // A new job folder was chosen: offer to bring this user's existing jobs along.
-        var locationChanged = newLocation != null &&
-            (previousLocation == null || !JobStorageLocationResolver.PathsEqual(previousLocation, newLocation));
+        // The job save location changed: ask whether to move this user's existing jobs from the
+        // folder they were being saved to into the new one.
+        var locationChanged = newLocation != null && previousRoot != null &&
+            !JobStorageLocationResolver.PathsEqual(previousRoot, newLocation);
         if (saved != null && locationChanged)
-            await MigrateJobsAsync(saved.Id, saved.UserName, onlyIfFound: true);
+            await MigrateJobsAsync(saved.Id, saved.UserName, onlyIfFound: true, fromFolder: previousRoot);
     }
 
     private async Task MigrateJobsForSelectedAsync()
@@ -138,8 +142,11 @@ public partial class UserProfilesView : UserControl
     /// Finds the user's job folders on this computer's local drives, confirms, then moves them
     /// into their job save location (see <see cref="JobFolderMigrationService"/>).
     /// </summary>
-    /// <param name="onlyIfFound">When true, stays silent if there is nothing to move.</param>
-    private async Task MigrateJobsAsync(int profileId, string userName, bool onlyIfFound)
+    /// <param name="onlyIfFound">When true, only notes it in the status line if there is nothing to move.</param>
+    /// <param name="fromFolder">
+    /// Search only this folder (the previous job save location); null searches this computer's local drives.
+    /// </param>
+    private async Task MigrateJobsAsync(int profileId, string userName, bool onlyIfFound, string? fromFolder = null)
     {
         var window = TopLevel.GetTopLevel(this) as Window;
         if (window == null) return;
@@ -148,8 +155,10 @@ public partial class UserProfilesView : UserControl
         JobFolderMigrationPlan plan;
         try
         {
-            StatusLabel.Text = "Looking for job folders on this computer...";
-            plan = await Task.Run(() => service.Preview(profileId));
+            StatusLabel.Text = fromFolder != null
+                ? $"Saved. Looking for jobs in {fromFolder}..."
+                : "Looking for job folders on this computer...";
+            plan = await Task.Run(() => service.Preview(profileId, fromFolder));
         }
         catch (System.Exception ex)
         {
@@ -161,13 +170,18 @@ public partial class UserProfilesView : UserControl
         StatusLabel.Text = string.Empty;
         if (!plan.HasChanges)
         {
-            if (!onlyIfFound)
+            if (onlyIfFound)
+                StatusLabel.Text = fromFolder != null ? $"Saved. No existing jobs to move from {fromFolder}." : "Saved.";
+            else
                 await DialogHelper.ShowScrollableInfoAsync(window, JobFolderMigrationService.DescribeNothingToMove(plan, userName), "Move Jobs");
             return;
         }
 
-        if (!await DialogHelper.ConfirmAsync(window, JobFolderMigrationService.DescribePlan(plan, userName), "Move Jobs to Job Save Location"))
+        if (!await DialogHelper.ConfirmAsync(window, JobFolderMigrationService.DescribePlan(plan, userName), "Move Existing Jobs?"))
+        {
+            StatusLabel.Text = "Saved. Existing jobs were left where they are.";
             return;
+        }
 
         MigrateJobsButton.IsEnabled = false;
         StatusLabel.Text = $"Moving {plan.Moves.Count} job folder(s)...";
