@@ -1,0 +1,82 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+             x:Class="HardwareTemplateBuilder.Wpf.Views.AppSettingsView">
+    <DockPanel Margin="8">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}" Margin="0,0,0,6"><TextBlock Text="App Settings" Style="{StaticResource CaptionText}"/></Border>
+        <ScrollViewer>
+            <ui:Stack MaxWidth="640" HorizontalAlignment="Left" Spacing="12">
+
+                <!-- Template storage location -->
+                <GroupBox Header="Template Storage Location">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Shared folder where all template files are saved. All users on all machines must point to the same location (e.g. a network drive)."
+                                   Margin="0,0,0,8" />
+                        <Grid ui:GridEx.Columns="*,Auto" Margin="0,0,0,12">
+                            <TextBox Grid.Column="0" x:Name="StorageLocationBox" ui:Watermark.Text="e.g. \\server\templates or /mnt/shared/templates" />
+                            <Button Grid.Column="1" x:Name="BrowseButton" Content="Browse..." Width="80" Margin="6,0,0,0" />
+                        </Grid>
+                        <Button x:Name="SaveButton" Content="Save" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="StatusLabel" Margin="0,10,0,0" Foreground="{StaticResource DangerBrush}" />
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Database connection -->
+                <GroupBox Header="Database Connection">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="The shared MySQL database used by all clients. Every workstation connects directly to the same server."
+                                   Margin="0,0,0,8" />
+                        <TextBlock Text="Active connection:" FontWeight="SemiBold" Margin="0,0,0,2" />
+                        <TextBlock x:Name="CurrentDbPathLabel" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="11" Margin="0,0,0,4" />
+                        <TextBlock Text="Pointer file:" FontSize="10" Margin="0,0,0,2" />
+                        <TextBlock x:Name="PointerFilePathLabel" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="10" Margin="0,0,0,16" />
+
+                        <TextBlock Text="Update connection string:" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Example: Server=myserver;Port=3306;Database=hardware_templates;Uid=appuser;Pwd=secret;"
+                                   Margin="0,0,0,6"/>
+                        <TextBox x:Name="DbConnectPathBox" ui:Watermark.Text="Server=...;Port=3306;Database=...;Uid=...;Pwd=...;" Margin="0,0,0,8" />
+                        <Button x:Name="DbConnectButton" Content="Connect" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="DbStatusLabel" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{StaticResource DangerBrush}" />
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Upload missing records from an old SQLite backup -->
+                <GroupBox Header="Upload Missing Records from Old Database">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="Select an old SQLite database file (.db/.sqlite). Any records present in that file but missing from the active database will be added. Existing records are never changed or deleted."
+                                   Margin="0,0,0,8" />
+                        <Grid ui:GridEx.Columns="*,Auto" Margin="0,0,0,8">
+                            <TextBox Grid.Column="0" x:Name="SqliteMergePathBox" ui:Watermark.Text="Path to old .db/.sqlite file" IsReadOnly="True" />
+                            <Button Grid.Column="1" x:Name="BrowseSqliteButton" Content="Browse..." Width="80" Margin="6,0,0,0" />
+                        </Grid>
+                        <Button x:Name="UploadMissingRecordsButton" Content="Upload Missing Records" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="SqliteMergeStatusLabel" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{StaticResource DangerBrush}" />
+                    </StackPanel>
+                </GroupBox>
+
+                <!-- Requested-from-manufacturer placeholder template -->
+                <GroupBox Header="Requested-from-Manufacturer Placeholder">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hint}"
+                                   Text="The local PDF file used (linked as-is) when marking a hardware item's template as 'Requested from Manufacturer'."
+                                   Margin="0,0,0,8" />
+                        <TextBlock Text="Placeholder PDF path:" Margin="0,0,0,2" />
+                        <Grid ui:GridEx.Columns="*,Auto" Margin="0,0,0,12">
+                            <TextBox Grid.Column="0" x:Name="RequestedFromManufacturerPdfPathBox" ui:Watermark.Text="e.g. \\server\templates\placeholder.pdf" />
+                            <Button Grid.Column="1" x:Name="BrowseRequestedFromManufacturerPdfButton" Content="Browse..." Width="80" Margin="6,0,0,0" />
+                        </Grid>
+                        <Button x:Name="SaveRequestedFromManufacturerButton" Content="Save" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="RequestedFromManufacturerStatusLabel" Margin="0,10,0,0" Foreground="{StaticResource DangerBrush}" />
+                    </StackPanel>
+                </GroupBox>
+
+            </ui:Stack>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

@@ -1,0 +1,40 @@
+<UserControl x:Class="HardwareTemplateBuilder.Wpf.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel Margin="6">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}">
+            <TextBlock Text="Hardware Template Builder" Style="{StaticResource CaptionText}"/>
+        </Border>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="2,6,2,2">
+                <TextBlock x:Name="WelcomeLabel" Margin="0,0,0,8"/>
+
+                <GroupBox Header="Work" Style="{StaticResource PanelGroup}">
+                    <WrapPanel>
+                        <Button x:Name="BtnJobs"           Style="{StaticResource DashboardPrimaryButton}" Content="_Jobs" Margin="0,0,6,6"/>
+                        <Button x:Name="BtnTemplateLookup" Style="{StaticResource DashboardPrimaryButton}" Content="_Template Lookup" Margin="0,0,6,6"/>
+                    </WrapPanel>
+                </GroupBox>
+
+                <GroupBox Header="Data Management" Style="{StaticResource PanelGroup}">
+                    <WrapPanel>
+                        <Button x:Name="BtnHardwareItems"   Style="{StaticResource DashboardButton}" Content="Hardware Items" Margin="0,0,6,6"/>
+                        <Button x:Name="BtnTemplates"       Style="{StaticResource DashboardButton}" Content="Templates" Margin="0,0,6,6"/>
+                        <Button x:Name="BtnCustomers"       Style="{StaticResource DashboardButton}" Content="Customers" Margin="0,0,6,6"/>
+                        <Button x:Name="BtnManufacturers"   Style="{StaticResource DashboardButton}" Content="Manufacturers" Margin="0,0,6,6"/>
+                        <Button x:Name="BtnDescriptions"    Style="{StaticResource DashboardButton}" Content="Descriptions" Margin="0,0,6,6"/>
+                        <Button x:Name="BtnProjectManagers" Style="{StaticResource DashboardButton}" Content="Project Managers" Margin="0,0,6,6"/>
+                        <Button x:Name="BtnUserProfiles"    Style="{StaticResource DashboardButton}" Content="User Profiles" Margin="0,0,6,6"/>
+                    </WrapPanel>
+                </GroupBox>
+
+                <GroupBox Header="System" Style="{StaticResource PanelGroup}">
+                    <WrapPanel>
+                        <Button x:Name="BtnAppSettings"      Style="{StaticResource DashboardButton}" Content="App Settings" Margin="0,0,6,6"/>
+                        <Button x:Name="BtnRefreshTemplates" Style="{StaticResource DashboardButton}" Content="Refresh Templates" Margin="0,0,6,6"/>
+                    </WrapPanel>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

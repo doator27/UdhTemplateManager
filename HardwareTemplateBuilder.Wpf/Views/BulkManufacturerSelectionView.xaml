@@ -1,0 +1,60 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+             x:Class="HardwareTemplateBuilder.Wpf.Views.BulkManufacturerSelectionView">
+    <DockPanel Margin="8">
+        <!-- Top toolbar -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left"  x:Name="BackButton"     Content="← Back to Job"   Margin="0,0,8,0"/>
+            <Button DockPanel.Dock="Right" x:Name="ContinueButton" Content="Continue →"       IsEnabled="False"/>
+            <Border Style="{StaticResource CaptionBar}"><TextBlock Text="Bulk Add — Select Manufacturers" Style="{StaticResource CaptionText}"/></Border>
+        </DockPanel>
+
+        <!-- Status bar -->
+        <TextBlock DockPanel.Dock="Bottom" x:Name="StatusLabel" Margin="0,6,0,0"
+                   Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"/>
+
+        <Grid ui:GridEx.Columns="*,Auto,Auto,Auto,*">
+
+            <!-- Left: all manufacturers (searchable) -->
+            <DockPanel Grid.Column="0" MinWidth="160">
+                <TextBlock DockPanel.Dock="Top" Text="All Manufacturers:" FontWeight="Bold" Margin="0,0,0,4"/>
+                <TextBox DockPanel.Dock="Top" x:Name="SearchBox" ui:Watermark.Text="Search…" Margin="0,0,0,4"/>
+
+                <!-- Create new -->
+                <ContentControl Style="{StaticResource Etched}" DockPanel.Dock="Bottom"
+                        Padding="8" Margin="0,8,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Create new manufacturer:" FontSize="11" Margin="0,0,0,4"/>
+                        <Grid ui:GridEx.Columns="*,Auto">
+                            <TextBox Grid.Column="0" x:Name="NewMfrNameBox" ui:Watermark.Text="Manufacturer name"/>
+                            <Button  Grid.Column="1" x:Name="CreateMfrButton" Content="Add New"
+                                     Width="70" MinWidth="0" Margin="6,0,0,0"/>
+                        </Grid>
+                        <TextBlock x:Name="CreateStatusLabel" FontSize="11" Foreground="{StaticResource DangerBrush}" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </ContentControl>
+
+                <ListBox x:Name="AllMfrList" SelectionMode="Extended"/>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+
+            <!-- Middle: add/remove buttons -->
+            <ui:Stack Grid.Column="2" VerticalAlignment="Center" Spacing="6">
+                <Button x:Name="AddButton"    Content="→" Width="36" MinWidth="0" HorizontalContentAlignment="Center"/>
+                <Button x:Name="RemoveButton" Content="←" Width="36" MinWidth="0" HorizontalContentAlignment="Center"/>
+            </ui:Stack>
+
+            <GridSplitter Grid.Column="3" Width="6" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+
+            <!-- Right: selected manufacturers -->
+            <DockPanel Grid.Column="4" MinWidth="160">
+                <TextBlock DockPanel.Dock="Top" Text="Selected (for this job):" FontWeight="Bold" Margin="0,0,0,4"/>
+                <TextBlock DockPanel.Dock="Top" x:Name="SelectedCountLabel" Style="{StaticResource Hint}" Margin="0,0,0,4"/>
+                <ListBox x:Name="SelectedMfrList" SelectionMode="Extended"/>
+            </DockPanel>
+
+        </Grid>
+    </DockPanel>
+</UserControl>

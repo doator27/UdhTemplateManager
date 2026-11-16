@@ -1,0 +1,87 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+             x:Class="HardwareTemplateBuilder.Wpf.Views.JobsView">
+    <DockPanel Margin="8">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}" Margin="0,0,0,6"><TextBlock Text="Jobs" Style="{StaticResource CaptionText}"/></Border>
+        <Grid ui:GridEx.Columns="260,Auto,*">
+            <!-- Left: job list -->
+            <DockPanel Grid.Column="0" MinWidth="160" Margin="0,0,0,0">
+                <TextBlock DockPanel.Dock="Top" Text="Filter:" Margin="0,0,0,2"/>
+                <TextBox DockPanel.Dock="Top" x:Name="FilterBox" ui:Watermark.Text="Search..." Margin="0,0,0,4"/>
+                <CheckBox DockPanel.Dock="Top" x:Name="ShowCompletedCheck" Content="Show completed" Margin="0,0,0,4"/>
+                <TextBlock DockPanel.Dock="Top" Text="User:" Margin="0,0,0,2"/>
+                <ComboBox DockPanel.Dock="Top" x:Name="CreatorFilterCombo" HorizontalAlignment="Stretch"
+                          ui:Watermark.Text="(Any)" Margin="0,0,0,4"/>
+                <ui:Stack DockPanel.Dock="Top" Orientation="Horizontal" Spacing="4" Margin="0,0,0,6">
+                    <Button x:Name="SortByCreatorButton" Content="Sort: Creator ↑"/>
+                </ui:Stack>
+                <ListBox x:Name="JobList" ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+            </DockPanel>
+            <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+            <!-- Right: metadata form -->
+            <ScrollViewer Grid.Column="2" Margin="8,0,0,0">
+                <ContentControl Style="{StaticResource Etched}" Padding="10">
+                    <StackPanel>
+                        <Grid ui:GridEx.Columns="*,*" ui:GridEx.Rows="Auto,Auto,Auto,Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Job Number:" Margin="0,0,8,2"/>
+                            <TextBox   Grid.Row="1" Grid.Column="0" x:Name="JobNumberBox" Margin="0,0,8,8"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Job Name:" Margin="0,0,0,2"/>
+                            <TextBox   Grid.Row="1" Grid.Column="1" x:Name="JobNameBox" Margin="0,0,0,8"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Customer:" Margin="0,0,8,2"/>
+                            <DockPanel Grid.Row="3" Grid.Column="0" Margin="0,0,8,0">
+                                <Button DockPanel.Dock="Right" x:Name="AddCustomerButton" Content="+" Width="28" MinWidth="0" Margin="4,0,0,0"/>
+                                <ComboBox x:Name="CustomerCombo" HorizontalAlignment="Stretch"/>
+                            </DockPanel>
+                            <DockPanel Grid.Row="4" Grid.Column="0" x:Name="NewCustomerPanel" Visibility="Collapsed" Margin="0,4,8,0">
+                                <Button DockPanel.Dock="Right" x:Name="CancelCustomerButton" Content="✕" Width="28" MinWidth="0" Margin="4,0,0,0"/>
+                                <Button DockPanel.Dock="Right" x:Name="SaveCustomerButton"  Content="Add" Width="40" MinWidth="0" Margin="4,0,0,0"/>
+                                <TextBox x:Name="NewCustomerBox" ui:Watermark.Text="New customer name..."/>
+                            </DockPanel>
+
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Project Manager:" Margin="0,0,0,2"/>
+                            <DockPanel Grid.Row="3" Grid.Column="1">
+                                <Button DockPanel.Dock="Right" x:Name="AddProjectManagerButton" Content="+" Width="28" MinWidth="0" Margin="4,0,0,0"/>
+                                <ComboBox x:Name="ProjectManagerCombo" HorizontalAlignment="Stretch"/>
+                            </DockPanel>
+                            <DockPanel Grid.Row="4" Grid.Column="1" x:Name="NewProjectManagerPanel" Visibility="Collapsed" Margin="0,4,0,0">
+                                <Button DockPanel.Dock="Right" x:Name="CancelProjectManagerButton" Content="✕" Width="28" MinWidth="0" Margin="4,0,0,0"/>
+                                <Button DockPanel.Dock="Right" x:Name="SaveProjectManagerButton"  Content="Add" Width="40" MinWidth="0" Margin="4,0,0,0"/>
+                                <TextBox x:Name="NewProjectManagerBox" ui:Watermark.Text="New project manager name..."/>
+                            </DockPanel>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button x:Name="SaveButton"    Content="Save"     Margin="0,0,8,0"/>
+                            <Button x:Name="NewButton"     Content="New"      Margin="0,0,8,0"/>
+                            <Button x:Name="DeleteButton"  Content="Delete"   Margin="0,0,8,0"/>
+                            <Button x:Name="OpenJobButton" Content="Open Job" Margin="0,0,8,0"/>
+                            <Button x:Name="ToggleCompleteButton" Content="Mark Complete" Margin="0,0,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="StatusLabel" Margin="0,8,0,0" Foreground="{StaticResource DangerBrush}"/>
+
+                        <!-- Notes -->
+                        <DockPanel Margin="0,12,0,2">
+                            <TextBlock DockPanel.Dock="Left" Text="Notes:" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="NotesDateLabel" DockPanel.Dock="Right"
+                                       Style="{StaticResource Hint}"
+                                       VerticalAlignment="Center" TextAlignment="Right"/>
+                        </DockPanel>
+                        <TextBox x:Name="NotesBox"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Height="100"
+                                 ui:Watermark.Text="Waiting on templates, special instructions, reminders..."
+                                 Margin="0,0,0,4"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="SaveNotesButton" Content="Save Notes" Margin="0,0,8,0"/>
+                            <Button x:Name="ClearNotesButton" Content="Clear Note" Margin="0,0,0,0"/>
+                            <TextBlock x:Name="NotesStatusLabel" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{StaticResource DangerBrush}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ContentControl>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</UserControl>

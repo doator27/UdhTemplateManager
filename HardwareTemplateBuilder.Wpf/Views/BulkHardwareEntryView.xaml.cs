@@ -1,0 +1,1115 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using HardwareTemplateBuilder.Wpf.Ui;
+using System.Threading.Tasks;
+using HardwareTemplateBuilder.Wpf.Helpers;
+using HardwareTemplateBuilder.Core.Data;
+using HardwareTemplateBuilder.Core.Models;
+using HardwareTemplateBuilder.Core.Repositories;
+using HardwareTemplateBuilder.Core.Services;
+using HardwareTemplateBuilder.Core.Services.Pdf;
+using Microsoft.EntityFrameworkCore;
+
+namespace HardwareTemplateBuilder.Wpf.Views;
+
+/// <summary>
+/// Per-manufacturer bulk hardware entry view. Displays item cards for a single
+/// manufacturer — no manufacturer picker is shown. Each item supports multiple
+/// custom labels, each of which becomes a distinct <see cref="JobHardware"/> line item.
+/// </summary>
+public partial class BulkHardwareEntryView : UserControl
+{
+    private readonly int _jobId;
+    private readonly int _manufacturerId;
+    private Manufacturer? _manufacturer;
+    private List<Description> _allDescriptions = new();
+    private List<DescriptionComboItem> _descComboItems = new();
+    private List<DescriptionComboItem> _searchDescComboItems = new();
+
+    /// <summary>In-memory item with its matched state and UI restore callback.</summary>
+    private sealed class ItemEntry
+    {
+        public int? DescriptionId { get; set; }
+
+        public Description? Description { get; set; }
+
+        public string ModelNumber { get; set; } = string.Empty;
+
+        /// <summary>Remarks for the <see cref="HardwareItem"/> itself (not per-label).</summary>
+        public string? HardwareItemRemarks { get; set; }
+
+        public HardwareItem? MatchedItem { get; set; }
+
+        /// <summary>Label rows; always contains at least one entry.</summary>
+        public List<LabelEntry> Labels { get; } = new();
+
+        /// <summary>Callback to update all UI controls from model state after restore.</summary>
+        public Action? RestoreUI { get; set; }
+
+        /// <summary>The card border element in the scroll panel.</summary>
+        public Border Card { get; set; } = null!;
+
+        /// <summary>Single-line summary row shown when this card is collapsed.</summary>
+        public FrameworkElement? CompactPanel { get; set; }
+
+        /// <summary>Full-detail panel shown when this card is expanded.</summary>
+        public FrameworkElement? ExpandedPanel { get; set; }
+
+        /// <summary>Refreshes the compact summary text blocks from current entry state.</summary>
+        public Action? UpdateCompact { get; set; }
+
+        /// <summary>Refreshes the match label/compact summary after <see cref="MatchedItem"/> is set programmatically.</summary>
+        public Action? RefreshMatchDisplay { get; set; }
+    }
+
+    private sealed class LabelEntry
+    {
+        public string CustomLabel { get; set; } = string.Empty;
+
+        public string? Remarks { get; set; }
+
+        /// <summary>Removes this label from the UI panel; set after the row is built.</summary>
+        public Action? RemoveFromUI { get; set; }
+    }
+
+    private readonly List<ItemEntry> _items = new();
+
+    /// <summary>The item card currently shown in expanded (edit) state.</summary>
+    private ItemEntry? _activeEntry;
+
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event Action<string>? NavigationRequested;
+
+    /// <summary>Initializes the view for the given job and manufacturer.</summary>
+    /// <param name="jobId">Job being edited.</param>
+    /// <param name="manufacturerId">The single manufacturer whose items are shown.</param>
+    public BulkHardwareEntryView(int jobId, int manufacturerId)
+    {
+        _jobId = jobId;
+        _manufacturerId = manufacturerId;
+        InitializeComponent();
+        Loaded += (_, _) => Initialize();
+    }
+
+    private void Initialize()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        _manufacturer = new ManufacturerRepository(ctx).GetById(_manufacturerId);
+        _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
+        // Full hierarchy, including intermediate parent categories, so the user can pick
+        // any node from the description tree in the combo/picker below.
+        _descComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
+        // Inactive descriptions (and their hardware) must not be discoverable via search/autocomplete.
+        _searchDescComboItems = _descComboItems
+            .Where(d => _allDescriptions.First(x => x.Id == d.Id).IsActive)
+            .ToList();
+
+        HeaderLabel.Text = _manufacturer != null
+            ? $"{_manufacturer.ManufacturerName} — Items"
+            : "Items";
+
+        BackButton.Click += (_, _) =>
+        {
+            SaveDraft();
+            NavigationRequested?.Invoke($"BulkJobHub:{_jobId}");
+        };
+        SaveButton.Click += (_, _) =>
+        {
+            SaveDraft();
+            StatusLabel.Text = "Saved.";
+        };
+        GenerateCoverSheetButton.Click += async (_, _) => await GenerateCoverSheetAsync();
+        AddItemButton.Click += (_, _) => AddItem(null);
+
+        if (!RestoreFromDraft())
+        {
+            AddItem(null);
+        }
+    }
+
+    /// <summary>
+    /// Expands <paramref name="entry"/>, collapsing whichever entry was previously active.
+    /// </summary>
+    private void SetActiveEntry(ItemEntry entry)
+    {
+        if (_activeEntry == entry) return;
+
+        if (_activeEntry != null)
+        {
+            _activeEntry.UpdateCompact?.Invoke();
+            if (_activeEntry.CompactPanel  != null) _activeEntry.CompactPanel.SetVisible(true);
+            if (_activeEntry.ExpandedPanel != null) _activeEntry.ExpandedPanel.SetVisible(false);
+        }
+
+        _activeEntry = entry;
+        if (entry.CompactPanel  != null) entry.CompactPanel.SetVisible(false);
+        if (entry.ExpandedPanel != null) entry.ExpandedPanel.SetVisible(true);
+    }
+
+    /// <summary>Appends a new item card to the panel, optionally pre-populated from a draft item.</summary>
+    private void AddItem(BulkDraftItem? draft)
+    {
+        var entry = new ItemEntry();
+        _items.Add(entry);
+
+        // Editable ComboBox seeded with descriptions that currently have hardware items for
+        // this manufacturer. The user may also type any text not in the list — the full-tree
+        // fallback list below then shows matching descriptions from the global hierarchy, and
+        // the "Tree" button opens a picker over the full hierarchy.
+        var descCombo = new ComboBox
+        {
+            IsEditable = true,
+            IsTextSearchEnabled = false,
+            FontSize = 11,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            ItemsSource = GetDescriptionsForManufacturer(_manufacturerId)
+        }.WithWatermark("Description…");
+        descCombo.DisplayMemberPath = "DisplayText";
+
+        // Full-tree fallback: shown when typed text doesn't match any manufacturer description.
+        var descMatchList = new ListBox { MaxHeight = 80, Visibility = Visibility.Collapsed };
+        descMatchList.DisplayMemberPath = "DisplayText";
+        var descLabel = new TextBlock
+        {
+            Text = "(none)",
+            Foreground = AppColors.Muted,
+            FontSize = 10,
+            TextWrapping = TextWrapping.Wrap
+        };
+        var pickTreeBtn = new Button { Content = "⋯ Tree", FontSize = 10, Padding = new Thickness(4, 1) };
+        var newDescBtn = new Button { Content = "+ New", FontSize = 10, Padding = new Thickness(4, 1) };
+        var descBtnRow = new Stack
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 4,
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+        descBtnRow.Children.Add(pickTreeBtn);
+        descBtnRow.Children.Add(newDescBtn);
+        var descStack = new Stack { Spacing = 2 };
+        descStack.Children.Add(descCombo);
+        descStack.Children.Add(descMatchList);
+        descStack.Children.Add(descLabel);
+        descStack.Children.Add(descBtnRow);
+
+        var modelCombo = new ComboBox
+        {
+            IsEditable = true,
+            IsTextSearchEnabled = false,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+        modelCombo.DisplayMemberPath = "ModelNumber";
+
+        var showAllModelsCheckBox = new CheckBox
+        {
+            Content = "Show all models",
+            FontSize = 10,
+            IsChecked = true,
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+
+        var modelStack = new Stack { Spacing = 2 };
+        modelStack.Children.Add(modelCombo);
+        modelStack.Children.Add(showAllModelsCheckBox);
+
+        var itemRemarksBox = new TextBox
+        {
+            VerticalAlignment = VerticalAlignment.Top,
+            TextWrapping = TextWrapping.Wrap,
+            MaxHeight = 60
+        }.WithWatermark("Item remarks (optional)");
+
+        var matchLabel = new TextBlock
+        {
+            Text = "",
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Top,
+            Foreground = AppColors.Muted,
+            TextWrapping = TextWrapping.Wrap
+        };
+
+        var removeItemBtn = new Button
+        {
+            Content = "× Remove",
+            FontSize = 10,
+            Foreground = AppColors.Danger,
+            Padding = new Thickness(6, 2)
+        };
+
+        var addEditTemplateBtn = new Button
+        {
+            Content = "Add/Edit Template",
+            FontSize = 10,
+            Padding = new Thickness(6, 2),
+            Margin = new Thickness(0, 0, 4, 0)
+        };
+        addEditTemplateBtn.Click += (_, _) => OpenOrCreateTemplateEditorForItem(entry);
+
+        var openTemplatesBtn = new Button
+        {
+            Content = "Templates",
+            FontSize = 10,
+            Padding = new Thickness(6, 2),
+            Margin = new Thickness(0, 0, 4, 0)
+        };
+        openTemplatesBtn.Click += (_, _) => OpenTemplatesForItem(entry);
+
+        var itemContextMenu = new ContextMenu();
+        var openTemplatesMenuItem = new MenuItem { Header = "Open Templates for This Item" };
+        openTemplatesMenuItem.Click += (_, _) => OpenTemplatesForItem(entry);
+        itemContextMenu.Items.Add(openTemplatesMenuItem);
+
+        var expandedContextMenu = new ContextMenu();
+        var openTemplatesMenuItem2 = new MenuItem { Header = "Open Templates for This Item" };
+        openTemplatesMenuItem2.Click += (_, _) => OpenTemplatesForItem(entry);
+        expandedContextMenu.Items.Add(openTemplatesMenuItem2);
+
+        var topRow = new Grid
+        {
+            Margin = new Thickness(0, 0, 0, 8),
+            ContextMenu = expandedContextMenu
+        };
+        topRow.Columns("250,160,*,70,Auto,Auto,Auto");
+        topRow.Children.Add(descStack);
+        Grid.SetColumn(modelStack, 1);
+        topRow.Children.Add(modelStack);
+        Grid.SetColumn(itemRemarksBox, 2);
+        topRow.Children.Add(itemRemarksBox);
+        Grid.SetColumn(matchLabel, 3);
+        topRow.Children.Add(matchLabel);
+        Grid.SetColumn(addEditTemplateBtn, 4);
+        topRow.Children.Add(addEditTemplateBtn);
+        Grid.SetColumn(openTemplatesBtn, 5);
+        topRow.Children.Add(openTemplatesBtn);
+        Grid.SetColumn(removeItemBtn, 6);
+        topRow.Children.Add(removeItemBtn);
+
+        var labelsPanel = new Stack { Spacing = 4, Margin = new Thickness(0, 4, 0, 0) };
+        var labelsHeader = new Stack { Orientation = Orientation.Horizontal, Spacing = 8 };
+        labelsHeader.Children.Add(new TextBlock
+        {
+            Text = "Labels:",
+            FontWeight = FontWeights.SemiBold,
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        var addLabelBtn = new Button
+        {
+            Content = "+ Add Label",
+            FontSize = 10,
+            Padding = new Thickness(6, 2)
+        };
+        labelsHeader.Children.Add(addLabelBtn);
+        labelsPanel.Children.Add(labelsHeader);
+
+        // ── Compact summary row (shown when this card is not the active/focused one) ──
+        var compactDescText = new TextBlock
+        {
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        var compactModelText = new TextBlock
+        {
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        var compactRemarksText = new TextBlock
+        {
+            FontSize = 11,
+            Foreground = AppColors.Muted,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        var compactMatchText = new TextBlock
+        {
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var compactAddEditTemplateBtn = new Button
+        {
+            Content = "Add/Edit Template",
+            FontSize = 10,
+            Padding = new Thickness(6, 2),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0)
+        };
+        compactAddEditTemplateBtn.Click += (_, _) => OpenOrCreateTemplateEditorForItem(entry);
+
+        var compactTemplatesBtn = new Button
+        {
+            Content = "Templates",
+            FontSize = 10,
+            Padding = new Thickness(6, 2),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        compactTemplatesBtn.Click += (_, _) => OpenTemplatesForItem(entry);
+
+        var compactRow = new Grid
+        {
+            Cursor = Cursors.Hand,
+            Background = Brushes.Transparent,
+            ContextMenu = itemContextMenu
+        };
+        compactRow.Columns("200,150,*,70,Auto,Auto");
+        Grid.SetColumn(compactDescText,   0); compactRow.Children.Add(compactDescText);
+        Grid.SetColumn(compactModelText,  1); compactRow.Children.Add(compactModelText);
+        Grid.SetColumn(compactRemarksText, 2); compactRow.Children.Add(compactRemarksText);
+        Grid.SetColumn(compactMatchText,  3); compactRow.Children.Add(compactMatchText);
+        Grid.SetColumn(compactAddEditTemplateBtn, 4); compactRow.Children.Add(compactAddEditTemplateBtn);
+        Grid.SetColumn(compactTemplatesBtn, 5); compactRow.Children.Add(compactTemplatesBtn);
+
+        entry.UpdateCompact = () =>
+        {
+            compactDescText.Text = entry.Description != null
+                ? BuildDescPath(entry.Description)
+                : "(no description)";
+            compactDescText.Foreground = entry.Description != null ? AppColors.Primary : AppColors.Muted;
+
+            compactModelText.Text = string.IsNullOrWhiteSpace(entry.ModelNumber)
+                ? "(no model)" : entry.ModelNumber;
+
+            compactRemarksText.Text = entry.HardwareItemRemarks ?? string.Empty;
+
+            UpdateMatchLabel(compactMatchText, entry.MatchedItem, entry.ModelNumber);
+        };
+
+        compactRow.MouseLeftButtonDown += (_, _) => SetActiveEntry(entry);
+
+        // ── Expanded content (full editor) ──────────────────────────────────────
+        var expandedPanel = new StackPanel();
+        expandedPanel.Children.Add(topRow);
+        expandedPanel.Children.Add(labelsPanel);
+
+        entry.CompactPanel  = compactRow;
+        entry.ExpandedPanel = expandedPanel;
+
+        var cardContent = new StackPanel();
+        cardContent.Children.Add(compactRow);
+        cardContent.Children.Add(expandedPanel);
+
+        var card = new Border
+        {
+            BorderBrush = AppColors.Muted,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(2),
+            Padding = new Thickness(10, 8),
+            Child = cardContent
+        };
+        entry.Card = card;
+        ItemsPanel.Children.Add(card);
+
+        // New item is immediately the active (expanded) entry; any previously
+        // active entry collapses to its summary row.
+        SetActiveEntry(entry);
+
+        // Initialize the model combo with all items for this manufacturer
+        RefreshModelItems();
+
+        void RefreshModelItems()
+        {
+            if (_manufacturer == null)
+            {
+                modelCombo.ItemsSource = null;
+                return;
+            }
+
+            using var ctx = DatabaseInitializer.CreateContext();
+            var q = ctx.HardwareItems.AsQueryable()
+                .Where(h => h.ManufacturerId == _manufacturerId && h.IsActive && h.Description.IsActive);
+
+            // Only filter by description if checkbox is unchecked and a description is selected
+            if (showAllModelsCheckBox.IsChecked != true && entry.Description != null)
+            {
+                q = q.Where(h => h.DescriptionId == entry.Description.Id);
+            }
+
+            modelCombo.ItemsSource = q.OrderBy(h => h.ModelNumber).ToList();
+        }
+
+        void SyncMatch()
+        {
+            var text = modelCombo.Text?.Trim() ?? string.Empty;
+            entry.ModelNumber = text;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                entry.MatchedItem = null;
+            }
+            else if (modelCombo.SelectedItem is HardwareItem h && h.ModelNumber == text)
+            {
+                entry.MatchedItem = h;
+                
+                // If a full item was selected and we don't have a description yet (or "show all" is checked),
+                // auto-populate the description from the matched item
+                if (entry.Description == null || showAllModelsCheckBox.IsChecked == true)
+                {
+                    var matchedDesc = _allDescriptions.FirstOrDefault(d => d.Id == h.DescriptionId);
+                    if (matchedDesc != null)
+                    {
+                        SelectDescription(matchedDesc);
+                        return; // SelectDescription calls SyncMatch, avoid double processing
+                    }
+                }
+            }
+            else
+            {
+                entry.MatchedItem = null;
+                if (entry.Description != null)
+                {
+                    using var ctx = DatabaseInitializer.CreateContext();
+                    entry.MatchedItem = ctx.HardwareItems.FirstOrDefault(i =>
+                        i.ManufacturerId == _manufacturerId &&
+                        i.DescriptionId == entry.Description.Id &&
+                        i.ModelNumber == text &&
+                        i.IsActive &&
+                        i.Description.IsActive);
+                }
+            }
+
+            // Populate the remarks box from the matched item. If no match, leave
+            // the current text so the user's manually typed remarks are preserved.
+            if (entry.MatchedItem != null)
+            {
+                itemRemarksBox.Text = entry.MatchedItem.Remarks ?? string.Empty;
+            }
+
+            UpdateMatchLabel(matchLabel, entry.MatchedItem, text);
+            entry.UpdateCompact?.Invoke();
+        }
+
+        entry.RefreshMatchDisplay = () =>
+        {
+            UpdateMatchLabel(matchLabel, entry.MatchedItem, entry.ModelNumber);
+            entry.UpdateCompact?.Invoke();
+        };
+
+        // Guard to prevent re-entrant calls when SelectDescription programmatically
+        // clears descCombo.Text and SelectedItem after a selection is made.
+        bool suppressDescSync = false;
+
+        void SelectDescription(Description? desc)
+        {
+            if (suppressDescSync) return;
+            suppressDescSync = true;
+            entry.Description = desc;
+            entry.DescriptionId = desc?.Id;
+            descLabel.Text = desc != null ? BuildDescPath(desc) : "(none)";
+            descLabel.Foreground = desc != null ? AppColors.Primary : AppColors.Muted;
+            descCombo.Text = string.Empty;
+            descCombo.SelectedItem = null;
+            descMatchList.SetVisible(false);
+            
+            // When a description is selected, uncheck "Show all models" to filter the list
+            if (desc != null)
+            {
+                showAllModelsCheckBox.IsChecked = false;
+            }
+            
+            suppressDescSync = false;
+            RefreshModelItems();
+            SyncMatch();
+        }
+
+        // When the user picks a manufacturer description from the dropdown.
+        descCombo.SelectionChanged += (_, _) =>
+        {
+            if (!suppressDescSync && descCombo.SelectedItem is DescriptionComboItem item)
+                SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == item.Id));
+        };
+
+        // When the user types text: show full-tree matches as a fallback list.
+        descCombo.WhenChanged(ComboBox.TextProperty, () =>
+        {
+            if (suppressDescSync) return;
+            var q = descCombo.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(q))
+            {
+                descMatchList.SetVisible(false);
+                return;
+            }
+            var hits = _searchDescComboItems
+                .Where(d => d.DisplayText.Contains(q, StringComparison.OrdinalIgnoreCase))
+                .Take(8)
+                .ToList();
+            descMatchList.ItemsSource = hits;
+            descMatchList.SetVisible(hits.Count > 0);
+        });
+
+        descMatchList.SelectionChanged += (_, _) =>
+        {
+            if (descMatchList.SelectedItem is DescriptionComboItem item)
+            {
+                SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == item.Id));
+            }
+        };
+        pickTreeBtn.Click += async (_, _) =>
+        {
+            var picked = await OpenDescriptionPickerAsync();
+            if (picked.HasValue)
+            {
+                SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == picked.Value));
+            }
+        };
+        newDescBtn.Click += async (_, _) =>
+        {
+            var name = descCombo.Text?.Trim();
+            if (string.IsNullOrEmpty(name))
+            {
+                return;
+            }
+
+            var window = this.OwnerWindow();
+            if (window == null) return;
+
+            // Let the user pick a reference node in the hierarchy; the new description is
+            // inserted as a sibling placed immediately after that node (not as its child).
+            var parentPicker = new DescriptionPickerWindow(_allDescriptions, allowTopLevel: true);
+            var parentPick = await parentPicker.ShowDialogAsync<int?>(window);
+            if (!parentPick.HasValue) return; // cancelled
+
+            using var ctx = DatabaseInitializer.CreateContext();
+
+            int? parentId;
+            int? afterId;
+            if (parentPick.Value == DescriptionPickerWindow.TopLevelId)
+            {
+                parentId = null;
+                afterId = null;
+            }
+            else
+            {
+                var reference = ctx.Descriptions.FirstOrDefault(d => d.Id == parentPick.Value);
+                parentId = reference?.ParentId;
+                afterId = reference?.Id;
+            }
+
+            var siblings = ctx.Descriptions
+                .Where(d => d.ParentId == parentId)
+                .OrderBy(d => d.SortOrder)
+                .ThenBy(d => d.DescriptionText)
+                .ToList();
+
+            var insertIndex = afterId.HasValue
+                ? siblings.FindIndex(d => d.Id == afterId.Value) + 1
+                : siblings.Count;
+            if (insertIndex < 0) insertIndex = siblings.Count;
+
+            // Normalise existing sibling sort orders, then shift everything at/after the
+            // insertion point down by one to make room for the new node.
+            for (int i = 0; i < siblings.Count; i++)
+                siblings[i].SortOrder = i >= insertIndex ? i + 1 : i;
+
+            var newDesc = new Description { DescriptionText = name, ParentId = parentId, SortOrder = insertIndex };
+            ctx.Descriptions.Add(newDesc);
+            ctx.SaveChanges();
+
+            RefreshDescriptions();
+            SelectDescription(_allDescriptions.FirstOrDefault(d => d.Id == newDesc.Id));
+        };
+
+        modelCombo.WhenChanged(ComboBox.TextProperty, SyncMatch);
+        modelCombo.SelectionChanged += (_, _) => SyncMatch();
+
+        showAllModelsCheckBox.Click += (_, _) => RefreshModelItems();
+
+        itemRemarksBox.TextChanged += (_, _) =>
+        {
+            entry.HardwareItemRemarks = string.IsNullOrWhiteSpace(itemRemarksBox.Text)
+                ? null : itemRemarksBox.Text.Trim();
+            entry.UpdateCompact?.Invoke();
+        };
+
+        addLabelBtn.Click += (_, _) => AddLabelRow(entry, labelsPanel, null);
+
+        removeItemBtn.Click += (_, _) =>
+        {
+            if (_activeEntry == entry) _activeEntry = null;
+            _items.Remove(entry);
+            ItemsPanel.Children.Remove(card);
+        };
+
+        entry.RestoreUI = () =>
+        {
+            // Capture before SyncMatch (triggered by setting modelCombo.Text or
+            // SelectDescription) overwrites entry.HardwareItemRemarks with the DB value.
+            var savedRemarks = entry.HardwareItemRemarks;
+            modelCombo.Text = entry.ModelNumber;
+            SelectDescription(entry.Description);
+            // Restore draft remarks AFTER SyncMatch has run so the draft value wins.
+            itemRemarksBox.Text = savedRemarks ?? string.Empty;
+        };
+
+        if (draft != null)
+        {
+            if (draft.DescriptionId.HasValue)
+            {
+                entry.Description = _allDescriptions.FirstOrDefault(d => d.Id == draft.DescriptionId.Value);
+            }
+
+            entry.DescriptionId       = draft.DescriptionId;
+            entry.ModelNumber         = draft.ModelNumber;
+            entry.HardwareItemRemarks = draft.HardwareItemRemarks;
+
+            UiExtensions.Post(() => entry.RestoreUI?.Invoke());
+
+            foreach (var lbl in draft.Labels)
+            {
+                AddLabelRow(entry, labelsPanel, lbl);
+            }
+
+            if (draft.Labels.Count == 0)
+            {
+                AddLabelRow(entry, labelsPanel, null);
+            }
+        }
+        else
+        {
+            AddLabelRow(entry, labelsPanel, null);
+        }
+    }
+
+    private void AddLabelRow(ItemEntry item, Panel labelsPanel, BulkDraftLabel? draft)
+    {
+        var label = new LabelEntry
+        {
+            CustomLabel = draft?.CustomLabel ?? string.Empty,
+            Remarks = draft?.Remarks
+        };
+        item.Labels.Add(label);
+
+        var customBox = new TextBox
+        {
+            MinWidth = 160,
+            Text = label.CustomLabel
+        }.WithWatermark("Custom label (optional)");
+        var remarksBox = new TextBox
+        {
+            MinWidth = 140,
+            Text = label.Remarks ?? string.Empty
+        }.WithWatermark("Remarks (optional)");
+        var removeBtn = new Button
+        {
+            Content = "×",
+            Width = 24,
+            MinWidth = 0,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            FontSize = 10,
+            Visibility = item.Labels.Count > 1 ? Visibility.Visible : Visibility.Collapsed
+        };
+
+        var row = new Stack
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 6,
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+        row.Children.Add(customBox);
+        row.Children.Add(remarksBox);
+        row.Children.Add(removeBtn);
+        labelsPanel.Children.Add(row);
+
+        label.RemoveFromUI = () =>
+        {
+            item.Labels.Remove(label);
+            labelsPanel.Children.Remove(row);
+            UpdateLabelRemoveButtons(item, labelsPanel);
+        };
+        customBox.TextChanged += (_, _) => label.CustomLabel = customBox.Text?.Trim() ?? string.Empty;
+        remarksBox.TextChanged += (_, _) =>
+            label.Remarks = string.IsNullOrWhiteSpace(remarksBox.Text) ? null : remarksBox.Text.Trim();
+        removeBtn.Click += (_, _) => label.RemoveFromUI?.Invoke();
+
+        UpdateLabelRemoveButtons(item, labelsPanel);
+    }
+
+    private static void UpdateLabelRemoveButtons(ItemEntry item, Panel labelsPanel)
+    {
+        for (int i = 1; i < labelsPanel.Children.Count; i++)
+        {
+            if (labelsPanel.Children[i] is Panel rowPanel && rowPanel.Children.Cast<UIElement>().LastOrDefault() is Button btn)
+            {
+                btn.SetVisible(item.Labels.Count > 1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Opens the PDF template(s) linked to the hardware item matched on this row.
+    /// Prefers the locally cached file (<see cref="IndividualTemplate.LocalLink"/>); falls back
+    /// to the online link if no local copy is available. Reports status if nothing can be opened.
+    /// </summary>
+    /// <summary>
+    /// Navigates to <see cref="HardwareItemDetailView"/> for this row's hardware item so the user can
+    /// add or edit its templates directly from the bulk entry screen, without waiting for the
+    /// Template Resolution Wizard step. If the row isn't matched to an existing <see cref="HardwareItem"/>
+    /// yet, finds a matching one by Manufacturer+Description+ModelNumber or creates it on the fly
+    /// (mirroring the dedup logic in the "Add All to Job" commit path).
+    /// </summary>
+    private void OpenOrCreateTemplateEditorForItem(ItemEntry entry)
+    {
+        if (entry.Description == null || string.IsNullOrWhiteSpace(entry.ModelNumber))
+        {
+            StatusLabel.Text = "Select a description and enter a model number before adding a template.";
+            return;
+        }
+
+        if (entry.MatchedItem == null)
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var item = ctx.HardwareItems.FirstOrDefault(h =>
+                h.ManufacturerId == _manufacturerId &&
+                h.DescriptionId  == entry.Description.Id &&
+                h.ModelNumber    == entry.ModelNumber);
+
+            if (item == null)
+            {
+                item = new HardwareItem
+                {
+                    ManufacturerId = _manufacturerId,
+                    DescriptionId  = entry.Description.Id,
+                    ModelNumber    = entry.ModelNumber,
+                    Remarks        = entry.HardwareItemRemarks
+                };
+                ctx.HardwareItems.Add(item);
+                ctx.SaveChanges();
+            }
+
+            entry.MatchedItem = item;
+            entry.RefreshMatchDisplay?.Invoke();
+        }
+
+        SaveDraft();
+        NavigationRequested?.Invoke(
+            $"HardwareItemDetail:{entry.MatchedItem.Id}:BulkHardwareEntry:{_jobId}:{_manufacturerId}");
+    }
+
+    private void OpenTemplatesForItem(ItemEntry entry)
+    {
+        if (entry.MatchedItem == null)
+        {
+            StatusLabel.Text = "Match this line to an existing hardware item before opening its templates.";
+            return;
+        }
+
+        using var context = DatabaseInitializer.CreateContext();
+        var linked = context.HardwareItemTemplates
+            .Include(hit => hit.IndividualTemplate)
+            .Where(hit => hit.HardwareItemId == entry.MatchedItem.Id)
+            .Select(hit => hit.IndividualTemplate)
+            .Where(t => t != null)
+            .ToList();
+
+        if (linked.Count == 0)
+        {
+            StatusLabel.Text = "No templates are linked to this hardware item yet.";
+            return;
+        }
+
+        var opened = 0;
+        foreach (var template in linked)
+        {
+            if (TryOpenTemplate(template!))
+            {
+                opened++;
+            }
+        }
+
+        StatusLabel.Text = opened == 0
+            ? "Could not open any linked templates (no local file or online link available)."
+            : $"Opened {opened} of {linked.Count} linked template(s).";
+    }
+
+    private bool TryOpenTemplate(IndividualTemplate template)
+    {
+        try
+        {
+            var localLink = string.IsNullOrWhiteSpace(template.LocalLink)
+                ? template.LocalLink
+                : HardwareTemplateBuilder.Core.Data.NetworkPathResolver.ResolveToUnc(template.LocalLink);
+
+            if (!string.IsNullOrWhiteSpace(localLink) && File.Exists(localLink))
+            {
+                Process.Start(new ProcessStartInfo(localLink) { UseShellExecute = true });
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(template.OnlineLink))
+            {
+                Process.Start(new ProcessStartInfo(template.OnlineLink) { UseShellExecute = true });
+                return true;
+            }
+        }
+        catch
+        {
+            // Fall through to return false below.
+        }
+
+        return false;
+    }
+
+    private void SaveDraft()
+    {
+        var draft = BulkDraftService.Load(_jobId);
+        draft.Items.RemoveAll(i => i.ManufacturerId == _manufacturerId);
+
+        foreach (var item in _items.Where(i => !string.IsNullOrWhiteSpace(i.ModelNumber)))
+        {
+            draft.Items.Add(new BulkDraftItem
+            {
+                ManufacturerId      = _manufacturerId,
+                DescriptionId       = item.DescriptionId,
+                ModelNumber         = item.ModelNumber,
+                HardwareItemRemarks = item.HardwareItemRemarks,
+                Labels = item.Labels.Select(l => new BulkDraftLabel
+                {
+                    CustomLabel = l.CustomLabel,
+                    Remarks = l.Remarks
+                }).ToList()
+            });
+        }
+
+        BulkDraftService.Save(_jobId, draft);
+    }
+
+    private bool RestoreFromDraft()
+    {
+        var draft = BulkDraftService.Load(_jobId);
+        var myItems = draft.Items.Where(i => i.ManufacturerId == _manufacturerId).ToList();
+        if (myItems.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var item in myItems)
+        {
+            AddItem(item);
+        }
+
+        StatusLabel.Text = "Draft restored.";
+        return true;
+    }
+
+    private static void UpdateMatchLabel(TextBlock label, HardwareItem? matched, string model)
+    {
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            label.Text = "";
+            label.Foreground = AppColors.Muted;
+        }
+        else if (matched != null)
+        {
+            label.Text = " ✓ Matched";
+            label.Foreground = HasLinkedTemplates(matched.Id) ? AppColors.Success : AppColors.Warning;
+        }
+        else
+        {
+            label.Text = " (new)";
+            label.Foreground = AppColors.Info;
+        }
+    }
+
+    /// <summary>
+    /// Checks whether the given hardware item has at least one linked template. A matched
+    /// <see cref="HardwareItem"/> with no linked templates is still shown as "(new)" so the user
+    /// knows it hasn't actually been catalogued yet — this covers items that were only just
+    /// created via the "Add/Edit Template" button (see <see cref="OpenOrCreateTemplateEditorForItem"/>).
+    /// </summary>
+    private static bool HasLinkedTemplates(int hardwareItemId)
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        return ctx.HardwareItemTemplates.Any(hit => hit.HardwareItemId == hardwareItemId);
+    }
+
+    private void RefreshDescriptions()
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        _allDescriptions = new DescriptionRepository(ctx).GetAll().ToList();
+        _descComboItems = DescriptionHelper.BuildComboItems(_allDescriptions);
+        _searchDescComboItems = _descComboItems
+            .Where(d => _allDescriptions.First(x => x.Id == d.Id).IsActive)
+            .ToList();
+    }
+
+    private async Task<int?> OpenDescriptionPickerAsync()
+    {
+        var window = this.OwnerWindow();
+        if (window == null)
+        {
+            return null;
+        }
+
+        // Full tree is shown for navigation context; any node (including parent
+        // categories) can be picked as a hardware item's description.
+        var picker = new DescriptionPickerWindow(_allDescriptions, leafOnly: false);
+        return await picker.ShowDialogAsync<int?>(window);
+    }
+
+    /// <summary>
+    /// Returns the subset of <see cref="_descComboItems"/> whose descriptions currently have
+    /// active hardware items belonging to <paramref name="manufacturerId"/>. These are offered
+    /// as quick-select options in the per-item description ComboBox.
+    /// </summary>
+    private List<DescriptionComboItem> GetDescriptionsForManufacturer(int manufacturerId)
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var usedDescIds = ctx.HardwareItems
+            .Where(h => h.ManufacturerId == manufacturerId && h.IsActive && h.Description.IsActive)
+            .Select(h => h.DescriptionId)
+            .Distinct()
+            .ToHashSet();
+        return _searchDescComboItems.Where(d => usedDescIds.Contains(d.Id)).ToList();
+    }
+
+    private string BuildDescPath(Description target)
+    {
+        var lookup = _allDescriptions.ToDictionary(d => d.Id);
+        var parts = new List<string>();
+        var current = target;
+        while (current != null)
+        {
+            parts.Insert(0, current.DescriptionText);
+            current = current.ParentId.HasValue && lookup.TryGetValue(current.ParentId.Value, out var parent)
+                ? parent
+                : null;
+        }
+
+        return string.Join(" / ", parts);
+    }
+
+    /// <summary>
+    /// Generates a cover sheet PDF showing all hardware items currently entered for this manufacturer.
+    /// </summary>
+    private async Task GenerateCoverSheetAsync()
+    {
+        if (_items.Count == 0 || _items.All(i => string.IsNullOrWhiteSpace(i.ModelNumber)))
+        {
+            StatusLabel.Text = "Add at least one item with a model number before generating.";
+            StatusLabel.Foreground = AppColors.Danger;
+            return;
+        }
+
+        StatusLabel.Text = "Generating cover sheet...";
+        StatusLabel.Foreground = AppColors.Primary;
+
+        string outputPath;
+        try
+        {
+            outputPath = await Task.Run(() =>
+            {
+                using var ctx = DatabaseInitializer.CreateContext();
+                var job = ctx.Jobs
+                    .Include(j => j.Customer)
+                    .Include(j => j.ProjectManager)
+                    .FirstOrDefault(j => j.Id == _jobId);
+
+                if (job == null)
+                    throw new InvalidOperationException("Job not found.");
+
+                var profile = ctx.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
+                var saveDir = new AppSettingRepository(ctx).GetValue("TemplateStorageLocation");
+                if (string.IsNullOrWhiteSpace(saveDir))
+                    saveDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+                var rows = new List<CoverSheetRow>();
+
+                // Build rows from the current in-memory items.
+                foreach (var item in _items.Where(i => !string.IsNullOrWhiteSpace(i.ModelNumber)))
+                {
+                    var descText = item.Description?.DescriptionText ?? string.Empty;
+
+                    // For each label in the item (or one unlabeled row if no labels).
+                    var labelEntries = item.Labels.Count > 0
+                        ? item.Labels
+                        : new List<LabelEntry> { new LabelEntry() };
+
+                    foreach (var label in labelEntries)
+                    {
+                        var hardwareDesc = !string.IsNullOrWhiteSpace(label.CustomLabel)
+                            ? label.CustomLabel
+                            : item.ModelNumber;
+
+                        // Combine item-level remarks with every label's remark for this description,
+                        // separated by "|" when there are multiple distinct values.
+                        var remarkParts = new List<string>();
+                        if (!string.IsNullOrWhiteSpace(item.HardwareItemRemarks))
+                            remarkParts.Add(item.HardwareItemRemarks!.Trim());
+                        remarkParts.AddRange(labelEntries
+                            .Select(l => l.Remarks)
+                            .Where(r => !string.IsNullOrWhiteSpace(r))
+                            .Select(r => r!.Trim())
+                            .Distinct());
+
+                        string? combinedRemarks = remarkParts.Count > 0
+                            ? string.Join(" | ", remarkParts)
+                            : null;
+
+                        rows.Add(new CoverSheetRow
+                        {
+                            Manufacturer        = _manufacturer?.ManufacturerName ?? "Unknown",
+                            HardwareType        = descText,
+                            HardwareDescription = hardwareDesc,
+                            TemplateNumbers     = string.Empty,  // No template info in bulk entry
+                            PageNumbers         = string.Empty,
+                            Remarks             = combinedRemarks
+                        });
+                    }
+                }
+
+                if (rows.Count == 0)
+                    throw new InvalidOperationException("No items to include in the cover sheet.");
+
+                var coverData = new CoverSheetData
+                {
+                    JobNumber          = job.JobNumber,
+                    JobName            = job.JobName,
+                    CustomerName       = job.Customer?.CustomerName             ?? string.Empty,
+                    ProjectManagerName = job.ProjectManager?.ProjectManagerName ?? string.Empty,
+                    DateCreated        = DateTime.Now,
+                    PreparedBy         = profile?.UserName ?? string.Empty,
+                    Rows               = rows.AsReadOnly()
+                };
+
+                var safeName = string.Concat((_manufacturer?.ManufacturerName ?? "Unknown")
+                    .Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+                var jobDir = Path.Combine(saveDir, job.JobNumber);
+                Directory.CreateDirectory(jobDir);
+                var outPath = Path.Combine(jobDir, $"Bulk Entry - {safeName}.pdf");
+
+                new CoverSheetBuilder().Build(coverData, outPath);
+                return outPath;
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = $"Cover sheet generation failed: {ex.Message}";
+            StatusLabel.Foreground = AppColors.Danger;
+            var win = this.OwnerWindow();
+            if (win != null)
+                await DialogHelper.ShowScrollableInfoAsync(win, ex.Message, "Cover Sheet Generation Failed");
+            return;
+        }
+
+        StatusLabel.Text = $"Generated: {Path.GetFileName(outputPath)}";
+        StatusLabel.Foreground = AppColors.Success;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(outputPath) { UseShellExecute = true });
+        }
+        catch
+        {
+            // Non-fatal: file was generated but couldn't be auto-opened.
+        }
+    }
+}

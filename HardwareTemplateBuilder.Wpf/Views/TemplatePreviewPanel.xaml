@@ -1,0 +1,19 @@
+<UserControl x:Class="HardwareTemplateBuilder.Wpf.Views.TemplatePreviewPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui">
+    <DockPanel>
+        <ui:Stack DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,4" Spacing="8">
+            <Button x:Name="PrevPageButton" Content="&lt; _Prev" IsEnabled="False"/>
+            <TextBlock x:Name="PageLabel" VerticalAlignment="Center" Text="No template selected"/>
+            <Button x:Name="NextPageButton" Content="_Next &gt;" IsEnabled="False"/>
+        </ui:Stack>
+        <!-- Pages render on the dark-gray "viewer" background, inside a sunken frame -->
+        <ContentControl Style="{StaticResource Sunken}" Background="{StaticResource ShadowBrush}">
+            <ScrollViewer x:Name="PdfScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <Image x:Name="PdfPreviewImage" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Top"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+            </ScrollViewer>
+        </ContentControl>
+    </DockPanel>
+</UserControl>

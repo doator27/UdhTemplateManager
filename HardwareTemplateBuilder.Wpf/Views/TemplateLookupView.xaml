@@ -1,0 +1,87 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+             x:Class="HardwareTemplateBuilder.Wpf.Views.TemplateLookupView">
+    <DockPanel Margin="8">
+
+        <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}" Margin="0,0,0,6"><TextBlock Text="Individual Template Lookup" Style="{StaticResource CaptionText}"/></Border>
+
+        <!-- Progress + status (docked bottom) -->
+        <ProgressBar DockPanel.Dock="Bottom" x:Name="GenerateProgress"
+                     IsIndeterminate="True" Visibility="Collapsed"
+                     Height="14" Margin="0,8,0,4"/>
+        <TextBlock DockPanel.Dock="Bottom" x:Name="StatusLabel" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"/>
+
+        <!-- Lookup controls (left) + PDF previewer (right), resizable via splitter -->
+        <Grid ui:GridEx.Columns="340,8,*">
+
+            <!-- Left: lookup controls -->
+            <DockPanel Grid.Column="0">
+                <ui:Stack DockPanel.Dock="Top" Spacing="8">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Manufacturer" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="MfrCombo" HorizontalAlignment="Stretch"/>
+                    </DockPanel>
+
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Description" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="DescCombo" HorizontalAlignment="Stretch"/>
+                    </DockPanel>
+
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Model #" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="ModelCombo" HorizontalAlignment="Stretch"/>
+                    </DockPanel>
+
+                    <ui:Stack Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                        <Button x:Name="ExportLookupDataButton" Content="Update Lookup App Data"/>
+                        <Button x:Name="ClearButton" Content="Clear" Width="100"/>
+                    </ui:Stack>
+
+                    <ContentControl Style="{StaticResource Etched}" Padding="8" Margin="0,8,0,0">
+                        <ui:Stack Spacing="8">
+                            <TextBlock Text="Hardware Description:" FontWeight="Bold"/>
+                            <TextBox x:Name="LabelLookupBox" ui:Watermark.Text="Enter exact label used on a job..." VerticalContentAlignment="Center"/>
+                            <ListBox x:Name="LabelSuggestionsList" MaxHeight="140" Visibility="Collapsed"/>
+                            <ui:Stack Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                                <Button x:Name="LookupButton" Content="Lookup" Width="100"/>
+                            </ui:Stack>
+                        </ui:Stack>
+                    </ContentControl>
+
+                    <ContentControl Style="{StaticResource Etched}" Padding="8">
+                        <StackPanel>
+                            <TextBlock x:Name="SelectedMfrLabel" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                            <TextBlock x:Name="SelectedDescLabel" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                            <TextBlock x:Name="SelectedModelLabel" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                            <TextBlock x:Name="SelectedFreqLabel" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,8"/>
+                            <Button x:Name="GenerateButton"
+                                    Content="Generate PDF"
+                                    IsEnabled="False"
+                                    HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+                    </ContentControl>
+                </ui:Stack>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Stretch" ResizeDirection="Columns"/>
+
+            <!-- Right: PDF previewer fills the rest of the page -->
+            <ContentControl Style="{StaticResource Etched}" Grid.Column="2" Padding="4">
+                <DockPanel>
+                    <ui:Stack DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,4" Spacing="8">
+                        <Button x:Name="PrevPageButton" Content="&lt; Prev" IsEnabled="False"/>
+                        <TextBlock x:Name="PageLabel" VerticalAlignment="Center" Text="No document loaded"/>
+                        <Button x:Name="NextPageButton" Content="Next &gt;" IsEnabled="False"/>
+                    </ui:Stack>
+                    <ContentControl Style="{StaticResource Sunken}" Background="{StaticResource ShadowBrush}">
+                        <ScrollViewer x:Name="PdfScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                            <Image x:Name="PdfPreviewImage" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </ScrollViewer>
+                    </ContentControl>
+                </DockPanel>
+            </ContentControl>
+        </Grid>
+    </DockPanel>
+</UserControl>

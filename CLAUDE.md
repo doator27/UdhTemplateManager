@@ -19,6 +19,7 @@ HardwareTemplateBuilder.sln
 ├── HardwareTemplateBuilder.Core/       # Class library: models, EF context, repositories, services
 ├── HardwareTemplateBuilder.App/        # Avalonia UI application (main product)
 ├── HardwareTemplateBuilder.Lookup/     # Standalone read-only Avalonia app: search + generate/open a merged template PDF, no write access to the DB
+├── HardwareTemplateBuilder.Wpf/        # WPF port of HardwareTemplateBuilder.App with a Windows 95 look (Windows-only at runtime)
 ├── HardwareTemplateBuilder.Tests/      # xUnit tests
 ├── HardwareTemplateBuilder.SmokeTest/  # Console smoke tests: full CRUD against all entity types
 └── HardwareTemplateBuilder.MigrationTool/  # One-time console tool: copies data from a legacy SQLite DB into MySQL
@@ -33,6 +34,7 @@ HardwareTemplateBuilder.Diagnostic/     # Standalone console scratch project (no
 dotnet build                          # Build the solution
 dotnet run --project HardwareTemplateBuilder.App  # Run the main app
 dotnet run --project HardwareTemplateBuilder.Lookup  # Run the standalone read-only template lookup app
+dotnet run --project HardwareTemplateBuilder.Wpf     # Run the Windows 95-style WPF frontend (Windows only; builds anywhere)
 dotnet test                           # Run all tests
 dotnet test --filter "FullyQualifiedName~PageRangeParser"  # Run a single test class
 dotnet ef migrations add <Name> --project HardwareTemplateBuilder.Core  # Add EF migration
@@ -92,7 +94,7 @@ It does **not** write `JobTemplateSnapshot` records itself — that, along with 
 - `IDynamicComponent` (non-generic) is in `QuestPDF.Infrastructure`; `IDynamicComponent<TState>` extends it with a `State` property
 - Cover sheet row ordering is by **minimum body page number** (not description path), so the Page # column always ascends in document order
 
-**Duplicated pipeline logic:** `TemplateLookupView` (in `HardwareTemplateBuilder.App`) and `HardwareTemplateBuilder.Lookup` both bypass `PdfAssemblyService` and manually re-implement steps 1–3 (`TemplateSorter` → `FileAcquirer` → `PageExtractor`/`PageRotator`/`PdfMerger`) to produce a quick merged PDF without a cover sheet or `JobTemplateSnapshot` write. Changes to those four classes' behavior/signatures must be mirrored in both call sites, not just `PdfAssemblyService`.
+**Duplicated pipeline logic:** `TemplateLookupView` (in both `HardwareTemplateBuilder.App` and `HardwareTemplateBuilder.Wpf`) and `HardwareTemplateBuilder.Lookup` all bypass `PdfAssemblyService` and manually re-implement steps 1–3 (`TemplateSorter` → `FileAcquirer` → `PageExtractor`/`PageRotator`/`PdfMerger`) to produce a quick merged PDF without a cover sheet or `JobTemplateSnapshot` write. Changes to those four classes' behavior/signatures must be mirrored in all three call sites, not just `PdfAssemblyService`.
 
 ### UI (App/)
 
@@ -137,6 +139,40 @@ Views that launch background work store a `CancellationTokenSource?` field and t
 #### Error Handling
 
 Batch operations (PDF assembly, template refresh) collect all per-item failures into a list and throw a single `InvalidOperationException` with a consolidated report — not fail-fast. `PdfAssemblyService.AssembleAsync`'s report further groups failures by category (hardware item / template / other) — see PDF Assembly Pipeline above. Batch **job** generation (`BatchJobPackageGenerationService`) applies this same collect-and-continue idea one level up: a failing job is skipped and recorded, not fatal to the run, while cancellation aborts the whole batch rather than skipping just the current job. Background startup tasks (missing-template alert, auto-refresh) swallow all exceptions to avoid disrupting the UI.
+
+### WPF frontend (Wpf/)
+
+`HardwareTemplateBuilder.Wpf` is a feature-for-feature port of `HardwareTemplateBuilder.App` to WPF
+(`net8.0-windows`, `EnableWindowsTargeting=true` so the solution still builds on Linux/CI). It shares
+`HardwareTemplateBuilder.Core` and mirrors the App's structure file-for-file: same view names, same
+code-behind (no MVVM), same `ViewRouter` route strings and `"ViewName:{id}"` parameterized routes, same
+`SessionService`/`BulkAddSession`/`BulkDraftService` state. **When you change behavior in an App view,
+make the same change in the matching Wpf view** (and vice versa).
+
+- **Look:** Windows 95, copied from SpecialJobLookup's WPF theme so the two apps match. `Themes/Win95.xaml`
+  is that theme (bevelled 3D edges built from nested 1px borders, gray `#C0C0C0` face, navy `#000080`
+  selection/caption, MS Sans Serif); `Themes/Win95Extras.xaml` merges it and adds menus, radio buttons,
+  tree, progress bar, the `Etched` frame and dashboard button styles. App.xaml merges only Extras.
+  Page titles are navy `CaptionBar` borders; the App's `Border.panel` frames are `GroupBox` (when they
+  had a bold title) or `ContentControl Style="{StaticResource Etched}"`. Lists draw their own sunken
+  frame. There is no Light/Dark setting in this frontend.
+- **Shell:** `MainWindow` uses a Start-menu style sidebar (navy gradient banner, grouped items) instead
+  of the App's menu bar; every menu command is there under the same group names (Maintenance, Admin,
+  File items at the bottom). Status bar = thin sunken fields (status, user, clock).
+- **Avalonia shims in `Ui/`** keep ported code close to the original: `ui:GridEx.Columns/Rows`
+  (compact `"Auto,*"` grid specs), `ui:Stack` (StackPanel with `Spacing`), `ui:Watermark.Text`
+  (placeholder for TextBox/ComboBox, drawn by the theme templates), `Win95Window` (dialog base with
+  `CloseWith(result)` / `ShowDialogAsync<T>(owner)` in place of Avalonia's `Close(result)` /
+  `ShowDialog<T>`), `ItemFactory.SetItemFactory<T>` (code-built list rows, for Avalonia's
+  `FuncDataTemplate`), `FilePickers` (Win32 dialogs returning paths), and `UiExtensions`
+  (`SetVisible`/`IsShown` for `IsVisible`, `OwnerWindow()` for `TopLevel.GetTopLevel`,
+  `WhenChanged` for `PropertyChanged` checks, `UiExtensions.Post` for `Dispatcher.UIThread.Post`).
+- `Helpers/AppColors` has the same member names as the App's but Win95-palette colors (dark red,
+  dark green, navy). Use it for code-behind status colors, same rule as in the App.
+- Gotchas: WPF `SelectionChanged`/`TextChanged` bubble, so a selector inside another selector's item
+  will fire the outer handler; `CheckBox.Click` (used for Avalonia's `IsCheckedChanged`) only fires on
+  user clicks, not programmatic `IsChecked` changes; `TreeView.SelectedItem` is read-only, so
+  `DescriptionsView` binds `IsSelected`/`IsExpanded` on its node objects instead.
 
 ### Description Hierarchy
 

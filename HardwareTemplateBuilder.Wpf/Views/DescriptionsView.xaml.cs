@@ -1,0 +1,421 @@
+using HardwareTemplateBuilder.Wpf.Helpers;
+using HardwareTemplateBuilder.Core.Data;
+using HardwareTemplateBuilder.Core.Models;
+using HardwareTemplateBuilder.Core.Repositories;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Windows.Threading;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using HardwareTemplateBuilder.Wpf.Ui;
+
+namespace HardwareTemplateBuilder.Wpf.Views;
+
+/// <summary>
+/// View for managing the <see cref="Description"/> hierarchy tree.
+/// Users can add root items, add children to any node, rename, reorder within siblings,
+/// indent/unindent, and delete leaf nodes.
+/// </summary>
+public partial class DescriptionsView : UserControl
+{
+    /// <summary>
+    /// Lightweight tree node used as the data item for the <c>TreeView</c>.
+    /// </summary>
+    private sealed class DescriptionNode : INotifyPropertyChanged
+    {
+        private bool _isExpanded;
+        private bool _isSelected;
+
+        public int Id { get; init; }
+        public string DescriptionText { get; set; } = "";
+        public int SortOrder { get; set; }
+        public int? ParentId { get; set; }
+        public bool IsActive { get; set; } = true;
+        public string DisplayDescriptionText => IsActive ? DescriptionText : $"[INACTIVE] {DescriptionText}";
+        public ObservableCollection<DescriptionNode> Children { get; } = new();
+
+        /// <summary>Bound to <c>TreeViewItem.IsExpanded</c>.</summary>
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set { if (_isExpanded == value) return; _isExpanded = value; Raise(nameof(IsExpanded)); }
+        }
+
+        /// <summary>Bound to <c>TreeViewItem.IsSelected</c> (WPF's TreeView.SelectedItem is read-only).</summary>
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { if (_isSelected == value) return; _isSelected = value; Raise(nameof(IsSelected)); }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    private DescriptionRepository? _repo;
+    /// <summary>Root nodes of the currently displayed tree.</summary>
+    private readonly ObservableCollection<DescriptionNode> _roots = new();
+    /// <summary>IDs of nodes that were expanded before the last tree rebuild.</summary>
+    private readonly HashSet<int> _expandedIds = new();
+
+    /// <summary>Raised when the user requests navigation to a named view.</summary>
+    public event System.Action<string>? NavigationRequested;
+
+    /// <summary>Initializes the view.</summary>
+    public DescriptionsView()
+    {
+        InitializeComponent();
+        Loaded += (_, _) => Initialize();
+    }
+
+    private void Initialize()
+    {
+        var context = DatabaseInitializer.CreateContext();
+        _repo = new DescriptionRepository(context);
+
+        DescTree.ItemsSource = _roots;
+
+        DescTree.SelectedItemChanged += (_, _) => OnTreeSelectionChanged();
+        SaveButton.Click          += (_, _) => Save();
+        AddRootButton.Click       += (_, _) => AddNode(parentId: null);
+        AddChildButton.Click      += (_, _) => AddChildToSelected();
+        DeleteButton.Click        += (_, _) => DeleteSelected();
+        MoveUpButton.Click        += (_, _) => MoveSelected(-1);
+        MoveDownButton.Click      += (_, _) => MoveSelected(1);
+        IndentButton.Click        += (_, _) => IndentSelected();
+        UnindentButton.Click      += (_, _) => UnindentSelected();
+        ShowInactiveCheck.Click += (_, _) => LoadTree();
+
+        LoadTree();
+    }
+
+    // ── Tree build ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Rebuilds the tree from the database, then restores expansion state and optionally
+    /// re-selects a specific node. Pass <paramref name="keepSelectedId"/> to restore the
+    /// selection after the rebuild (e.g. after a move operation). Pass
+    /// <paramref name="forceExpandId"/> to ensure a newly-relevant parent is expanded
+    /// even if it was not expanded before (e.g. after an indent).
+    /// </summary>
+    private void LoadTree(int? keepSelectedId = null, int? forceExpandId = null)
+    {
+        // Snapshot which nodes are currently expanded before wiping the collection.
+        _expandedIds.Clear();
+        CollectExpandedIds(_roots);
+        if (forceExpandId.HasValue)
+            _expandedIds.Add(forceExpandId.Value);
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var all = ctx.Descriptions.AsNoTracking().ToList();
+        if (ShowInactiveCheck.IsChecked != true)
+            all = all.Where(d => d.IsActive).ToList();
+        _roots.Clear();
+        BuildNodes(all, null, _roots, _expandedIds);
+
+        if (keepSelectedId.HasValue && FindNode(keepSelectedId.Value, _roots) is { } selected)
+        {
+            selected.IsSelected = true;
+            // Containers exist after the next layout pass; scroll the selection into view then.
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, () => BringNodeIntoView(selected));
+        }
+    }
+
+    /// <summary>Recursively collects the IDs of all currently expanded nodes.</summary>
+    private void CollectExpandedIds(IEnumerable<DescriptionNode> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            if (!node.IsExpanded) continue;
+            _expandedIds.Add(node.Id);
+            CollectExpandedIds(node.Children);
+        }
+    }
+
+    /// <summary>Depth-first search for the node with the given ID.</summary>
+    private static DescriptionNode? FindNode(int id, IEnumerable<DescriptionNode> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.Id == id) return node;
+            if (FindNode(id, node.Children) is { } match) return match;
+        }
+        return null;
+    }
+
+    /// <summary>Scrolls the tree so the given node's container is visible.</summary>
+    private void BringNodeIntoView(DescriptionNode target)
+    {
+        var container = FindContainer(DescTree, target);
+        container?.BringIntoView();
+    }
+
+    private static TreeViewItem? FindContainer(ItemsControl parent, DescriptionNode target)
+    {
+        foreach (var item in parent.Items)
+        {
+            if (parent.ItemContainerGenerator.ContainerFromItem(item) is not TreeViewItem tvi) continue;
+            if (ReferenceEquals(item, target)) return tvi;
+            if (FindContainer(tvi, target) is { } nested) return nested;
+        }
+        return null;
+    }
+
+    private static void BuildNodes(
+        List<Description> all,
+        int? parentId,
+        ObservableCollection<DescriptionNode> target,
+        HashSet<int> expandedIds)
+    {
+        var children = all
+            .Where(d => d.ParentId == parentId)
+            .OrderBy(d => d.SortOrder)
+            .ThenBy(d => d.DescriptionText);
+
+        foreach (var d in children)
+        {
+            var node = new DescriptionNode
+            {
+                Id = d.Id, DescriptionText = d.DescriptionText,
+                SortOrder = d.SortOrder, ParentId = d.ParentId,
+                IsActive = d.IsActive,
+                IsExpanded = expandedIds.Contains(d.Id)
+            };
+            BuildNodes(all, d.Id, node.Children, expandedIds);
+            target.Add(node);
+        }
+    }
+
+    private DescriptionNode? SelectedNode =>
+        DescTree.SelectedItem as DescriptionNode;
+
+    private void OnTreeSelectionChanged()
+    {
+        if (SelectedNode is DescriptionNode node)
+        {
+            DescriptionBox.Text = node.DescriptionText;
+            ActiveCheckBox.IsChecked = node.IsActive;
+            StatusLabel.Text = "";
+        }
+    }
+
+    // ── CRUD ──────────────────────────────────────────────────────────────
+
+    private void Save()
+    {
+        var node = SelectedNode;
+        if (node == null) { StatusLabel.Text = "Select a node to rename."; return; }
+
+        var text = DescriptionBox.Text?.Trim();
+        if (string.IsNullOrEmpty(text)) { StatusLabel.Text = "Name is required."; return; }
+
+        var existing = _repo!.GetById(node.Id);
+        if (existing == null) return;
+        var wasActive = existing.IsActive;
+        var isActive = ActiveCheckBox.IsChecked ?? true;
+        existing.DescriptionText = text;
+        existing.IsActive = isActive;
+        _repo.Update(existing);
+
+        if (wasActive && !isActive)
+            DeactivateHardwareItemsUnder(node.Id);
+
+        StatusLabel.Text = "Saved.";
+        LoadTree(node.Id);
+    }
+
+    /// <summary>
+    /// Marks every hardware item belonging to the given description, or to any of its
+    /// descendant descriptions, as inactive.
+    /// </summary>
+    private void DeactivateHardwareItemsUnder(int descriptionId)
+    {
+        using var ctx = DatabaseInitializer.CreateContext();
+        var ids = CollectDescendantDescriptionIds(ctx, descriptionId);
+
+        var items = ctx.HardwareItems.Where(h => ids.Contains(h.DescriptionId)).ToList();
+        foreach (var item in items)
+            item.IsActive = false;
+
+        ctx.SaveChanges();
+    }
+
+    /// <summary>Returns the given description ID plus the IDs of all its descendant nodes.</summary>
+    private static HashSet<int> CollectDescendantDescriptionIds(AppDbContext ctx, int rootId)
+    {
+        var all = ctx.Descriptions.AsNoTracking().ToList();
+        var result = new HashSet<int> { rootId };
+        var queue = new Queue<int>();
+        queue.Enqueue(rootId);
+
+        while (queue.Count > 0)
+        {
+            var currentId = queue.Dequeue();
+            foreach (var child in all.Where(d => d.ParentId == currentId))
+            {
+                if (result.Add(child.Id))
+                    queue.Enqueue(child.Id);
+            }
+        }
+
+        return result;
+    }
+
+    private void AddNode(int? parentId)
+    {
+        var text = DescriptionBox.Text?.Trim();
+        if (string.IsNullOrEmpty(text)) { StatusLabel.Text = "Enter a name first."; return; }
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var siblings = ctx.Descriptions.Where(d => d.ParentId == parentId).ToList();
+        var maxOrder = siblings.Any() ? siblings.Max(d => d.SortOrder) : -1;
+
+        var added = _repo!.Add(new Description
+        {
+            DescriptionText = text,
+            ParentId = parentId,
+            SortOrder = maxOrder + 1
+        });
+
+        StatusLabel.Text = "Added.";
+        DescriptionBox.Text = "";
+        // Expand the parent so the new child is visible, then select it.
+        LoadTree(added.Id, forceExpandId: parentId);
+    }
+
+    private void AddChildToSelected()
+    {
+        var node = SelectedNode;
+        if (node == null) { StatusLabel.Text = "Select a parent node first."; return; }
+        AddNode(parentId: node.Id);
+    }
+
+    private void DeleteSelected()
+    {
+        var node = SelectedNode;
+        if (node == null) { StatusLabel.Text = "Select a node to delete."; return; }
+        if (node.Children.Count > 0)
+        {
+            StatusLabel.Text = "Remove all children before deleting this item.";
+            return;
+        }
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var entity = ctx.Descriptions.Find(node.Id);
+        if (entity != null)
+        {
+            ctx.Descriptions.Remove(entity);
+            ctx.SaveChanges();
+        }
+        StatusLabel.Text = "Deleted.";
+        DescriptionBox.Text = "";
+        LoadTree();
+    }
+
+    // ── Reorder ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Moves the selected node up (-1) or down (+1) within its sibling list.
+    /// </summary>
+    private void MoveSelected(int direction)
+    {
+        var node = SelectedNode;
+        if (node == null) return;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var siblings = ctx.Descriptions
+            .Where(d => d.ParentId == node.ParentId)
+            .OrderBy(d => d.SortOrder)
+            .ThenBy(d => d.DescriptionText)
+            .ToList();
+
+        // Normalise to 0,1,2,…
+        for (int i = 0; i < siblings.Count; i++) siblings[i].SortOrder = i;
+
+        var idx = siblings.FindIndex(d => d.Id == node.Id);
+        if (idx < 0) return;
+        var swapIdx = idx + direction;
+        if (swapIdx < 0 || swapIdx >= siblings.Count) return;
+
+        (siblings[idx].SortOrder, siblings[swapIdx].SortOrder) =
+            (siblings[swapIdx].SortOrder, siblings[idx].SortOrder);
+
+        ctx.SaveChanges();
+        LoadTree(node.Id);
+    }
+
+    /// <summary>
+    /// Makes the selected node a child of its immediately preceding sibling
+    /// (moves it one level deeper).
+    /// </summary>
+    private void IndentSelected()
+    {
+        var node = SelectedNode;
+        if (node == null) return;
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var siblings = ctx.Descriptions
+            .Where(d => d.ParentId == node.ParentId)
+            .OrderBy(d => d.SortOrder)
+            .ThenBy(d => d.DescriptionText)
+            .ToList();
+
+        var idx = siblings.FindIndex(d => d.Id == node.Id);
+        if (idx <= 0) { StatusLabel.Text = "No sibling above to indent under."; return; }
+
+        var newParent = siblings[idx - 1];
+        var newSiblings = ctx.Descriptions.Where(d => d.ParentId == newParent.Id).ToList();
+        var maxOrder = newSiblings.Any() ? newSiblings.Max(d => d.SortOrder) : -1;
+
+        var entity = ctx.Descriptions.Find(node.Id)!;
+        entity.ParentId = newParent.Id;
+        entity.SortOrder = maxOrder + 1;
+        ctx.SaveChanges();
+
+        // forceExpandId ensures the new parent is open so the moved item is visible.
+        LoadTree(node.Id, forceExpandId: newParent.Id);
+    }
+
+    /// <summary>
+    /// Moves the selected node up one level (makes it a sibling of its current parent,
+    /// placed immediately after it).
+    /// </summary>
+    private void UnindentSelected()
+    {
+        var node = SelectedNode;
+        if (node == null) return;
+        if (node.ParentId == null) { StatusLabel.Text = "Already a root item."; return; }
+
+        using var ctx = DatabaseInitializer.CreateContext();
+        var parent = ctx.Descriptions.Find(node.ParentId.Value);
+        if (parent == null) return;
+
+        // Place after parent among grandparent's children.
+        var grandSiblings = ctx.Descriptions
+            .Where(d => d.ParentId == parent.ParentId)
+            .OrderBy(d => d.SortOrder)
+            .ThenBy(d => d.DescriptionText)
+            .ToList();
+
+        // Normalise, then insert after parent.
+        for (int i = 0; i < grandSiblings.Count; i++) grandSiblings[i].SortOrder = i * 2;
+        var parentInList = grandSiblings.FirstOrDefault(d => d.Id == parent.Id);
+        if (parentInList != null)
+        {
+            var entity = ctx.Descriptions.Find(node.Id)!;
+            entity.ParentId = parent.ParentId;
+            entity.SortOrder = parentInList.SortOrder + 1;
+
+            // Re-normalise to close the gap
+            foreach (var s in grandSiblings.Where(d => d.SortOrder > parentInList.SortOrder))
+                s.SortOrder += 2;
+        }
+        ctx.SaveChanges();
+        LoadTree(node.Id);
+    }
+}

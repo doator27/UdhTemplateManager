@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    WPF frontend for Hardware Template Builder with a Windows 95 look.
+    Functionally mirrors HardwareTemplateBuilder.App (the Avalonia frontend) and shares
+    HardwareTemplateBuilder.Core with it. Windows-only at runtime; EnableWindowsTargeting lets
+    the solution still build on Linux (CI and dev machines).
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <StartupObject>HardwareTemplateBuilder.Wpf.Program</StartupObject>
+    <!-- App.xaml is compiled as a plain Page so Program.Main can own startup (single-instance
+         mutex, AppUserModelID) before the WPF Application starts. -->
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Product>Hardware Template Builder 95</Product>
+    <Description>Hardware Template Builder (WPF, Windows 95 edition)</Description>
+    <AssemblyName>HardwareTemplateBuilder.Wpf</AssemblyName>
+    <RootNamespace>HardwareTemplateBuilder.Wpf</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\AppIcon.png" />
+    <Resource Include="Assets\AppIcon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PDFtoImage" Version="4.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HardwareTemplateBuilder.Core\HardwareTemplateBuilder.Core.csproj" />
+  </ItemGroup>
+</Project>

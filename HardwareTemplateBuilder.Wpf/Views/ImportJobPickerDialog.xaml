@@ -1,0 +1,23 @@
+<ui:Win95Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+        x:Class="HardwareTemplateBuilder.Wpf.Views.ImportJobPickerDialog"
+        Title="Import Hardware from Job"
+        Width="420" Height="320"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <DockPanel Margin="12">
+        <ui:Stack DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right"
+                    Spacing="8" Margin="0,10,0,0">
+            <Button x:Name="ImportButton" Content="Import" IsDefault="True"/>
+            <Button x:Name="CancelButton" Content="Cancel" IsCancel="True"/>
+        </ui:Stack>
+
+        <StackPanel>
+            <TextBlock Text="Select a job to import hardware from:" Margin="0,0,0,6"/>
+            <TextBox x:Name="FilterBox" ui:Watermark.Text="Search by job number or name…" Margin="0,0,0,6"/>
+            <ListBox x:Name="JobList" Height="200"/>
+            <TextBlock x:Name="StatusLabel" Foreground="{StaticResource DangerBrush}" Margin="0,6,0,0"/>
+        </StackPanel>
+    </DockPanel>
+</ui:Win95Window>

@@ -1,0 +1,44 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+             x:Class="HardwareTemplateBuilder.Wpf.Views.BulkManufacturerSessionView">
+    <DockPanel Margin="8">
+
+        <!-- Top toolbar -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Left" x:Name="BackButton" Content="← Back to Job" Margin="0,0,8,0"/>
+            <Border Style="{StaticResource CaptionBar}"><TextBlock x:Name="TitleLabel"  Style="{StaticResource CaptionText}"/></Border>
+        </DockPanel>
+
+        <!-- Bottom action bar -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Right" x:Name="AddAllButton" Content="Add All to Job →" IsEnabled="False" VerticalAlignment="Center"/>
+            <Button DockPanel.Dock="Right" x:Name="ItemsToFixButton" Content="Items to Fix" IsEnabled="False" Margin="0,0,8,0" VerticalAlignment="Center"/>
+            <TextBlock x:Name="StatusLabel" VerticalAlignment="Center" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"/>
+        </DockPanel>
+
+        <!-- Add-manufacturer panel -->
+        <ContentControl Style="{StaticResource Etched}" DockPanel.Dock="Top"
+                Padding="8" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock Text="Add Manufacturer to Session:" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <ui:Stack Orientation="Horizontal" Spacing="6">
+                    <ComboBox x:Name="MfrCombo" MinWidth="220"/>
+                    <Button x:Name="AddMfrToSessionButton" Content="Add to Session"/>
+                    <Button x:Name="ShowNewMfrButton" Content="+ New"/>
+                </ui:Stack>
+                <ui:Stack x:Name="NewMfrPanel" Visibility="Collapsed" Orientation="Horizontal"
+                            Spacing="6" Margin="0,6,0,0">
+                    <TextBox x:Name="NewMfrBox" ui:Watermark.Text="New manufacturer name…" MinWidth="220"/>
+                    <Button x:Name="SaveNewMfrButton" Content="Save"/>
+                    <Button x:Name="CancelNewMfrButton" Content="✕"/>
+                </ui:Stack>
+            </StackPanel>
+        </ContentControl>
+
+        <!-- Session list (code-generated) -->
+        <ScrollViewer>
+            <ui:Stack x:Name="SessionPanel" Spacing="6"/>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>
