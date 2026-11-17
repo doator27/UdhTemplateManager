@@ -152,7 +152,7 @@ public partial class PdfImportWizardWindow : Window
             LabelBox.Text = g.Label;
             DescriptionBox.Text = _session.DescriptionPath(g.NewDescriptionId);
             DescriptionBox.Tag = g.NewDescriptionId;
-            ModelBox.Text = string.IsNullOrEmpty(g.NewModelNumber) ? ImportText.StripSize(g.Catalog) : g.NewModelNumber;
+            ModelBox.Text = string.IsNullOrEmpty(g.NewModelNumber) ? ImportText.StripNotesAndSize(g.Catalog) : g.NewModelNumber;
 
             if (g.Skip) SkipRadio.IsChecked = true;
             else if (g.CreateNew || (g.HardwareItemId == null && g.Suggestions.Count == 0)) NewRadio.IsChecked = true;

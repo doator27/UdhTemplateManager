@@ -115,7 +115,7 @@ public static class HardwareImportMatcher
     {
         group.ManufacturerId = ResolveManufacturer(group, k);
         var fullKey = group.SourceKey;
-        var shortKey = ImportText.Key(ImportText.StripSize(group.Catalog));
+        var shortKey = ImportText.Key(ImportText.StripNotesAndSize(group.Catalog));
         var pool = k.Items.Values.Where(i => group.ManufacturerId == null || i.ManufacturerId == group.ManufacturerId).ToList();
         var suggestions = new Dictionary<(int, string?), ImportSuggestion>();
 
@@ -206,6 +206,20 @@ public static class HardwareImportMatcher
             if (score > 0) Suggest(item.Id, null, "Similar model number", score);
         }
 
+        // Nothing under the PDF's manufacturer: offer exact matches filed under any manufacturer
+        // (e.g. a hinge listed under SIMONSWERK but entered as Tectus).
+        if (suggestions.Count == 0 && group.ManufacturerId != null)
+        {
+            foreach (var key in new[] { fullKey, shortKey }.Where(x => x.Length > 0).Distinct())
+            {
+                foreach (var item in k.Items.Values.Where(i => ImportText.Key(i.ModelNumber) == key))
+                    Suggest(item.Id, null, "Same model number, other manufacturer", 30000);
+                if (k.LabelsByKey.TryGetValue(key, out var uses))
+                    foreach (var u in uses)
+                        Suggest(u.HardwareItemId, u.Label, "Same label, other manufacturer", 20000 + u.Count);
+            }
+        }
+
         group.Status = ImportMatchStatus.NeedsReview;
         group.Suggestions.AddRange(suggestions.Values.OrderByDescending(s => s.Score).Take(8));
         if (string.IsNullOrEmpty(group.Reason))
@@ -220,7 +234,7 @@ public static class HardwareImportMatcher
         else
         {
             group.Label = DefaultLabel(group.Catalog, null);
-            group.NewModelNumber = ImportText.StripSize(group.Catalog);
+            group.NewModelNumber = ImportText.StripNotesAndSize(group.Catalog);
             group.NewManufacturerId = group.ManufacturerId;
         }
     }
@@ -242,7 +256,7 @@ public static class HardwareImportMatcher
     /// <param name="modelNumber">The chosen item's model number, if any.</param>
     public static string DefaultLabel(string catalog, string? modelNumber)
     {
-        var label = ImportText.StripSize(ImportText.Tidy(catalog));
+        var label = ImportText.StripNotesAndSize(ImportText.Tidy(catalog));
         if (modelNumber != null && ImportText.Key(label) == ImportText.Key(modelNumber)) return string.Empty;
         return label;
     }

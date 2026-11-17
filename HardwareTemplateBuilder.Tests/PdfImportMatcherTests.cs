@@ -164,5 +164,7 @@ public class PdfImportMatcherTests
         Assert.Equal("LC", ImportText.CleanManufacturerCode("Lc"));
         Assert.Equal("4040XP CUSH", ImportText.StripSize("4040XP CUSH"));
         Assert.Equal("320N", ImportText.StripSize("320N X 36\""));
+        Assert.Equal("320N", ImportText.StripNotesAndSize("320N X 36\" (INSTALLED BY LIF)"));
+        Assert.Equal("5RS-853-EL(FAIL SAFE)-G6", ImportText.StripNotesAndSize("5RS-853-EL(FAIL SAFE)-G6"));
     }
 }

@@ -49,6 +49,25 @@ public static class ImportText
     /// <param name="catalog">The catalog text.</param>
     public static string StripSize(string catalog) => SizeSuffix.Replace(catalog, string.Empty).Trim();
 
+    /// <summary>
+    /// Removes trailing notes in brackets and then sizes: "320N X 36" (INSTALLED BY LIF)" → "320N".
+    /// Brackets inside a callout ("5RS-853-EL(FAIL SAFE)-G6") are kept.
+    /// </summary>
+    /// <param name="catalog">The catalog text.</param>
+    public static string StripNotesAndSize(string catalog)
+    {
+        var text = catalog.Trim();
+        string previous;
+        do
+        {
+            previous = text;
+            text = Regex.Replace(text, @"\s+\([^()]*\)\s*$", string.Empty).Trim();
+            text = StripSize(text);
+        }
+        while (text != previous && text.Length > 0);
+        return text.Length > 0 ? text : catalog.Trim();
+    }
+
     /// <summary>True when a token is a finish code (from the PDF's finish list or a standard one).</summary>
     /// <param name="token">One column value.</param>
     /// <param name="pdfFinishes">Finish codes listed in the PDF, if any.</param>
