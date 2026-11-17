@@ -15,7 +15,9 @@ permissions:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    # Windows runner: both apps build against the Windows 10 SDK there (built-in text
+    # recognition for scanned PDFs), and the WPF frontend only runs on Windows.
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -33,27 +35,29 @@ jobs:
         run: dotnet build HardwareTemplateBuilder.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test HardwareTemplateBuilder.sln --configuration Release --no-build
+        run: dotnet test HardwareTemplateBuilder.Tests --configuration Release --no-build
 
-      - name: Publish Windows x64 app
+      - name: Publish Avalonia app (win-x64)
+        run: >
+          dotnet publish HardwareTemplateBuilder.App/HardwareTemplateBuilder.App.csproj
+          --configuration Release --runtime win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          --output artifacts/app-win-x64
+
+      - name: Publish WPF app (win-x64)
+        run: >
+          dotnet publish HardwareTemplateBuilder.Wpf/HardwareTemplateBuilder.Wpf.csproj
+          --configuration Release --runtime win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          --output artifacts/wpf-win-x64
+
+      - name: Zip artifacts
+        shell: pwsh
         run: |
-          dotnet publish HardwareTemplateBuilder.App/HardwareTemplateBuilder.App.csproj \
-            --configuration Release \
-            --runtime win-x64 \
-            --self-contained true \
-            /p:PublishSingleFile=true \
-            /p:IncludeNativeLibrariesForSelfExtract=true \
-            --output artifacts/win-x64
-
-      - name: Zip artifact
-        run: |
-          VERSION="${{ github.ref_name }}"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          fi
-
-          cd artifacts
-          zip -r "HardwareTemplateBuilder-${VERSION}-win-x64.zip" win-x64
+          $version = "${{ github.ref_name }}"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") { $version = "${{ github.event.inputs.version }}" }
+          Compress-Archive -Path artifacts/app-win-x64/* -DestinationPath "artifacts/HardwareTemplateBuilder-$version-win-x64.zip"
+          Compress-Archive -Path artifacts/wpf-win-x64/* -DestinationPath "artifacts/HardwareTemplateBuilder95-$version-win-x64.zip"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -61,4 +65,4 @@ jobs:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
           name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
           generate_release_notes: true
-          files: artifacts/HardwareTemplateBuilder-*-win-x64.zip
+          files: artifacts/*-win-x64.zip
