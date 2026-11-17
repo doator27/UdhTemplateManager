@@ -30,6 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="TestData\PdfImport\*.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <Folder Include="ManualRepro\" />
   </ItemGroup>
 

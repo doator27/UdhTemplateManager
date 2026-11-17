@@ -1,0 +1,70 @@
+Component Costing                                                                606PH - KEVIN LALEZARIAN PH
+
+
+Section: 08 71 00 Door Hardware
+                                           Non-                   Add
+                                    List     Std Setup Disc Disc                   Adj Net/Deduct     Extended
+Mfg    Product Description         Price Charges Charges String String            Cost       Cost Qty      Cost
+        Cost Group: Hardware - Closers
+LC   Concealed Closer 2033 2,871.00            0.00      0.00     75      -2.5     0.00      735.69     1       735.69
+     BUMP 639
+       Openings: CUSTOM.1
+LC   Concealed Closer 2033 2,871.00            0.00      0.00     75      -2.5     0.00      735.69     2     1,471.38
+     BUMP 646
+       Openings: CUSTOM(2)
+VA01 Concealed door closer     0.00            0.00      0.00                    939.39      939.39     1       939.39
+     R104 PERKO POWER
+     SN
+       Openings: 2C
+                                                                        Hardware - Closers Subtotal:         3,146.46
+
+        Cost Group: Hardware - Flat Goods
+AC01 Flush Pull CO2002B BN          0.00       0.00      0.00                    110.00      110.00     4       440.00
+     AC01
+       Openings: 4(4)
+                                                                   Hardware - Flat Goods Subtotal:             440.00
+
+        Cost Group: Hardware - Gasketing
+ZE     Auto Door Bottom        209.87          0.00      0.00     60      -2.5     0.00       86.05     3       258.15
+       369AA 36"
+         Openings: CUSTOM(2), CUSTOM.1
+PE     Auto Door Bottom SN-    672.51          0.00      0.00    55.5              0.00      299.27     2       598.54
+       RD-A 36"
+         Openings: 4(2)
+ZE     Door Seal 188S-BK 19'    54.34          0.00      0.00     60      -2.5     0.00       22.28     3        66.84
+         Openings: CUSTOM(2), CUSTOM.1
+ZE     Sweep 8192AA 1 x 64"    215.02          0.00      0.00     60      -2.5     0.00       88.16     2       176.32
+       2 x 124"
+         Openings: 4(2)
+                                                                    Hardware - Gasketing Subtotal:           1,099.85
+
+        Cost Group: Hardware - Hinges
+S701 Concealed Hinge TE         268.20        0.00        0.00 -16.8                 0.00    313.26     6     1,879.56
+     640 3D A8 038
+       Openings: 5A(6)
+S701 Concealed Hinge TE         268.20        0.00        0.00 -16.8                 0.00    313.26    60 18,795.60
+     640 3D A8 144
+       Openings: 1(9), 2C(3), 2.1(4), 2.3(12), 2.4(3), 2.5(12), 2.6(3), 5A.1(6), CUSTOM(8)
+S701 Concealed Hinge TE         268.20        0.00        0.00 -16.8                 0.00    313.26    12     3,759.12
+     640 3D A8 174
+       Openings: 2(4), 1A(4), CUSTOM.1(4)
+
+Aug 25, 2026 10:49 AM                                                                                       Page 1 of 9
+Component Costing                                                      606PH - KEVIN LALEZARIAN PH
+
+
+Section: 08 71 00 Door Hardware
+                                       Non-                   Add
+                                List     Std Setup Disc Disc              Adj Net/Deduct     Extended
+Mfg    Product Description     Price Charges Charges String String       Cost       Cost Qty      Cost
+IV   Hinges 5BB1 4 1/2 x 4     31.40    0.00    0.00     75    -2.5      0.00        8.05   9        72.45
+     1/2 651
+       Openings: 2.2(9)
+AC01 Offset Pivot Set T1/D1     0.00    0.00    0.00                   308.00     308.00    3       924.00
+     X D1/B1 BN AC01
+       Openings: 5A.2(3)
+                                                              Hardware - Hinges Subtotal:       25,430.73
+
+        Cost Group: Hardware - Locks
+AC01 Classroom Lock             0.00    0.00    0.00                  1,200.00   1,200.00   1     1,200.00
+     9145ML.212

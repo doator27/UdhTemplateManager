@@ -539,6 +539,90 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.ToTable("Manufacturers");
                 });
 
+            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.PdfImportItemMapping", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ConfirmCount")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("HardwareItemId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsSkip")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("LastConfirmedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ManufacturerCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SourceText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("TargetManufacturerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TargetModelNumber")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManufacturerCode", "SourceKey")
+                        .IsUnique();
+
+                    b.ToTable("PdfImportItemMappings");
+                });
+
+            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.PdfImportManufacturerAlias", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("ConfirmCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("LastConfirmedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ManufacturerId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code", "ManufacturerId")
+                        .IsUnique();
+
+                    b.ToTable("PdfImportManufacturerAliases");
+                });
+
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.ProjectManager", b =>
                 {
                     b.Property<int>("Id")

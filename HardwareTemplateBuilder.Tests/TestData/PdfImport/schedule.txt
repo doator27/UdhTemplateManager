@@ -1,0 +1,93 @@
+740 8TH AVENUE (THE TORCH)
+6784.1
+
+Manufacturer List
+Code                    Name
+AB                      ABH Manufacturing Inc.
+AB01                    ABH
+EM01                    Emtek Products
+IV                      Ives
+LC                      LCN Closers
+LO                      Schlage Electronics
+MK01                    Marks Locks
+NA                      National Guard
+NG01                    National Guard Products
+RI01                    Richelieu Hardware
+RO                      Rockwood
+RX                      Rixson
+S501                    Salto Systems
+S701                    SIMONSWERK North America
+SC                      Schlage
+VA01                    Various - 'Pick a Supplier'
+VO                      Von Duprin
+ZE                      Zero
+
+
+
+     1 Single Door #38-T01L          TYP STAIR            STAIR A from CORRIDOR                   RHR
+     1 Single Door #38-T02L          TYP STAIR            STAIR B from CORRIDOR                   RHR
+     1 Single Door #38-T03R          TYP STAIR            STAIR C from CORRIDOR                   LHR
+               Opening Description: 3' 0" x 7' 6" x 1 3/4" x HMD x HMF x 90Min
+
+ H026      270 Hinges                     5BB1 4 1/2 x 4 1/2 NRP                       651        IV
+ M044       90 Power Transfer             PT1000                                       US28       AB
+  L047      60 Electrified Mortise        5RS-853-EL(FAIL SAFE)-G6-W10(REX)      RHR   26         MK01
+               Lockset                    "ROBODUE" 2 3/4"BS, 1 3/4"DR
+  L047      30 Electrified Mortise        5RS-853-EL(FAIL SAFE)-G6-W10(REX)      LHR   26         MK01
+               Lockset                    "ROBODUE" 2 3/4"BS, 1 3/4"DR
+Apr 27, 2026 10:09 AM                                                                         Page 31 of 147
+740 8TH AVENUE (THE TORCH)
+6784.1
+
+ A007        90 Construction Core        RC1182                                        4               MK01
+ A004        90 Permanent Core           RA1182 3 KEYS VKC GMK MK                      US26            MK01
+ C027        90 Closer                   4040XP REGARM                                 AL              LC
+ S024        90 Wall Stop                WS406/407CVX                                  US26            IV
+ W009        90 Door Seal                188S-BK 18'                                                   ZE
+ W002        90 Auto Door Bottom         355AA 36"                                                     ZE
+ M041        90 By Others:               POWER SUPPLY BY SECURITY                                      VA01
+                                         CONTRACTOR
+ M048        90 Door Contact (By Others) 8080-T-W 3/4" GRI                                             VA01
+                Note: ** FURNISHED BY SECURITY
+          Note: Note 1: Access Control Reader will be provided by the Security System Contractor
+                Note 2: Tie into Fire Alarm System for Fail Safe Operation
+
+
+
+
+
+
+Heading #213 (Set #090)
+     1 Single Door #8-1-T04R    TYP ENTRY   CORRIDOR to HOTEL ROOM       RH
+                                            ENTRY
+     1 Single Door #8-2-T04L    TYP ENTRY   CORRIDOR to HOTEL ROOM       LH
+                                                          ENTRY
+               Opening Description: 3' 0" x 7' 6" x 1 3/4" x HMD x HMF x 45Min x STC35
+
+ H025     3,897 Hinges                    5BB1 4 1/2 x 4 1/2                             651         IV
+ L049     1,299 Aelement Reader           AEB0IPBA4A8                                                S501
+ L048       689 ANSI Mortise Lockbody     LA1T1770A24IMS                         RH                  S501
+ L048       610 ANSI Mortise Lockbody     LA1T1770A24IMS                         LH                  S501
+ L051       610 Salto trim set            KRS 853 FD-SA-G6-T2 "ROBODUE"          LH      26          MK01
+                                          INCLUDE O/S& I/S LEVER/ROSE, CYL
+                                          HOUSING AND COLLAR, TP & TP ROSE
+                                          1 3/4"DR
+  L051     689 Salto trim set             KRS 853 FD-SA-G6-T2 "ROBODUE"          RH      26          MK01
+                                          INCLUDE O/S& I/S LEVER/ROSE, CYL
+                                          HOUSING AND COLLAR, TP & TP ROSE
+                                          1 3/4"DR
+ C001     1,299 Closer                    1460T STDTRK FPC                               AL          LC
+ S022     1,299 Floor Stop                FS410                                          US26        IV
+ M006     1,299 Door Viewer w/ Cover      624                                            CRM         RO
+ S007     1,299 Privacy Latch             18607                                          US32        AB
+ W045     1,299 Gasketing                 5050 C-20 20'                                              NA
+ W046     1,299 STC-35 Door Bottom        320N X 36" (INSTALLED BY LIF)                              NG01
+          Note: Note 1: Wireless Card Key Lockset will be Online Wireless Type
+                Note 2: AElement Software and Environmental Management System will be provided by others
+
+
+
+
+Apr 27, 2026 10:09 AM                                                                           Page 87 of 147
+740 8TH AVENUE (THE TORCH)
+6784.1

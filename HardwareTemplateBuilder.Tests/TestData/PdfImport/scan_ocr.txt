@@ -1,0 +1,60 @@
+          Heading #11 (Set #093)
+              1 Single Door #5-TO7L      TYP ENTRY VEST      CORRIDOR to HOTEL                         LH
+                                                             VESTIBULE
+               1 Single Door #5-T14L     TYP ENTRY VEST      CORRIDOR to HOTEL                         LH
+                                                             VESTIBULE
+               1 Single Door #6-TO7L     TYP ENTRY VEST      CORRIDOR to HOTEL                         LH
+                                                             VESTIBULE
+               1 Single Door #6-T14L     TYP ENTRY VEST      CORRIDOR to HOTEL                         LH
+                                                             VESTIBULE
+               1 Single Door #7-TO7L     TYP ENTRY VEST      CORRIDOR to HOTEL                         LH
+                                                             VESTIBULE
+               1 Single Door #7-T14L     TYP ENTRY VEST      CORRIDOR to HOTEL                         LH
+                                                             VESTIBULE
+                      Opening Description: 3' 0" x 7' 6" x 1 3/4” x HMD x HMF x STC35
+           HO25      18 Hinges                 5BB1 4 1/2x 41/2                        651             IV
+            L048      6 ANSI Mortise Lockbody  1A1T1770A24IMS                   LH                     $501
+            L049      6 Aelement Reader                        7S                                      5501
+            LO51      6 Salto trim set         KRS 853 FD-SA-G6-12 ROBODUE'
+5	1	6	1	4	10	1128	875	26	20	95.038826	LH
+5	1	6	1	4	11	1213	875	28	20	96.977768	26
+5	1	6	1	4	12	1445	873	68	20	57.466728	MKO1
+4	1	6	1	5	0	80	889	1008	55	-1	
+5	1	6	1	5	1	80	891	72	53	52.066975	~~
+5	1	6	1	5	2	653	912	102	20	93.274773	INCLUDE
+5	1	6	1	5	3	764	909	63	26	76.634293	O/S&
+5	1	6	1	5	4	836	909	28	26	61.101593	I/S
+5	1	6	1	5	5	874	908	152	27	92.298744	LEVER/ROSE,
+5	1	6	1	5	6	1035	889	53	52	61.944233	or
+4	1	6	1	6	0	632	946	468	24	-1	
+5	1	6	1	6	1	628	941	117	36	34.750526	HOLS
+5	1	6	1	6	2	775	941	156	36	0.000000	ANTD-COLLAR,
+5	1	6	1	6	3	939	947	29	19	91.785812	TP
+5	1	6	1	6	4	976	946	18	21	91.785812	&
+5	1	6	1	6	5	1002	947	28	20	96.718208	TP
+5	1	6	1	6	6	1040	947	60	20	96.577393	ROSE
+4	1	6	1	7	0	653	982	106	26	-1	
+5	1	6	1	7	1	653	982	106	26	86.544861	13/4DR
+           c001       6 Closer                 1460T STDTRK FPC                        AL              Lc
+           M066       6 Privacy Door Latch     18608                                   US32            ABO1
+           Mo06       6 Door Viewer            624              D3                     CRM             RO
+           wo045      6 Gasketing              5050 C-20 20'                                           NA
+           W046       6 STC-35 Door Bottom     320N X 36" (INSTALLED BY LIF)                           NGO1
+            $030      6 Automatic Door Holder  491-RKW                                 US26            RO
+                        w/ Stop
+           M048       6 Door Contact (By       8080-T-W 3/4" GRI                                       VA01
+                        Others)(By Others)
+                        Note: ** FURNISHED BY SECURITY
+                  Note: Note 1: Wireless Card Key Lockset will be Online Wireless Type
+                        Note 2: AElement Software and Environmetal Management System will be provided by others
+     LF
+                 No
+                             bud        with       few     piece
+          Aug 31, 2026 3:41 PM                                                                      Page 16 of 27
+                                                                     6784.1 - 740 8TH AVENUE (THE TORCH)
+          Hardware Schedule
+          Heading #11.1 (Set #093)
+               1 Single Door #5-TLSL     TYP ENTRY VEST      CORRIDOR to HOTEL                         LH
+                                                             VESTIBULE
+               1 Single Door #6-TASL     TYP ENTRY VEST      CORRIDOR to HOTEL                         LH
+                                                             VESTIBULE

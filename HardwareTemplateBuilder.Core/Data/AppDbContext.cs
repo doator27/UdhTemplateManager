@@ -63,6 +63,12 @@ public class AppDbContext : DbContext
     /// <summary>Gets or sets the ignored template duplicates table.</summary>
     public DbSet<IgnoredTemplateDuplicate> IgnoredTemplateDuplicates => Set<IgnoredTemplateDuplicate>();
 
+    /// <summary>Gets the PDF import's learned callout → hardware item mappings.</summary>
+    public DbSet<PdfImportItemMapping> PdfImportItemMappings => Set<PdfImportItemMapping>();
+
+    /// <summary>Gets the PDF import's learned manufacturer code → manufacturer aliases.</summary>
+    public DbSet<PdfImportManufacturerAlias> PdfImportManufacturerAliases => Set<PdfImportManufacturerAlias>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -232,6 +238,22 @@ public class AppDbContext : DbContext
             .WithMany(t => t.Snapshots)
             .HasForeignKey(s => s.IndividualTemplateId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // PDF import learning tables (plain ids, no foreign keys: stale rows are ignored on load).
+        modelBuilder.Entity<PdfImportItemMapping>(e =>
+        {
+            e.Property(m => m.ManufacturerCode).HasMaxLength(50).IsRequired();
+            e.Property(m => m.SourceKey).HasMaxLength(200).IsRequired();
+            e.Property(m => m.SourceText).HasMaxLength(500).IsRequired();
+            e.Property(m => m.TargetModelNumber).HasMaxLength(200);
+            e.Property(m => m.Label).HasMaxLength(500);
+            e.HasIndex(m => new { m.ManufacturerCode, m.SourceKey }).IsUnique();
+        });
+        modelBuilder.Entity<PdfImportManufacturerAlias>(e =>
+        {
+            e.Property(a => a.Code).HasMaxLength(50).IsRequired();
+            e.HasIndex(a => new { a.Code, a.ManufacturerId }).IsUnique();
+        });
 
         // JobAttachment → Job (cascade: deleting a job removes its attachments)
         modelBuilder.Entity<JobAttachment>()
