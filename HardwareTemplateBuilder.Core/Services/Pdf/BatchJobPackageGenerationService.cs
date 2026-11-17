@@ -161,7 +161,10 @@ public class BatchJobPackageGenerationService
             JobGenerationSummary summary;
             try
             {
-                var result = await generationService.GenerateAsync(jobId, null, itemProgress, cancellationToken);
+                int? activeReleaseId;
+                using (var releaseCtx = _contextFactory())
+                    activeReleaseId = JobPackageGenerationService.ActiveReleaseId(releaseCtx, jobId);
+                var result = await generationService.GenerateAsync(jobId, null, itemProgress, cancellationToken, activeReleaseId);
                 summary = new JobGenerationSummary
                 {
                     JobId      = jobId,

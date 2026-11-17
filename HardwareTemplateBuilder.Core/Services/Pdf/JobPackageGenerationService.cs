@@ -18,7 +18,10 @@ public class JobPackageGenerationResult
     /// <summary>Gets the ID of the job that was generated.</summary>
     public int JobId { get; init; }
 
-    /// <summary>Gets the job's number, for display in progress/result reporting.</summary>
+    /// <summary>
+    /// Gets the job number as printed on the cover sheet (with the release label appended for
+    /// a release, see <see cref="JobReleaseNaming.CoverJobNumber"/>), for progress/result reporting.
+    /// </summary>
     public string JobNumber { get; init; } = string.Empty;
 
     /// <summary>Gets the job's name, for display in progress/result reporting.</summary>
@@ -96,7 +99,11 @@ public class JobPackageGenerationService
         var release = releaseId.HasValue
             ? context.JobReleases.FirstOrDefault(r => r.Id == releaseId.Value)
             : null;
-        var displayName = release?.ReleaseLabel ?? job.JobName;
+        // A release never changes the job name; it is shown by appending its label to the job
+        // number on the cover sheet ("24117 Addendum 1"). The base list prints the plain number.
+        var displayName = job.JobName;
+        var coverJobNumber = JobReleaseNaming.CoverJobNumber(job.JobNumber, release?.ReleaseLabel);
+        var packageFileName = JobReleaseNaming.PackageFileName(coverJobNumber);
 
         var orderedItems = orderedHardware ?? LoadCanonicalOrder(context, jobId, releaseId);
 
@@ -167,7 +174,8 @@ public class JobPackageGenerationService
             OutputDirectory = saveDir,
             AllDescriptions = allDescriptions,
             PreparedByName  = profile?.UserName ?? string.Empty,
-            DisplayName     = displayName
+            DisplayName     = displayName,
+            CoverJobNumber  = coverJobNumber
         };
 
         // Back up the entire job folder contents before regenerating.
@@ -178,7 +186,11 @@ public class JobPackageGenerationService
         {
             var entries = Directory.GetFileSystemEntries(jobDir)
                 .Where(e => !Path.GetFileName(e).Equals("Old versions", StringComparison.OrdinalIgnoreCase)
-                         && !Path.GetFileName(e).Equals("Attachments", StringComparison.OrdinalIgnoreCase))
+                         && !Path.GetFileName(e).Equals("Attachments", StringComparison.OrdinalIgnoreCase)
+                         // Other releases' packages stay put: regenerating one release must not
+                         // archive the base list's (or another release's) current PDF.
+                         && !(JobReleaseNaming.IsPackageFile(Path.GetFileName(e))
+                              && !Path.GetFileName(e).Equals(packageFileName, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
             if (entries.Count > 0)
@@ -234,7 +246,7 @@ public class JobPackageGenerationService
 
         // Append a history entry to job_history.txt in the job folder.
         var historyPath = Path.Combine(saveDir, job.JobNumber, "job_history.txt");
-        AppendHistoryEntry(historyPath, job, displayName, hardware, result, profile?.UserName ?? "Unknown");
+        AppendHistoryEntry(historyPath, coverJobNumber, displayName, hardware, result, profile?.UserName ?? "Unknown");
 
         var snapshotRepo = new JobTemplateSnapshotRepository(context);
         foreach (var info in result.TemplateSnapshots)
@@ -272,11 +284,26 @@ public class JobPackageGenerationService
         return new JobPackageGenerationResult
         {
             JobId         = jobId,
-            JobNumber     = job.JobNumber,
+            JobNumber     = coverJobNumber,
             JobName       = displayName,
             OutputPath    = result.OutputPath,
             TemplateCount = result.TemplateSnapshots.Count
         };
+    }
+
+    /// <summary>
+    /// The release a job is currently set to (its <c>LastActiveReleaseId</c>, the one last
+    /// picked on the job page), or null for the base list / when that release no longer exists.
+    /// Batch generation uses this so each job is generated for its active release.
+    /// </summary>
+    /// <param name="context">An open database context.</param>
+    /// <param name="jobId">The job's ID.</param>
+    public static int? ActiveReleaseId(AppDbContext context, int jobId)
+    {
+        var releaseId = context.Jobs.Where(j => j.Id == jobId).Select(j => j.LastActiveReleaseId).FirstOrDefault();
+        return releaseId.HasValue && context.JobReleases.Any(r => r.Id == releaseId.Value && r.JobId == jobId)
+            ? releaseId
+            : null;
     }
 
     /// <summary>
@@ -319,7 +346,7 @@ public class JobPackageGenerationService
     /// </summary>
     private static void AppendHistoryEntry(
         string historyPath,
-        Job job,
+        string coverJobNumber,
         string displayName,
         IReadOnlyList<HardwareWithTemplates> hardware,
         AssemblyResult result,
@@ -329,7 +356,7 @@ public class JobPackageGenerationService
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"=== {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
-            sb.AppendLine($"Job:         {job.JobNumber} — {displayName}");
+            sb.AppendLine($"Job:         {coverJobNumber} — {displayName}");
             sb.AppendLine($"Prepared by: {preparedBy}");
             sb.AppendLine($"Hardware Items ({hardware.Count}):");
 

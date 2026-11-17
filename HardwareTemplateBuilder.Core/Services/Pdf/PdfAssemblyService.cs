@@ -238,7 +238,8 @@ public class PdfAssemblyService
             _merger.Merge(new[] { coverSheetPath, bodyPdfPath }, mergedPath);
 
             // ----- Step 7: Stamp page numbers on body pages -----
-            finalPath = Path.Combine(jobDir, $"Templates for job {request.Job.JobNumber}.pdf");
+            finalPath = Path.Combine(jobDir, JobReleaseNaming.PackageFileName(
+                !string.IsNullOrWhiteSpace(request.CoverJobNumber) ? request.CoverJobNumber! : request.Job.JobNumber));
             _numberer.StampPageNumbers(mergedPath, coverPageCount, finalPath);
         }
         catch (OperationCanceledException)
@@ -394,7 +395,7 @@ public class PdfAssemblyService
 
         return new CoverSheetData
         {
-            JobNumber          = request.Job.JobNumber,
+            JobNumber          = !string.IsNullOrWhiteSpace(request.CoverJobNumber) ? request.CoverJobNumber! : request.Job.JobNumber,
             JobName            = !string.IsNullOrWhiteSpace(request.DisplayName) ? request.DisplayName! : request.Job.JobName,
             CustomerName       = request.Job.Customer?.CustomerName             ?? string.Empty,
             ProjectManagerName = request.Job.ProjectManager?.ProjectManagerName ?? string.Empty,

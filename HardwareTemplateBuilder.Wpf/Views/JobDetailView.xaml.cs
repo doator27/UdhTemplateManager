@@ -46,6 +46,12 @@ public partial class JobDetailView : UserControl
     /// <summary>Whether the release selector has been populated at least once for this view instance.</summary>
     private bool _releasesInitialized;
 
+    /// <summary>
+    /// Releases this page has already offered to fill from the base list (so switching back to
+    /// an empty release doesn't ask again in the same visit).
+    /// </summary>
+    private readonly HashSet<int> _offeredBaseImport = new();
+
     /// <summary>Sentinel item shown in the release combo representing the base (no-release) hardware list.</summary>
     private sealed class BaseReleaseItem
     {
@@ -224,12 +230,18 @@ public partial class JobDetailView : UserControl
                 ? (match != null ? (object)match : _baseReleaseItem)
                 : _baseReleaseItem;
         }
+
+        // The first load runs before SelectionChanged is wired up, so set the active release
+        // here too; otherwise the combo shows the restored release while the hardware list,
+        // Bulk Add and Generate all keep working on the base list.
+        _currentReleaseId = ReleaseCombo.SelectedItem is JobRelease selected ? selected.Id : null;
     }
 
     private void OnReleaseSelectionChanged()
     {
         _currentReleaseId = ReleaseCombo.SelectedItem is JobRelease release ? release.Id : null;
         LoadLinkedHardware();
+        _ = OfferBaseListImportAsync();
 
         using var ctx = DatabaseInitializer.CreateContext();
         var job = ctx.Jobs.Find(_jobId);
@@ -260,54 +272,83 @@ public partial class JobDetailView : UserControl
         var releaseRepo = new JobReleaseRepository(ctx);
         var existingReleases = releaseRepo.GetByJob(_jobId).ToList();
 
+        var trimmed = label.Trim();
+        var existing = existingReleases.FirstOrDefault(r =>
+            string.Equals(r.ReleaseLabel.Trim(), trimmed, StringComparison.OrdinalIgnoreCase));
+        if (existing != null)
+        {
+            // Same name as an existing release: switch to it rather than making a second one.
+            await DialogHelper.ShowInfoAsync(window, $"This job already has a release named \"{existing.ReleaseLabel}\". Switching to it.", "New Release");
+            _currentReleaseId = existing.Id;
+            LoadReleases();
+            LoadLinkedHardware();
+            return;
+        }
+
         var newRelease = new JobRelease
         {
             JobId         = _jobId,
             ReleaseNumber = releaseRepo.NextReleaseNumber(_jobId),
-            ReleaseLabel  = label.Trim()
+            ReleaseLabel  = trimmed
         };
         releaseRepo.Add(newRelease);
 
-        // The header always shows the job's base name; do not overwrite Job.JobName or the
-        // header text with the release label — the release label is only used when a
-        // package/cover sheet is generated with that release selected.
-        var job = ctx.Jobs.Find(_jobId);
-
-        // Offer to copy hardware from the most recent existing release (or base list).
-        if (existingReleases.Count > 0 || ctx.JobHardware.Any(jh => jh.JobId == _jobId && jh.ReleaseId == null))
-        {
-            bool copy = await DialogHelper.ConfirmAsync(window,
-                "Would you like to copy the hardware list from the previous release into this new release?",
-                "Copy Hardware");
-
-            if (copy)
-            {
-                var sourceReleaseId = existingReleases.Count > 0
-                    ? existingReleases.OrderByDescending(r => r.ReleaseNumber).First().Id
-                    : (int?)null;
-
-                var sourceRows = ctx.JobHardware
-                    .Where(jh => jh.JobId == _jobId && jh.ReleaseId == sourceReleaseId)
-                    .ToList();
-
-                foreach (var row in sourceRows)
-                {
-                    ctx.JobHardware.Add(new JobHardware
-                    {
-                        JobId             = _jobId,
-                        HardwareItemId    = row.HardwareItemId,
-                        CustomDescription = row.CustomDescription,
-                        Remarks           = row.Remarks,
-                        CalloutRemarks    = row.CalloutRemarks,
-                        ReleaseId         = newRelease.Id
-                    });
-                }
-                ctx.SaveChanges();
-            }
-        }
-
+        // Selecting the new (empty) release triggers OnReleaseSelectionChanged, which asks
+        // whether to import the base list's hardware into it.
         _currentReleaseId = newRelease.Id;
         LoadReleases();
+        LoadLinkedHardware();
+        await OfferBaseListImportAsync();
+    }
+
+    /// <summary>
+    /// When a release is chosen and has no hardware yet, asks whether to import the base list's
+    /// hardware into it (once per release per visit). Declining leaves the release empty so
+    /// hardware is added the normal way (Bulk Add / Import Hardware), scoped to that release.
+    /// </summary>
+    private async Task OfferBaseListImportAsync()
+    {
+        if (_currentReleaseId is not int releaseId || _linkedHardware.Count > 0) return;
+        if (!_offeredBaseImport.Add(releaseId)) return;
+
+        var window = this.OwnerWindow();
+        if (window == null) return;
+
+        List<JobHardware> baseRows;
+        string releaseLabel;
+        using (var ctx = DatabaseInitializer.CreateContext())
+        {
+            baseRows = ctx.JobHardware
+                .Where(jh => jh.JobId == _jobId && jh.ReleaseId == null)
+                .OrderBy(jh => jh.Id)
+                .AsNoTracking()
+                .ToList();
+            releaseLabel = ctx.JobReleases.Where(r => r.Id == releaseId).Select(r => r.ReleaseLabel).FirstOrDefault() ?? "this release";
+        }
+        if (baseRows.Count == 0) return;
+
+        bool import = await DialogHelper.ConfirmAsync(window,
+            $"Import the base list's hardware ({baseRows.Count} item(s)) into \"{releaseLabel}\"?\n\n" +
+            "Choose No to start this release empty and add its hardware the normal way.",
+            "Import Base List");
+        if (!import || _currentReleaseId != releaseId) return;
+
+        using (var ctx = DatabaseInitializer.CreateContext())
+        {
+            foreach (var row in baseRows)
+            {
+                ctx.JobHardware.Add(new JobHardware
+                {
+                    JobId             = _jobId,
+                    HardwareItemId    = row.HardwareItemId,
+                    CustomDescription = row.CustomDescription,
+                    Remarks           = row.Remarks,
+                    CalloutRemarks    = row.CalloutRemarks,
+                    ReleaseId         = releaseId
+                });
+            }
+            ctx.SaveChanges();
+        }
         LoadLinkedHardware();
     }
 
@@ -670,11 +711,16 @@ public partial class JobDetailView : UserControl
     {
         string saveDir;
         string jobNumber;
+        string activePackageName;
         using (var ctx = DatabaseInitializer.CreateContext())
         {
             var job   = ctx.Jobs.Find(_jobId);
             jobNumber = job?.JobNumber ?? string.Empty;
             saveDir   = ResolvePrimaryJobDir(ctx, job);
+            var releaseLabel = _currentReleaseId.HasValue
+                ? ctx.JobReleases.Where(r => r.Id == _currentReleaseId.Value).Select(r => r.ReleaseLabel).FirstOrDefault()
+                : null;
+            activePackageName = JobReleaseNaming.PackageFileName(JobReleaseNaming.CoverJobNumber(jobNumber, releaseLabel));
         }
 
         var jobDir = Path.Combine(saveDir, jobNumber);
@@ -684,7 +730,11 @@ public partial class JobDetailView : UserControl
             return;
         }
 
+        // Prefer the package for the release that's selected; fall back to the newest PDF.
         var pdf = Directory.GetFiles(jobDir, "*.pdf")
+            .Where(f => Path.GetFileName(f).Equals(activePackageName, StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault()
+            ?? Directory.GetFiles(jobDir, "*.pdf")
             .OrderByDescending(File.GetLastWriteTime)
             .FirstOrDefault();
 
@@ -717,6 +767,10 @@ public partial class JobDetailView : UserControl
             var job   = ctx.Jobs.Find(_jobId);
             jobNumber = job?.JobNumber ?? string.Empty;
             saveDir   = ResolvePrimaryJobDir(ctx, job);
+            var releaseLabel = _currentReleaseId.HasValue
+                ? ctx.JobReleases.Where(r => r.Id == _currentReleaseId.Value).Select(r => r.ReleaseLabel).FirstOrDefault()
+                : null;
+            activePackageName = JobReleaseNaming.PackageFileName(JobReleaseNaming.CoverJobNumber(jobNumber, releaseLabel));
         }
 
         if (string.IsNullOrEmpty(jobNumber))
@@ -1080,7 +1134,9 @@ public partial class JobDetailView : UserControl
                 var release = _currentReleaseId.HasValue
                     ? context.JobReleases.FirstOrDefault(r => r.Id == _currentReleaseId.Value)
                     : null;
-                var displayName = release?.ReleaseLabel ?? job.JobName;
+                var displayName = job.JobName;
+                var coverJobNumber = JobReleaseNaming.CoverJobNumber(job.JobNumber, release?.ReleaseLabel);
+                var releaseSuffix = release != null ? $" ({JobReleaseNaming.SafeFileNamePart(release.ReleaseLabel)})" : string.Empty;
 
                 var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
                 var jobLocation = JobStorageLocationResolver.ResolveForProfile(context, profile);
@@ -1131,7 +1187,7 @@ public partial class JobDetailView : UserControl
 
                 var coverData = new CoverSheetData
                 {
-                    JobNumber          = job.JobNumber,
+                    JobNumber          = coverJobNumber,
                     JobName            = displayName,
                     CustomerName       = job.Customer?.CustomerName             ?? string.Empty,
                     ProjectManagerName = job.ProjectManager?.ProjectManagerName ?? string.Empty,
@@ -1143,7 +1199,7 @@ public partial class JobDetailView : UserControl
                 var safeName = string.Concat(manufacturerName.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
                 var jobDir = Path.Combine(saveDir, job.JobNumber);
                 Directory.CreateDirectory(jobDir);
-                var outPath = Path.Combine(jobDir, $"Cover Sheet - {safeName}.pdf");
+                var outPath = Path.Combine(jobDir, $"Cover Sheet - {safeName}{releaseSuffix}.pdf");
 
                 new CoverSheetBuilder().Build(coverData, outPath, fillableTemplateBox: true);
 
@@ -1208,7 +1264,9 @@ public partial class JobDetailView : UserControl
                 var release = _currentReleaseId.HasValue
                     ? context.JobReleases.FirstOrDefault(r => r.Id == _currentReleaseId.Value)
                     : null;
-                var displayName = release?.ReleaseLabel ?? job.JobName;
+                var displayName = job.JobName;
+                var coverJobNumber = JobReleaseNaming.CoverJobNumber(job.JobNumber, release?.ReleaseLabel);
+                var releaseSuffix = release != null ? $" ({JobReleaseNaming.SafeFileNamePart(release.ReleaseLabel)})" : string.Empty;
 
                 var profile = context.UserProfiles.FirstOrDefault(u => u.Id == job.UserProfileId);
                 var jobLocation = JobStorageLocationResolver.ResolveForProfile(context, profile);
@@ -1263,7 +1321,7 @@ public partial class JobDetailView : UserControl
 
                 var coverData = new CoverSheetData
                 {
-                    JobNumber          = job.JobNumber,
+                    JobNumber          = coverJobNumber,
                     JobName            = displayName,
                     CustomerName       = job.Customer?.CustomerName             ?? string.Empty,
                     ProjectManagerName = job.ProjectManager?.ProjectManagerName ?? string.Empty,
@@ -1274,7 +1332,7 @@ public partial class JobDetailView : UserControl
 
                 var jobDir = Path.Combine(saveDir, job.JobNumber);
                 Directory.CreateDirectory(jobDir);
-                var outPath = Path.Combine(jobDir, "Cover Sheet - Missing Templates.pdf");
+                var outPath = Path.Combine(jobDir, $"Cover Sheet - Missing Templates{releaseSuffix}.pdf");
 
                 new CoverSheetBuilder().Build(coverData, outPath);
 

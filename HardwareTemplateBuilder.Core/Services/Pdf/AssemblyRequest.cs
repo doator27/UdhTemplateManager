@@ -65,10 +65,17 @@ public class AssemblyRequest
 
     /// <summary>
     /// Gets or sets the display name for the cover sheet's "Job Name" field. Defaults to
-    /// <c>Job.JobName</c> when not set explicitly; pass the active release's label instead
-    /// when generating a package for a specific release so the cover sheet reflects it.
+    /// <c>Job.JobName</c> when not set explicitly. Releases do not change the job name; they
+    /// change <see cref="CoverJobNumber"/> instead.
     /// </summary>
     public string? DisplayName { get; init; }
+
+    /// <summary>
+    /// Gets or sets the job number printed on the cover sheet and used in the package file name
+    /// (see <see cref="JobReleaseNaming.CoverJobNumber"/>), e.g. "24117 Addendum 1" for a release.
+    /// Defaults to <c>Job.JobNumber</c> (the base list). The job folder is always the plain job number.
+    /// </summary>
+    public string? CoverJobNumber { get; init; }
 }
 
 /// <summary>
