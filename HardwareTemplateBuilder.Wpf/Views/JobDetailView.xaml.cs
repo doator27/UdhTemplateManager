@@ -767,10 +767,6 @@ public partial class JobDetailView : UserControl
             var job   = ctx.Jobs.Find(_jobId);
             jobNumber = job?.JobNumber ?? string.Empty;
             saveDir   = ResolvePrimaryJobDir(ctx, job);
-            var releaseLabel = _currentReleaseId.HasValue
-                ? ctx.JobReleases.Where(r => r.Id == _currentReleaseId.Value).Select(r => r.ReleaseLabel).FirstOrDefault()
-                : null;
-            activePackageName = JobReleaseNaming.PackageFileName(JobReleaseNaming.CoverJobNumber(jobNumber, releaseLabel));
         }
 
         if (string.IsNullOrEmpty(jobNumber))
