@@ -7,7 +7,9 @@
   -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- Windows 10 SDK target: needed for the built-in text recognition used on scanned PDFs (Shared/WindowsPdfOcrEngine.cs). -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
@@ -44,5 +46,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\HardwareTemplateBuilder.Core\HardwareTemplateBuilder.Core.csproj" />
+    <Compile Include="..\Shared\WindowsPdfOcrEngine.cs" Link="Helpers\WindowsPdfOcrEngine.cs" />
   </ItemGroup>
 </Project>

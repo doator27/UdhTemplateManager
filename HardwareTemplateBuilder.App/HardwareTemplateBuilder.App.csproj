@@ -2,6 +2,10 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
+    <!-- On Windows, build against the Windows 10 SDK so scanned PDFs can be read with the
+         built-in text recognition (Shared/WindowsPdfOcrEngine.cs). Linux builds stay plain net8.0. -->
+    <TargetFramework Condition="'$(OS)' == 'Windows_NT'">net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion Condition="'$(OS)' == 'Windows_NT'">10.0.17763.0</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -40,6 +44,7 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="PDFtoImage" Version="4.1.0" />
+    <Compile Include="..\Shared\WindowsPdfOcrEngine.cs" Link="Helpers\WindowsPdfOcrEngine.cs" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
