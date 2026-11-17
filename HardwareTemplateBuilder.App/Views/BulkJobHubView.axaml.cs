@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -60,7 +61,7 @@ public partial class BulkJobHubView : UserControl
         BuildCards(mfrs, draft);
 
         BackButton.Click     += (_, _) => NavigationRequested?.Invoke($"BulkManufacturerSelection:{_jobId}");
-        ContinueButton.Click += (_, _) => OnContinue(mfrs, draft);
+        ContinueButton.Click += async (_, _) => await OnContinueAsync(mfrs, draft);
     }
 
     private void BuildCards(List<Manufacturer> manufacturers, BulkDraftV2 draft)
@@ -110,7 +111,7 @@ public partial class BulkJobHubView : UserControl
         }
     }
 
-    private void OnContinue(List<Manufacturer> manufacturers, BulkDraftV2 draft)
+    private async Task OnContinueAsync(List<Manufacturer> manufacturers, BulkDraftV2 draft)
     {
         // Build PendingRows from draft items, grouped by manufacturer order.
         var rows = new List<BulkHardwareRow>();
@@ -167,7 +168,22 @@ public partial class BulkJobHubView : UserControl
             return;
         }
 
-        BulkAddSession.PendingRows = rows;
-        NavigationRequested?.Invoke($"TemplateResolutionWizard:{_jobId}");
+        // Items that already have templates go straight onto the job; only items with no
+        // linked templates are stepped through in the template wizard.
+        var needTemplates = BulkHardwareSaver.SaveRowsWithTemplates(_jobId, rows, BulkAddSession.ReleaseId, out var skipped);
+        if (skipped.Count > 0)
+        {
+            var win = TopLevel.GetTopLevel(this) as Window;
+            if (win != null)
+                await DialogHelper.ShowInfoAsync(win,
+                    "The following items were already in the job and were skipped:\n" +
+                    string.Join("\n", skipped.Select(s => $"  \u2022 {s}")),
+                    "Duplicate Items Skipped");
+        }
+
+        BulkAddSession.PendingRows = needTemplates;
+        NavigationRequested?.Invoke(needTemplates.Count > 0
+            ? $"TemplateResolutionWizard:{_jobId}"
+            : $"JobDetail:{_jobId}");
     }
 }

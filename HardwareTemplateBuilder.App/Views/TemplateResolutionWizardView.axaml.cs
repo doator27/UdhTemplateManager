@@ -93,7 +93,7 @@ public partial class TemplateResolutionWizardView : UserControl
 
         var mfrName = row.SelectedManufacturer?.ManufacturerName ?? "?";
         var model   = row.ModelNumber;
-        ItemHeaderLabel.Text = $"Item {index + 1} of {_rows.Count}  —  {mfrName}  {model}";
+        ItemHeaderLabel.Text = $"Needs templates: item {index + 1} of {_rows.Count}  —  {mfrName}  {model}";
 
         // Populate read-only labels display.
         LabelsDisplayPanel.Children.Clear();
@@ -304,167 +304,9 @@ public partial class TemplateResolutionWizardView : UserControl
 
     private async void OnFinish()
     {
-        var skipped = new List<string>();
-
-        using var ctx = DatabaseInitializer.CreateContext();
-        var hwRepo      = new HardwareItemRepository(ctx);
-        var hitRepo     = new HardwareItemTemplateRepository(ctx);
-        var jhRepo      = new JobHardwareRepository(ctx);
-        var freqService = new FrequencyService(ctx);
-
-        foreach (var row in _rows)
-        {
-            int hwItemId;
-
-            if (row.MatchedItem != null)
-            {
-                // Case A — matched; increment frequency and persist any remark the user set.
-                hwItemId = row.MatchedItem.Id;
-                var existing = ctx.HardwareItems.Find(hwItemId);
-                if (existing != null)
-                {
-                    freqService.IncrementFrequency(existing);
-                    if (!string.IsNullOrWhiteSpace(row.HardwareItemRemarks) &&
-                        existing.Remarks != row.HardwareItemRemarks)
-                    {
-                        existing.Remarks = row.HardwareItemRemarks;
-                        ctx.SaveChanges();
-                    }
-                }
-
-                // Link any job-specific templates carried over from an import.
-                foreach (var pending in row.PendingTemplates)
-                {
-                    int templateId;
-
-                    // If the template was scoped to a different job, clone it for this job.
-                    if (pending.Template.OriginJobId.HasValue && pending.Template.OriginJobId != _jobId)
-                    {
-                        var existingClone = ctx.IndividualTemplates.FirstOrDefault(t =>
-                            t.ManufacturerId == pending.Template.ManufacturerId &&
-                            t.TemplateNumber == pending.Template.TemplateNumber &&
-                            t.DoorMaterialId == pending.Template.DoorMaterialId &&
-                            t.OriginJobId    == _jobId);
-
-                        if (existingClone != null)
-                        {
-                            templateId = existingClone.Id;
-                        }
-                        else
-                        {
-                            var clone = new IndividualTemplate
-                            {
-                                ManufacturerId    = pending.Template.ManufacturerId,
-                                DescriptionId     = pending.Template.DescriptionId,
-                                DoorMaterialId    = pending.Template.DoorMaterialId,
-                                TemplateNumber    = pending.Template.TemplateNumber,
-                                NumPages          = pending.Template.NumPages,
-                                PagesToPrint      = pending.Template.PagesToPrint,
-                                PagesToRotate     = pending.Template.PagesToRotate,
-                                RotationDirection = pending.Template.RotationDirection,
-                                OnlineLink        = pending.Template.OnlineLink,
-                                LocalLink         = pending.Template.LocalLink,
-                                OriginJobId       = _jobId
-                            };
-                            ctx.IndividualTemplates.Add(clone);
-                            ctx.SaveChanges();
-                            templateId = clone.Id;
-                        }
-                    }
-                    else
-                    {
-                        templateId = pending.Template.Id;
-                    }
-
-                    bool linkExists = ctx.HardwareItemTemplates.Any(hit =>
-                        hit.HardwareItemId       == hwItemId &&
-                        hit.IndividualTemplateId == templateId &&
-                        hit.JobId                == _jobId);
-
-                    if (!linkExists)
-                        hitRepo.Add(new HardwareItemTemplate
-                        {
-                            HardwareItemId       = hwItemId,
-                            IndividualTemplateId = templateId,
-                            JobId                = _jobId
-                        });
-                }
-            }
-            else
-            {
-                // Case B — create new HardwareItem if not yet created.
-                // hwRepo.Add() returns an existing record when a duplicate is found,
-                // so explicitly update Remarks afterward to ensure the user's value is saved.
-                if (row.CreatedItem == null)
-                {
-                    var newItem = hwRepo.Add(new HardwareItem
-                    {
-                        ManufacturerId = row.SelectedManufacturer!.Id,
-                        DescriptionId  = row.SelectedDescription!.Id,
-                        ModelNumber    = row.ModelNumber,
-                        Remarks        = row.HardwareItemRemarks
-                    });
-
-                    if (!string.IsNullOrWhiteSpace(row.HardwareItemRemarks) &&
-                        newItem.Remarks != row.HardwareItemRemarks)
-                    {
-                        var tracked = ctx.HardwareItems.Find(newItem.Id);
-                        if (tracked != null)
-                        {
-                            tracked.Remarks = row.HardwareItemRemarks;
-                            ctx.SaveChanges();
-                        }
-                    }
-
-                    row.CreatedItem = newItem;
-                }
-                hwItemId = row.CreatedItem.Id;
-
-                // Link staged templates to the new hardware item
-                foreach (var pending in row.PendingTemplates)
-                {
-                    hitRepo.Add(new HardwareItemTemplate
-                    {
-                        HardwareItemId       = hwItemId,
-                        IndividualTemplateId = pending.Template.Id,
-                        JobId                = pending.IsJobSpecific ? _jobId : null
-                    });
-                }
-            }
-
-            // Create one JobHardware record per label. Skip any that already exist.
-            var labelsToSave = row.Labels.Count > 0
-                ? row.Labels
-                : new System.Collections.Generic.List<BulkHardwareLabel>
-                    { new() { CustomLabel = "", Remarks = null } };
-
-            foreach (var lbl in labelsToSave)
-            {
-                var customLabel = string.IsNullOrWhiteSpace(lbl.CustomLabel) ? null : lbl.CustomLabel;
-                var remarks     = string.IsNullOrWhiteSpace(lbl.Remarks)     ? null : lbl.Remarks;
-
-                bool isDuplicate = ctx.JobHardware.Any(jh =>
-                    jh.JobId             == _jobId &&
-                    jh.HardwareItemId    == hwItemId &&
-                    jh.CustomDescription == customLabel &&
-                    jh.ReleaseId         == BulkAddSession.ReleaseId);
-
-                if (isDuplicate)
-                {
-                    skipped.Add(row.ModelNumber + (customLabel != null ? $" ({customLabel})" : string.Empty));
-                    continue;
-                }
-
-                jhRepo.Add(new JobHardware
-                {
-                    JobId             = _jobId,
-                    HardwareItemId    = hwItemId,
-                    CustomDescription = customLabel,
-                    CalloutRemarks    = remarks,
-                    ReleaseId         = BulkAddSession.ReleaseId
-                });
-            }
-        }
+        // Rows that already had templates were saved before the wizard opened
+        // (BulkHardwareSaver.SaveRowsWithTemplates); these are the ones that needed them.
+        var skipped = BulkHardwareSaver.Save(_jobId, _rows, BulkAddSession.ReleaseId);
 
         if (skipped.Count > 0)
         {

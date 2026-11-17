@@ -136,6 +136,7 @@ public partial class JobDetailView : UserControl
         ReactivateButton.Click    += (_, _) => Reactivate();
 
         RemoveHardwareButton.Click                += (_, _) => RemoveHardwareFromJob();
+        RemoveAllHardwareButton.Click             += async (_, _) => await RemoveAllHardwareAsync();
         GeneratePackageButton.Click               += async (_, _) => await OnGeneratePackageAsync();
         GenerateForManufacturerButton.Click       += async (_, _) => await OnGenerateCoverSheetForManufacturerAsync();
         FilterDescriptionsButton.Click             += async (_, _) => await OnFilterDescriptionsAsync();
@@ -392,6 +393,38 @@ public partial class JobDetailView : UserControl
             ManufacturerFilterComboBox.SelectedIndex = 0;
     }
 
+    /// <summary>
+    /// Removes every hardware item from the job's active release (the list shown), after asking.
+    /// Other releases and the hardware items themselves are untouched.
+    /// </summary>
+    private async Task RemoveAllHardwareAsync()
+    {
+        if (_linkedHardware.Count == 0) { LinkStatusLabel.Text = "There is no hardware to remove."; return; }
+
+        var window = this.OwnerWindow();
+        if (window == null) return;
+
+        string listName;
+        using (var ctx = DatabaseInitializer.CreateContext())
+            listName = _currentReleaseId.HasValue
+                ? $"release \"{ctx.JobReleases.Where(r => r.Id == _currentReleaseId.Value).Select(r => r.ReleaseLabel).FirstOrDefault()}\""
+                : "the base list";
+
+        if (!await DialogHelper.ConfirmAsync(window,
+                $"Remove all {_linkedHardware.Count} hardware item(s) from {listName} of this job?",
+                "Remove All Hardware"))
+            return;
+
+        using (var ctx = DatabaseInitializer.CreateContext())
+        {
+            var rows = ctx.JobHardware.Where(jh => jh.JobId == _jobId && jh.ReleaseId == _currentReleaseId).ToList();
+            ctx.JobHardware.RemoveRange(rows);
+            ctx.SaveChanges();
+            LinkStatusLabel.Text = $"Removed {rows.Count} item(s).";
+        }
+        LoadLinkedHardware();
+    }
+
     private void RemoveHardwareFromJob()
     {
         if (LinkedHardwareList.SelectedItem is not JobHardware jh) { LinkStatusLabel.Text = "Select a linked item to remove."; return; }
@@ -482,10 +515,26 @@ public partial class JobDetailView : UserControl
             });
         }
 
-        BulkAddSession.PendingRows = pendingRows;
         BulkAddSession.JobId       = _jobId;
         BulkAddSession.ReleaseId   = _currentReleaseId;
-        NavigationRequested?.Invoke($"TemplateResolutionWizard:{_jobId}");
+        var rows = pendingRows;
+        // Items that already have templates go straight onto the job; only items with no
+        // linked templates are stepped through in the template wizard.
+        var needTemplates = BulkHardwareSaver.SaveRowsWithTemplates(_jobId, rows, BulkAddSession.ReleaseId, out var skipped);
+        if (skipped.Count > 0)
+        {
+            var win = this.OwnerWindow();
+            if (win != null)
+                await DialogHelper.ShowInfoAsync(win,
+                    "The following items were already in the job and were skipped:\n" +
+                    string.Join("\n", skipped.Select(s => $"  \u2022 {s}")),
+                    "Duplicate Items Skipped");
+        }
+
+        BulkAddSession.PendingRows = needTemplates;
+        NavigationRequested?.Invoke(needTemplates.Count > 0
+            ? $"TemplateResolutionWizard:{_jobId}"
+            : $"JobDetail:{_jobId}");
     }
 
     // --- Phase 20: Job complete status ---

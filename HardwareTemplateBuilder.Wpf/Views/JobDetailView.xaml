@@ -55,7 +55,10 @@
                         <StackPanel x:Name="LinkedHardwareBody">
 
                             <ListBox x:Name="LinkedHardwareList" Height="180" Margin="0,0,0,8"/>
-                            <Button x:Name="RemoveHardwareButton" Content="Remove from Job" HorizontalAlignment="Left" Margin="0,0,0,6"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,0,0,6">
+                                <Button x:Name="RemoveHardwareButton" Content="Remove from Job" Margin="0,0,6,0"/>
+                                <Button x:Name="RemoveAllHardwareButton" Content="Remove All Hardware"/>
+                            </StackPanel>
                             <TextBlock x:Name="LinkStatusLabel" Foreground="{StaticResource DangerBrush}"/>
                         </StackPanel>
                     </StackPanel>
