@@ -1,28 +1,33 @@
-using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Services.Import;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Data.Sqlite;
 
-// Runs only the new migration's SQL on an empty LocalDB database, then uses the new tables.
-var cs = @"Server=(localdb)\MSSQLLocalDB;Database=HtbCiMigrate;Trusted_Connection=True;TrustServerCertificate=True";
-using (var ctx = DatabaseInitializer.CreateContextForConnectionString(cs))
+// Matches the test excerpts against the August database snapshot (hardware_templates.db).
+using var db = new SqliteConnection("Data Source=hardware_templates.db;Mode=ReadOnly");
+db.Open();
+List<T> Query<T>(string sql, Func<SqliteDataReader, T> map)
 {
-    ctx.Database.EnsureDeleted();
-    ctx.GetService<IRelationalDatabaseCreator>().Create();
-    ctx.Database.ExecuteSqlRaw("CREATE TABLE [__EFMigrationsHistory] ([MigrationId] nvarchar(150) NOT NULL PRIMARY KEY, [ProductVersion] nvarchar(32) NOT NULL)");
-    var script = ctx.GetService<IMigrator>().GenerateScript("20261021182731_AddIsActiveToDescription", "20261117200000_AddPdfImportLearning");
-    foreach (var batch in script.Split("\nGO", StringSplitOptions.RemoveEmptyEntries))
-        if (batch.Trim().Length > 0) ctx.Database.ExecuteSqlRaw(batch);
-    Console.WriteLine(script);
+    using var cmd = db.CreateCommand(); cmd.CommandText = sql;
+    using var r = cmd.ExecuteReader(); var list = new List<T>();
+    while (r.Read()) list.Add(map(r));
+    return list;
 }
-using (var ctx = DatabaseInitializer.CreateContextForConnectionString(cs))
+var mfrs = Query("select Id, ManufacturerName from Manufacturers", r => (r.GetInt32(0), r.GetString(1))).ToDictionary(x => x.Item1, x => x.Item2);
+var items = Query("select Id, ManufacturerId, DescriptionId, ModelNumber from HardwareItems where IsActive = 1",
+    r => new ImportItemInfo(r.GetInt32(0), r.GetInt32(1), r.GetInt32(2), r.GetString(3))).ToDictionary(i => i.Id);
+var labels = Query("select HardwareItemId, CustomDescription, count(*) from JobHardware where CustomDescription is not null and CustomDescription <> '' group by HardwareItemId, CustomDescription",
+        r => new ImportLabelUse(r.GetInt32(0), r.GetString(1), ImportText.Key(r.GetString(1)), r.GetInt32(2)))
+    .Where(l => items.ContainsKey(l.HardwareItemId) && l.Key.Length > 0).GroupBy(l => l.Key).ToDictionary(g => g.Key, g => g.ToList());
+var k = new HardwareImportKnowledge { Manufacturers = mfrs, Items = items, LabelsByKey = labels, Threshold = 5 };
+
+foreach (var file in new[] { "schedule.txt", "costing.txt", "scan_ocr.txt" })
 {
-    var g = new HardwareImportGroup { ManufacturerCode = "LC", Catalog = "4040XP REGARM", SourceKey = ImportText.Key("4040XP REGARM"), HardwareItemId = 5, Label = "4040XP REGARM" };
-    for (int i = 0; i < 5; i++) HardwareImportLearningService.Record(ctx, new[] { g }, _ => (2, "4040XP RWPA"));
-    var m = ctx.PdfImportItemMappings.Single();
-    var a = ctx.PdfImportManufacturerAliases.Single();
-    Console.WriteLine($"MIGRATE OK: mapping count={m.ConfirmCount} item={m.HardwareItemId} alias {a.Code}->{a.ManufacturerId} x{a.ConfirmCount}");
-    if (m.ConfirmCount != 5 || a.ConfirmCount != 5) throw new Exception("counts wrong");
+    var lines = File.ReadAllLines(Path.Combine("HardwareTemplateBuilder.Tests", "TestData", "PdfImport", file));
+    var parsed = HardwarePdfParser.Parse(new[] { (IReadOnlyList<string>)lines });
+    var groups = HardwareImportMatcher.Match(parsed.Lines, k);
+    Console.WriteLine($"=== {file}: {parsed.Lines.Count} lines, {groups.Count} distinct, formats: {string.Join(",", parsed.Formats)}");
+    foreach (var g in groups)
+    {
+        var item = g.HardwareItemId is int id && items.TryGetValue(id, out var it) ? $"{mfrs[it.ManufacturerId]} | {it.ModelNumber}" : "-";
+        Console.WriteLine($"RES {g.Status,-11} {g.ManufacturerCode,-5}->{(g.ManufacturerId is int m ? mfrs[m] : "?"),-10} [{g.Catalog}] => {item} [{g.Label}]");
+    }
 }
