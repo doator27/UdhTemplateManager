@@ -120,6 +120,7 @@ public partial class JobDetailView : UserControl
         AddFileButton.Click            += async (_, _) => await AddAttachmentAsync();
         OpenAttachmentButton.Click    += (_, _) => OpenAttachment();
         RemoveAttachmentButton.Click  += (_, _) => RemoveAttachment();
+        ParsePdfButton.Click          += async (_, _) => await ParsePdfIntoBulkAddAsync();
 
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
         BulkAddButton.Click += (_, _) =>
@@ -388,6 +389,36 @@ public partial class JobDetailView : UserControl
             ManufacturerFilterComboBox.SelectedItem = previous;
         else if (names.Count > 0)
             ManufacturerFilterComboBox.SelectedIndex = 0;
+    }
+
+    /// <summary>
+    /// Opens the "Parse PDF into Bulk Add" wizard for the PDF selected in the attachments list,
+    /// then goes to the Bulk Add hub with the hardware it added.
+    /// </summary>
+    private async Task ParsePdfIntoBulkAddAsync()
+    {
+        if (AttachmentList.SelectedItem is not JobAttachment attachment ||
+            !attachment.StoredPath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            AttachmentStatusLabel.Text = "Select a PDF in the attachments list first.";
+            return;
+        }
+        if (!File.Exists(attachment.StoredPath))
+        {
+            AttachmentStatusLabel.Text = $"File not found: {attachment.StoredPath}";
+            return;
+        }
+        var window = TopLevel.GetTopLevel(this) as Window;
+        if (window == null) return;
+
+        AttachmentStatusLabel.Text = string.Empty;
+        var wizard = new PdfImportWizardWindow(_jobId, _currentReleaseId, attachment.StoredPath, attachment.FileName);
+        var added = await wizard.ShowDialog<bool?>(window);
+        if (added != true) return;
+
+        BulkAddSession.JobId     = _jobId;
+        BulkAddSession.ReleaseId = _currentReleaseId;
+        NavigationRequested?.Invoke($"BulkJobHub:{_jobId}");
     }
 
     /// <summary>

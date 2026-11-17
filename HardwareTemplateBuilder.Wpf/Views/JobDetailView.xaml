@@ -36,6 +36,7 @@
                                 <Button x:Name="AddFileButton"          Content="+ Add File…"/>
                                 <Button x:Name="OpenAttachmentButton"   Content="Open"/>
                                 <Button x:Name="RemoveAttachmentButton" Content="Remove"/>
+                                <Button x:Name="ParsePdfButton" Content="Parse PDF into Bulk Add..."/>
                             </ui:Stack>
                             <TextBlock x:Name="AttachmentStatusLabel" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"/>
                         </StackPanel>

@@ -1,0 +1,72 @@
+<ui:Win95Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+        x:Class="HardwareTemplateBuilder.Wpf.Views.PdfImportWizardWindow"
+        Title="Parse PDF into Bulk Add"
+        Width="860" Height="640" MinWidth="700" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip">
+    <DockPanel Margin="10">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}" Margin="0,0,0,8">
+            <TextBlock x:Name="HeaderText" Text="Parse PDF into Bulk Add" Style="{StaticResource CaptionText}"/>
+        </Border>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <ui:Stack DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                <Button x:Name="BackButton" Content="&lt; Back" IsEnabled="False"/>
+                <Button x:Name="NextButton" Content="Next &gt;" IsEnabled="False" IsDefault="True"/>
+                <Button x:Name="FinishButton" Content="Add to Bulk Add" IsEnabled="False"/>
+                <Button x:Name="CancelButton" Content="Cancel" IsCancel="True"/>
+            </ui:Stack>
+            <TextBlock x:Name="StatusLabel" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource DangerBrush}"/>
+        </DockPanel>
+
+        <Grid>
+            <!-- Page 1: summary -->
+            <DockPanel x:Name="SummaryPanel">
+                <TextBlock DockPanel.Dock="Top" x:Name="SummaryText" TextWrapping="Wrap" Margin="0,0,0,8" Text="Reading the PDF..."/>
+                <CheckBox DockPanel.Dock="Bottom" x:Name="ReviewAllCheck" Margin="0,8,0,0"
+                          Content="Also step through the items that were identified automatically"/>
+                <ListBox x:Name="SummaryList" FontFamily="Consolas" FontSize="11"/>
+            </DockPanel>
+
+            <!-- Page 2..n: one callout -->
+            <DockPanel x:Name="StepPanel" Visibility="Collapsed">
+                <GroupBox DockPanel.Dock="Top" Header="From the PDF" Margin="0,0,0,8">
+                    <StackPanel Margin="6">
+                        <TextBlock x:Name="SourceText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"/>
+                        <TextBlock x:Name="ReasonText" TextWrapping="Wrap" Margin="0,4,0,0" FontStyle="Italic"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <ui:Stack DockPanel.Dock="Top" Orientation="Horizontal" Spacing="16" Margin="0,0,0,6">
+                    <RadioButton x:Name="ExistingRadio" Content="Existing hardware item" GroupName="Mode" IsChecked="True"/>
+                    <RadioButton x:Name="NewRadio" Content="New hardware item" GroupName="Mode"/>
+                    <RadioButton x:Name="SkipRadio" Content="Leave this out" GroupName="Mode"/>
+                </ui:Stack>
+
+                <Grid DockPanel.Dock="Top" ui:GridEx.Columns="Auto,*" ui:GridEx.Rows="Auto,Auto" Margin="0,0,0,6">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="ManufacturerCombo" Margin="0,0,0,4" IsEditable="False"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Label:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="LabelBox" ui:Watermark.Text="Label on the job (blank = none)"/>
+                </Grid>
+
+                <!-- New item fields -->
+                <Grid DockPanel.Dock="Top" x:Name="NewPanel" ui:GridEx.Columns="Auto,*,Auto" ui:GridEx.Rows="Auto,Auto" Margin="0,0,0,6" Visibility="Collapsed">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="DescriptionBox" IsReadOnly="True" Margin="0,0,6,4"/>
+                    <Button Grid.Row="0" Grid.Column="2" x:Name="PickDescriptionButton" Content="Choose..." Margin="0,0,0,4"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Model number:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" x:Name="ModelBox"/>
+                </Grid>
+
+                <!-- Existing item list -->
+                <DockPanel x:Name="ExistingPanel">
+                    <TextBox DockPanel.Dock="Top" x:Name="SearchBox" ui:Watermark.Text="Search model numbers..." Margin="0,0,0,4"/>
+                    <ListBox x:Name="ItemsList" FontSize="11"/>
+                </DockPanel>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</ui:Win95Window>

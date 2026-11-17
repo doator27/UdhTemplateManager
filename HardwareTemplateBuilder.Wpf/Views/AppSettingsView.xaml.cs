@@ -51,6 +51,22 @@ public partial class AppSettingsView : UserControl
         RequestedFromManufacturerPdfPathBox.Text = _repo.GetValue("RequestedFromManufacturerPdfPath");
         BrowseRequestedFromManufacturerPdfButton.Click += async (_, _) => await BrowseRequestedFromManufacturerPdfAsync();
         SaveRequestedFromManufacturerButton.Click += (_, _) => SaveRequestedFromManufacturer();
+        var threshold = _repo!.GetValue(HardwareTemplateBuilder.Core.Services.Import.HardwareImportKnowledge.ThresholdSettingKey);
+        PdfImportThresholdBox.Text = int.TryParse(threshold, out var t) && t >= 1
+            ? t.ToString()
+            : HardwareTemplateBuilder.Core.Services.Import.HardwareImportKnowledge.DefaultThreshold.ToString();
+        SavePdfImportButton.Click += (_, _) =>
+        {
+            if (!int.TryParse(PdfImportThresholdBox.Text?.Trim(), out var value) || value < 1 || value > 100)
+            {
+                PdfImportStatusLabel.Foreground = AppColors.Danger;
+                PdfImportStatusLabel.Text = "Enter a whole number from 1 to 100.";
+                return;
+            }
+            _repo!.SetValue(HardwareTemplateBuilder.Core.Services.Import.HardwareImportKnowledge.ThresholdSettingKey, value.ToString());
+            PdfImportStatusLabel.Foreground = AppColors.Success;
+            PdfImportStatusLabel.Text = $"Saved: {value} confirmations.";
+        };
     }
 
     private Task BrowseRequestedFromManufacturerPdfAsync()

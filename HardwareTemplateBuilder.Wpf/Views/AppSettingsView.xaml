@@ -76,6 +76,20 @@
                     </StackPanel>
                 </GroupBox>
 
+                <GroupBox Header="Parse PDF into Bulk Add">
+                    <StackPanel Margin="6">
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource Hint}"
+                                   Text="How many times you must confirm the same answer for a PDF callout (or manufacturer code) in the wizard before it is filled in automatically."
+                                   Margin="0,0,0,8" />
+                        <ui:Stack Orientation="Horizontal" Spacing="6" Margin="0,0,0,12">
+                            <TextBlock Text="Confirmations before automatic:" VerticalAlignment="Center" />
+                            <TextBox x:Name="PdfImportThresholdBox" Width="60" />
+                        </ui:Stack>
+                        <Button x:Name="SavePdfImportButton" Content="Save" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="PdfImportStatusLabel" Margin="0,10,0,0" Foreground="{StaticResource DangerBrush}" />
+                    </StackPanel>
+                </GroupBox>
+
             </ui:Stack>
         </ScrollViewer>
     </DockPanel>

@@ -24,6 +24,7 @@ ZE                      Zero
 
 
 
+Heading #212 (Set #080-TYP)
      1 Single Door #38-T01L          TYP STAIR            STAIR A from CORRIDOR                   RHR
      1 Single Door #38-T02L          TYP STAIR            STAIR B from CORRIDOR                   RHR
      1 Single Door #38-T03R          TYP STAIR            STAIR C from CORRIDOR                   LHR

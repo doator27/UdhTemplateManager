@@ -35,6 +35,7 @@
                                 <Button Name="AddFileButton"          Content="+ Add File…"/>
                                 <Button Name="OpenAttachmentButton"   Content="Open"/>
                                 <Button Name="RemoveAttachmentButton" Content="Remove"/>
+                                <Button Name="ParsePdfButton" Content="Parse PDF into Bulk Add..."/>
                             </StackPanel>
                             <TextBlock Name="AttachmentStatusLabel" Foreground="#FF6B6B" TextWrapping="Wrap"/>
                         </StackPanel>

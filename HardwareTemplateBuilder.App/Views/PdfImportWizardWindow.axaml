@@ -1,0 +1,68 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="HardwareTemplateBuilder.App.Views.PdfImportWizardWindow"
+        Title="Parse PDF into Bulk Add"
+        Width="900" Height="660" MinWidth="720" MinHeight="540"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Name="HeaderText" Text="Parse PDF into Bulk Add"
+                   FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                <Button Name="BackButton" Content="&lt; Back" IsEnabled="False"/>
+                <Button Name="NextButton" Content="Next &gt;" IsEnabled="False" IsDefault="True"/>
+                <Button Name="FinishButton" Content="Add to Bulk Add" IsEnabled="False" Classes="dashboard-primary"/>
+                <Button Name="CancelButton" Content="Cancel" IsCancel="True"/>
+            </StackPanel>
+            <TextBlock Name="StatusLabel" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#FF6B6B"/>
+        </DockPanel>
+
+        <Grid>
+            <!-- Page 1: summary -->
+            <DockPanel Name="SummaryPanel">
+                <TextBlock DockPanel.Dock="Top" Name="SummaryText" TextWrapping="Wrap" Margin="0,0,0,8" Text="Reading the PDF..."/>
+                <CheckBox DockPanel.Dock="Bottom" Name="ReviewAllCheck" Margin="0,8,0,0"
+                          Content="Also step through the items that were identified automatically"/>
+                <ListBox Name="SummaryList" FontFamily="Consolas,Menlo,monospace" FontSize="11"/>
+            </DockPanel>
+
+            <!-- Page 2..n: one callout -->
+            <DockPanel Name="StepPanel" IsVisible="False">
+                <Border DockPanel.Dock="Top" Classes="panel" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="From the PDF" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <TextBlock Name="SourceText" TextWrapping="Wrap" FontFamily="Consolas,Menlo,monospace" FontSize="11"/>
+                        <TextBlock Name="ReasonText" TextWrapping="Wrap" Margin="0,4,0,0" FontStyle="Italic" Foreground="#A7ADB8"/>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="16" Margin="0,0,0,6">
+                    <RadioButton Name="ExistingRadio" Content="Existing hardware item" GroupName="Mode" IsChecked="True"/>
+                    <RadioButton Name="NewRadio" Content="New hardware item" GroupName="Mode"/>
+                    <RadioButton Name="SkipRadio" Content="Leave this out" GroupName="Mode"/>
+                </StackPanel>
+
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,6">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1" Name="ManufacturerCombo" Margin="0,0,0,4" HorizontalAlignment="Stretch"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Label:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Name="LabelBox" Watermark="Label on the job (blank = none)"/>
+                </Grid>
+
+                <Grid DockPanel.Dock="Top" Name="NewPanel" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,6" IsVisible="False">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                    <TextBox Grid.Row="0" Grid.Column="1" Name="DescriptionBox" IsReadOnly="True" Margin="0,0,6,4"/>
+                    <Button Grid.Row="0" Grid.Column="2" Name="PickDescriptionButton" Content="Choose..." Margin="0,0,0,4"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Model number:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Name="ModelBox"/>
+                </Grid>
+
+                <DockPanel Name="ExistingPanel">
+                    <TextBox DockPanel.Dock="Top" Name="SearchBox" Watermark="Search model numbers..." Margin="0,0,0,4"/>
+                    <ListBox Name="ItemsList" FontSize="12"/>
+                </DockPanel>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</Window>
