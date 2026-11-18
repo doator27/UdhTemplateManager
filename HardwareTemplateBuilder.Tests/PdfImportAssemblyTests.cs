@@ -17,6 +17,23 @@ public class PdfImportAssemblyTests
     }
 
     [Fact]
+    public void HeadingPagesCoverTheWholeHeading()
+    {
+        var exit = G("VO", "Exit Device", "99EO", "Heading #3");
+        exit.Lines[0].Page = 4;
+        var trim = G("VO", "Trim", "996L", "Heading #3");
+        trim.Lines[0].Page = 5;
+        var other = G("IV", "Hinge", "5BB1", "Heading #7");
+        other.Lines[0].Page = 9;
+        var loose = G("LC", "Closer", "4040XP");
+        loose.Lines.Add(new ParsedHardwareLine { ManufacturerCode = "LC", Catalog = "4040XP", Quantity = 1, Page = 2 });
+
+        var all = new[] { exit, trim, other, loose };
+        Assert.Equal(new[] { 4, 5 }, HardwareImportAssemblies.HeadingPages(exit, all));
+        Assert.Equal(new[] { 2 }, HardwareImportAssemblies.HeadingPages(loose, all));
+    }
+
+    [Fact]
     public void CandidatesComeFromTheSameHeading()
     {
         var device = G("VO", "Exit Device", "99L-F 996L-R", "080-TYP");

@@ -454,7 +454,7 @@ public partial class PdfImportWizardWindow : Window
     {
         if (_session == null || Current is not { } g) return;
         SaveStep(validate: false);
-        var choice = await new AssemblyWindow(_session, g).ShowDialog<AssemblyChoice?>(this);
+        var choice = await new AssemblyWindow(_session, g, _pdfPath).ShowDialog<AssemblyChoice?>(this);
         if (choice == null) return;
         HardwareImportAssemblies.Apply(g, choice.Parts, choice.Description, choice.DescriptionId);
         if (g.IsAssembly && choice.DescriptionId is int did && DescriptionBox.Tag is not int)

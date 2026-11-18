@@ -76,6 +76,24 @@ public static class HardwareImportAssemblies
             .ToList();
     }
 
+    /// <summary>
+    /// The PDF pages the callout's heading/set is on: every page with a line from the same
+    /// heading (any callout), else the callout's own pages. Used to preview the heading in full.
+    /// </summary>
+    /// <param name="anchor">The callout.</param>
+    /// <param name="groups">All callouts.</param>
+    public static List<int> HeadingPages(HardwareImportGroup anchor, IEnumerable<HardwareImportGroup> groups)
+    {
+        var sets = new HashSet<string>(anchor.Sets, StringComparer.OrdinalIgnoreCase);
+        var pages = sets.Count == 0
+            ? new List<int>()
+            : groups.SelectMany(g => g.AllLines)
+                .Where(l => l.SetName != null && sets.Contains(l.SetName) && l.Page > 0)
+                .Select(l => l.Page).ToList();
+        if (pages.Count == 0) pages = anchor.AllLines.Where(l => l.Page > 0).Select(l => l.Page).ToList();
+        return pages.Distinct().OrderBy(p => p).ToList();
+    }
+
     /// <summary>The assembly's label: the description (when given), then each callout, joined with " | ".</summary>
     /// <param name="description">The description to start with (blank = none).</param>
     /// <param name="anchor">The assembly's callout.</param>

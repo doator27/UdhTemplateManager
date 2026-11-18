@@ -1,43 +1,52 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:HardwareTemplateBuilder.App.Views"
         x:Class="HardwareTemplateBuilder.App.Views.AssemblyWindow"
         Title="Make Assembly"
-        Width="760" Height="600" MinWidth="560" MinHeight="420"
+        Width="1300" Height="780" MinWidth="900" MinHeight="520"
         WindowStartupLocation="CenterOwner">
     <DockPanel Margin="12">
         <TextBlock DockPanel.Dock="Top" Name="HeaderText" FontSize="16" FontWeight="Bold" TextWrapping="Wrap" Margin="0,0,0,4"/>
         <TextBlock DockPanel.Dock="Top" Name="IntroText" TextWrapping="Wrap" Foreground="#A7ADB8" FontSize="12" Margin="0,0,0,8"/>
 
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
-            <TextBlock Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <TextBox Grid.Column="1" Name="DescriptionBox" IsReadOnly="True" Watermark="Starts the label (none = callouts only)"/>
-            <Button Grid.Column="2" Name="ChooseDescriptionButton" Content="Choose..." Margin="6,0,0,0"/>
-            <Button Grid.Column="3" Name="ClearDescriptionButton" Content="Clear" Margin="6,0,0,0"/>
-        </Grid>
+        <Grid ColumnDefinitions="5*,10,6*">
+            <DockPanel Grid.Column="0">
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
+                    <TextBlock Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Grid.Column="1" Name="DescriptionBox" IsReadOnly="True" Watermark="Starts the label (none = callouts only)"/>
+                    <Button Grid.Column="2" Name="ChooseDescriptionButton" Content="Choose..." Margin="6,0,0,0"/>
+                    <Button Grid.Column="3" Name="ClearDescriptionButton" Content="Clear" Margin="6,0,0,0"/>
+                </Grid>
 
-        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,8,0,0">
-            <Border Classes="panel">
-                <StackPanel Spacing="4">
-                    <TextBlock Text="Label" FontWeight="Bold"/>
-                    <TextBlock Name="LabelPreview" TextWrapping="Wrap" FontFamily="Consolas,Menlo,monospace" FontSize="12"/>
+                <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,8,0,0">
+                    <Border Classes="panel">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Label" FontWeight="Bold"/>
+                            <TextBlock Name="LabelPreview" TextWrapping="Wrap" FontFamily="Consolas,Menlo,monospace" FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                            <Button Name="RemoveButton" Content="Not an Assembly" IsVisible="False"/>
+                            <Button Name="OkButton" Content="Make Assembly" Classes="dashboard-primary" IsDefault="True"/>
+                            <Button Name="CancelButton" Content="Cancel" IsCancel="True"/>
+                        </StackPanel>
+                        <TextBlock Name="StatusLabel" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="#FF6B6B"/>
+                    </DockPanel>
                 </StackPanel>
-            </Border>
-            <DockPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                    <Button Name="RemoveButton" Content="Not an Assembly" IsVisible="False"/>
-                    <Button Name="OkButton" Content="Make Assembly" Classes="dashboard-primary" IsDefault="True"/>
-                    <Button Name="CancelButton" Content="Cancel" IsCancel="True"/>
-                </StackPanel>
-                <TextBlock Name="StatusLabel" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="#FF6B6B"/>
+
+                <DockPanel>
+                    <CheckBox DockPanel.Dock="Top" Name="AllHeadingsCheck" Content="Show items from every heading" Margin="0,0,0,6"/>
+                    <TextBlock DockPanel.Dock="Top" Text="Tick the items that are part of this assembly:" Margin="0,0,0,4"/>
+                    <ScrollViewer>
+                        <StackPanel Name="PartsList" Spacing="4"/>
+                    </ScrollViewer>
+                </DockPanel>
             </DockPanel>
-        </StackPanel>
-
-        <DockPanel>
-            <CheckBox DockPanel.Dock="Top" Name="AllHeadingsCheck" Content="Show items from every heading" Margin="0,0,0,6"/>
-            <TextBlock DockPanel.Dock="Top" Text="Tick the items that are part of this assembly:" Margin="0,0,0,4"/>
-            <ScrollViewer>
-                <StackPanel Name="PartsList" Spacing="4"/>
-            </ScrollViewer>
-        </DockPanel>
+            <DockPanel Grid.Column="2">
+                <TextBlock DockPanel.Dock="Top" Name="HeadingPreviewText" Text="The heading in the PDF" FontWeight="Bold" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                <views:TemplatePreviewPanel Name="HeadingPreview"/>
+            </DockPanel>
+        </Grid>
     </DockPanel>
 </Window>

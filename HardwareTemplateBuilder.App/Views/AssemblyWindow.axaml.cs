@@ -33,7 +33,8 @@ public partial class AssemblyWindow : Window
     /// <summary>Creates the window.</summary>
     /// <param name="session">The import session.</param>
     /// <param name="anchor">The callout that is the assembly.</param>
-    public AssemblyWindow(HardwareImportSession session, HardwareImportGroup anchor)
+    /// <param name="pdfPath">The PDF being imported, for the heading preview (null = no preview).</param>
+    public AssemblyWindow(HardwareImportSession session, HardwareImportGroup anchor, string? pdfPath = null)
     {
         _session = session;
         _anchor = anchor;
@@ -77,6 +78,31 @@ public partial class AssemblyWindow : Window
         RemoveButton.Click += (_, _) => Close(new AssemblyChoice(new List<HardwareImportGroup>(), string.Empty));
         CancelButton.Click += (_, _) => Close(null);
         BuildList();
+        Opened += async (_, _) => await ShowHeadingAsync(pdfPath);
+    }
+
+    /// <summary>Shows the PDF page(s) the callout's heading is on, so the whole heading can be read.</summary>
+    private async System.Threading.Tasks.Task ShowHeadingAsync(string? pdfPath)
+    {
+        if (_session == null || _anchor == null) return;
+        var pages = HardwareImportAssemblies.HeadingPages(_anchor, _session.Analysis.Groups);
+        var heading = _anchor.Sets.Count > 0 ? string.Join(", ", _anchor.Sets.Take(2)) : "This item";
+        if (string.IsNullOrEmpty(pdfPath) || pages.Count == 0 || !System.IO.File.Exists(pdfPath))
+        {
+            HeadingPreviewText.Text = "The PDF page isn't available to preview.";
+            await HeadingPreview.ShowPdfAsync(null);
+            return;
+        }
+        HeadingPreviewText.Text = $"{heading}: page{(pages.Count == 1 ? "" : "s")} {string.Join(", ", pages)} of the PDF";
+        try
+        {
+            var bytes = await System.Threading.Tasks.Task.Run(() => HardwarePdfImportService.PagesPdf(pdfPath, pages));
+            await HeadingPreview.ShowPdfAsync(bytes);
+        }
+        catch (System.Exception ex)
+        {
+            HeadingPreviewText.Text = $"Couldn't show the PDF page: {ex.Message}";
+        }
     }
 
     private void BuildList()

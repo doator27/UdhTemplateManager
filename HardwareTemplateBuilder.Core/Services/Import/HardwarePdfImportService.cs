@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using HardwareTemplateBuilder.Core.Data;
+using PdfSharp.Pdf;
+using PdfSharp.Pdf.IO;
 
 namespace HardwareTemplateBuilder.Core.Services.Import;
 
@@ -38,6 +41,23 @@ public sealed class HardwarePdfAnalysis
 /// </summary>
 public static class HardwarePdfImportService
 {
+    /// <summary>Cuts the given pages (1-based, in order; out-of-range ones skipped) out of a PDF, for a preview.</summary>
+    /// <param name="pdfPath">The PDF.</param>
+    /// <param name="pages">The pages.</param>
+    /// <returns>A PDF of those pages, or null when none of them exist.</returns>
+    public static byte[]? PagesPdf(string pdfPath, IEnumerable<int> pages)
+    {
+        using var source = PdfReader.Open(pdfPath, PdfDocumentOpenMode.Import);
+        using var output = new PdfDocument();
+        foreach (var page in pages.Distinct().OrderBy(p => p))
+            if (page >= 1 && page <= source.PageCount)
+                output.AddPage(source.Pages[page - 1]);
+        if (output.PageCount == 0) return null;
+        using var ms = new MemoryStream();
+        output.Save(ms, false);
+        return ms.ToArray();
+    }
+
     /// <summary>Analyses a PDF.</summary>
     /// <param name="pdfPath">The PDF.</param>
     /// <param name="ocr">Text recognition for scanned pages, or null.</param>
