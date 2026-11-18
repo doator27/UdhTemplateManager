@@ -63,6 +63,12 @@
                     </DockPanel>
                 </Border>
 
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <Button DockPanel.Dock="Right" Name="AssemblyButton" Content="Make Assembly..." VerticalAlignment="Top" Margin="8,0,0,0"/>
+                    <TextBlock Name="AssemblyText" TextWrapping="Wrap" FontSize="12" VerticalAlignment="Center" Foreground="#A7ADB8"
+                               Text="Is this item an assembly with other items in its heading? Make Assembly... puts them on one line."/>
+                </DockPanel>
+
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="16" Margin="0,0,0,6">
                     <RadioButton Name="ExistingRadio" Content="Existing hardware item" GroupName="Mode" IsChecked="True"/>
                     <RadioButton Name="NewRadio" Content="New hardware item" GroupName="Mode"/>

@@ -78,6 +78,27 @@ public sealed class HardwareImportGroup
     /// <summary>Gets or sets whether the user unticked it on a "similar items" page (left out for this job only).</summary>
     public bool LeftOutAsSimilar { get; set; }
 
+    /// <summary>
+    /// Gets the other callouts that make up this one's assembly (this callout is the assembly's
+    /// line; the parts are only in its label, not added on their own). Empty = not an assembly.
+    /// </summary>
+    public List<HardwareImportGroup> AssemblyParts { get; } = new();
+
+    /// <summary>Gets or sets the assembly this callout is a part of (then it isn't added on its own).</summary>
+    public HardwareImportGroup? PartOfAssembly { get; set; }
+
+    /// <summary>Gets or sets the description that starts the assembly's label (empty = callouts only).</summary>
+    public string AssemblyDescription { get; set; } = string.Empty;
+
+    /// <summary>True when this callout is an assembly's line.</summary>
+    public bool IsAssembly => AssemblyParts.Count > 0;
+
+    /// <summary>Gets the parts a past assembly of this callout had that are in this PDF too (a suggestion; the user confirms).</summary>
+    public List<HardwareImportGroup> SuggestedAssemblyParts { get; } = new();
+
+    /// <summary>Gets or sets the description the suggested assembly had.</summary>
+    public string? SuggestedAssemblyDescription { get; set; }
+
     /// <summary>Gets or sets the manufacturer the code resolved to (null = unknown).</summary>
     public int? ManufacturerId { get; set; }
 

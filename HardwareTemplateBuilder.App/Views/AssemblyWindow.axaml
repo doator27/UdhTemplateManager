@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="HardwareTemplateBuilder.App.Views.AssemblyWindow"
+        Title="Make Assembly"
+        Width="760" Height="600" MinWidth="560" MinHeight="420"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Name="HeaderText" FontSize="16" FontWeight="Bold" TextWrapping="Wrap" Margin="0,0,0,4"/>
+        <TextBlock DockPanel.Dock="Top" Name="IntroText" TextWrapping="Wrap" Foreground="#A7ADB8" FontSize="12" Margin="0,0,0,8"/>
+
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+            <TextBlock Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBox Grid.Column="1" Name="DescriptionBox" Watermark="Starts the label, e.g. Exit Device Assembly (blank = callouts only)"/>
+        </Grid>
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,8,0,0">
+            <Border Classes="panel">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Label" FontWeight="Bold"/>
+                    <TextBlock Name="LabelPreview" TextWrapping="Wrap" FontFamily="Consolas,Menlo,monospace" FontSize="12"/>
+                </StackPanel>
+            </Border>
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                    <Button Name="RemoveButton" Content="Not an Assembly" IsVisible="False"/>
+                    <Button Name="OkButton" Content="Make Assembly" Classes="dashboard-primary" IsDefault="True"/>
+                    <Button Name="CancelButton" Content="Cancel" IsCancel="True"/>
+                </StackPanel>
+                <TextBlock Name="StatusLabel" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="#FF6B6B"/>
+            </DockPanel>
+        </StackPanel>
+
+        <DockPanel>
+            <CheckBox DockPanel.Dock="Top" Name="AllHeadingsCheck" Content="Show items from every heading" Margin="0,0,0,6"/>
+            <TextBlock DockPanel.Dock="Top" Text="Tick the items that are part of this assembly:" Margin="0,0,0,4"/>
+            <ScrollViewer>
+                <StackPanel Name="PartsList" Spacing="4"/>
+            </ScrollViewer>
+        </DockPanel>
+    </DockPanel>
+</Window>

@@ -70,6 +70,7 @@ public partial class PdfImportWizardWindow : Window
                 LabelBox.Text = _session!.LabelFor(g, c);
         };
         PickDescriptionButton.Click += async (_, _) => await PickDescriptionAsync();
+        AssemblyButton.Click += async (_, _) => await MakeAssemblyAsync();
         CatalogButton.Click += async (_, _) =>
         {
             if (Current is { CatalogInfo: { } info } g)
@@ -145,6 +146,12 @@ public partial class PdfImportWizardWindow : Window
             // depend on what was kept and combined.
             _steps = _session.BuildSteps(ReviewAllCheck.IsChecked == true);
         }
+        // Skip callouts that became part of an assembly since the list was built.
+        int dir = delta > 0 ? 1 : -1;
+        while (next >= ClusterCount && next - ClusterCount < _steps.Count && !HardwareImportSession.InPlay(_steps[next - ClusterCount]))
+            next += dir;
+        if (next < 0) { ShowSummary(); return; }
+        if (next < ClusterCount) { ShowCluster(next); return; }
         if (next - ClusterCount < _steps.Count) ShowStep(next - ClusterCount);
         else UpdateButtons();
     }
@@ -208,6 +215,7 @@ public partial class PdfImportWizardWindow : Window
             StepPanel.IsVisible = true;
             HeaderText.Text = $"Item {index + 1} of {_steps.Count}: {g.GenericName}";
             SourceText.Text = _session!.SourceText(g);
+            ShowAssembly(g);
             CatalogPanel.IsVisible = g.CatalogInfo != null;
             CatalogText.Text = g.CatalogInfo?.Summary ?? string.Empty;
             ReasonText.Text = g.Status switch
@@ -314,6 +322,38 @@ public partial class PdfImportWizardWindow : Window
         return true;
     }
 
+    /// <summary>Shows whether the current callout is an assembly (or was one last time).</summary>
+    private void ShowAssembly(HardwareImportGroup g)
+    {
+        AssemblyButton.Content = g.IsAssembly ? "Edit Assembly..." : "Make Assembly...";
+        AssemblyText.Text = g.IsAssembly
+            ? $"Assembly with: {string.Join(" | ", g.AssemblyParts.Select(p => p.Catalog))}. Choose below the hardware item the assembly is."
+            : g.SuggestedAssemblyParts.Count > 0
+                ? $"Last time this was an assembly with: {string.Join(" | ", g.SuggestedAssemblyParts.Select(p => p.Catalog))}. Make Assembly... to use it again."
+                : "Is this item an assembly with other items in its heading? Make Assembly... puts them on one line.";
+    }
+
+    /// <summary>
+    /// Opens the assembly window for the current callout: the ticked items become its parts
+    /// (left out on their own) and its label becomes the description plus every callout joined
+    /// with " | ". The user then picks the hardware item the assembly is on this page.
+    /// </summary>
+    private async Task MakeAssemblyAsync()
+    {
+        if (_session == null || Current is not { } g) return;
+        SaveStep(validate: false);
+        var choice = await new AssemblyWindow(_session, g).ShowDialog<AssemblyChoice?>(this);
+        if (choice == null) return;
+        HardwareImportAssemblies.Apply(g, choice.Parts, choice.Description);
+        LabelBox.Text = g.Label;
+        SourceText.Text = _session.SourceText(g);
+        ShowAssembly(g);
+        StatusLabel.Text = g.IsAssembly && SkipRadio.IsChecked == true
+            ? "This item is set to be left out: choose the hardware item the assembly is."
+            : string.Empty;
+        UpdateButtons();
+    }
+
     private async Task PickDescriptionAsync()
     {
         if (_session == null) return;
@@ -347,9 +387,10 @@ public partial class PdfImportWizardWindow : Window
         else
         {
             int step = _index - ClusterCount;
-            NextButton.IsEnabled = step < _steps.Count - 1;
+            bool more = _steps.Skip(step + 1).Any(HardwareImportSession.InPlay);
+            NextButton.IsEnabled = more;
             NextButton.Content = "Next >";
-            FinishButton.IsEnabled = step >= _steps.Count - 1;
+            FinishButton.IsEnabled = !more;
         }
     }
 

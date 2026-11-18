@@ -89,6 +89,14 @@ public sealed class HardwareImportSession
 
         MarkAlreadyAdded(Analysis.Groups, _existing, Item);
         Clusters = HardwareImportSimilarity.FindClusters(Analysis.Groups);
+        try
+        {
+            HardwareImportAssemblies.Suggest(Analysis.Groups, HardwareImportAssemblies.Load(ctx));
+        }
+        catch
+        {
+            // Suggestions are extra help only.
+        }
     }
 
     /// <summary>Gets the sets of similar callouts to ask about, in PDF order.</summary>
@@ -156,7 +164,7 @@ public sealed class HardwareImportSession
 
     /// <summary>True when the callout is still to be added (not already there, not combined into another, not unticked).</summary>
     /// <param name="g">The callout.</param>
-    public static bool InPlay(HardwareImportGroup g) => !g.IsAlreadyAdded && g.MergedInto == null && !g.LeftOutAsSimilar;
+    public static bool InPlay(HardwareImportGroup g) => !g.IsAlreadyAdded && g.MergedInto == null && !g.LeftOutAsSimilar && g.PartOfAssembly == null;
 
     /// <summary>Summary for the wizard's first page.</summary>
     public string SummaryText
@@ -198,6 +206,7 @@ public sealed class HardwareImportSession
         var mark = g.IsAlreadyAdded ? "have" : g.Status switch { ImportMatchStatus.Matched => "OK", ImportMatchStatus.Skipped => "skip", _ => "??" };
         string target = g.IsAlreadyAdded ? $"({g.AlreadyAddedReason!.ToLowerInvariant()})"
             : g.MergedInto != null ? $"(same item as {g.MergedInto.Catalog})"
+            : g.PartOfAssembly != null ? $"(part of the assembly {g.PartOfAssembly.Catalog})"
             : g.Skip ? "(left out)"
             : g.CreateNew ? $"new: {ManufacturerName(g.NewManufacturerId)} {g.NewModelNumber}"
             : Item(g.HardwareItemId) is { } item ? $"{ManufacturerName(item.ManufacturerId)} {item.ModelNumber}" : "(not identified)";
@@ -234,6 +243,8 @@ public sealed class HardwareImportSession
         var handings = g.Lines.Select(l => l.Handing).Where(h => !string.IsNullOrEmpty(h)).Distinct().ToList();
         if (finishes.Count > 0 || handings.Count > 0)
             sb.AppendLine($"Finish: {string.Join(", ", finishes)}   Handing: {string.Join(", ", handings)}");
+        if (g.IsAssembly)
+            sb.AppendLine($"Assembly with: {string.Join(" | ", g.AssemblyParts.Select(p => p.Catalog))}");
         if (g.MergedGroups.Count > 0)
             sb.AppendLine($"Also covers (same item): {string.Join("; ", g.MergedGroups.Select(m => m.Catalog))}");
         var sets = g.Sets;
@@ -302,11 +313,19 @@ public sealed class HardwareImportSession
         // Callouts combined into a reviewed one learn the same answer; unticked similar callouts
         // are left out for this job only, so they teach nothing.
         HardwareImportSimilarity.CopyCombinedAnswers(Analysis.Groups);
-        var list = reviewed.ToList();
+        var list = reviewed.Where(g => g.PartOfAssembly == null).ToList();
         list.AddRange(list.SelectMany(g => g.MergedGroups).Where(m => !list.Contains(m)).ToList());
         using var ctx = DatabaseInitializer.CreateContext();
         HardwareImportLearningService.Record(ctx, list.Where(g => !g.LeftOutAsSimilar),
             id => Item(id) is { } i ? (i.ManufacturerId, i.ModelNumber) : null);
+        // Assemblies made this time are offered again when the same callouts come up.
+        var assemblies = Analysis.Groups.Where(g => g.IsAssembly && !g.Skip && InPlay(g)).ToList();
+        if (assemblies.Count > 0)
+        {
+            var learned = HardwareImportAssemblies.Load(ctx);
+            HardwareImportAssemblies.Record(learned, assemblies);
+            HardwareImportAssemblies.Save(ctx, learned);
+        }
     }
 
     /// <summary>

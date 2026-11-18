@@ -1,0 +1,42 @@
+<ui:Win95Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+        x:Class="HardwareTemplateBuilder.Wpf.Views.AssemblyWindow"
+        Title="Make Assembly"
+        Width="760" Height="600" MinWidth="560" MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip">
+    <DockPanel Margin="10">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}" Margin="0,0,0,6">
+            <TextBlock x:Name="HeaderText" Style="{StaticResource CaptionText}" TextTrimming="CharacterEllipsis"/>
+        </Border>
+        <TextBlock DockPanel.Dock="Top" x:Name="IntroText" TextWrapping="Wrap" Style="{StaticResource Hint}" Margin="0,0,0,8"/>
+
+        <Grid DockPanel.Dock="Top" ui:GridEx.Columns="Auto,*" Margin="0,0,0,8">
+            <TextBlock Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBox Grid.Column="1" x:Name="DescriptionBox" ui:Watermark.Text="Starts the label, e.g. Exit Device Assembly (blank = callouts only)"/>
+        </Grid>
+
+        <ui:Stack DockPanel.Dock="Bottom" Spacing="8" Margin="0,8,0,0">
+            <GroupBox Header="Label" Padding="6">
+                <TextBlock x:Name="LabelPreview" TextWrapping="Wrap" FontFamily="Courier New"/>
+            </GroupBox>
+            <DockPanel>
+                <ui:Stack DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                    <Button x:Name="RemoveButton" Content="Not an Assembly" Visibility="Collapsed"/>
+                    <Button x:Name="OkButton" Content="Make Assembly" IsDefault="True"/>
+                    <Button x:Name="CancelButton" Content="Cancel" IsCancel="True"/>
+                </ui:Stack>
+                <TextBlock x:Name="StatusLabel" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{StaticResource DangerBrush}"/>
+            </DockPanel>
+        </ui:Stack>
+
+        <DockPanel>
+            <CheckBox DockPanel.Dock="Top" x:Name="AllHeadingsCheck" Content="Show items from every heading" Margin="0,0,0,6"/>
+            <TextBlock DockPanel.Dock="Top" Text="Tick the items that are part of this assembly:" Margin="0,0,0,4"/>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ui:Stack x:Name="PartsList" Spacing="4"/>
+            </ScrollViewer>
+        </DockPanel>
+    </DockPanel>
+</ui:Win95Window>
