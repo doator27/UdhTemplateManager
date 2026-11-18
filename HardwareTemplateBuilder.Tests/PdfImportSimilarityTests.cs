@@ -100,8 +100,8 @@ public class PdfImportSimilarityTests
         Assert.Equal("TE640 BAA", HardwareImportLabelLearning.Apply(data, "TE640 BAA", key, threshold: 6));
         Assert.Equal("4040XP", HardwareImportLabelLearning.Apply(data, "4040XP BAA", HardwareImportLabelLearning.ItemKey(3, "4040XP"), threshold: 5));
         // Unchanged labels teach nothing.
-        HardwareImportLabelLearning.Observe(data, "X", "X", key);
-        Assert.False(data.Words.ContainsKey("X"));
+        HardwareImportLabelLearning.Observe(data, "QQQ", "QQQ", key);
+        Assert.False(data.Words.ContainsKey("QQQ"));
     }
 
     [Fact]
