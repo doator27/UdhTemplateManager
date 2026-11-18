@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Runtime.Versioning;
 using System.Threading;
+using HardwareTemplateBuilder.Core.Platform;
 using HardwareTemplateBuilder.App.Helpers;
 
 namespace HardwareTemplateBuilder.App;
@@ -65,15 +66,17 @@ class Program
             .LogToTrace();
 
     /// <summary>
-    /// (Re)creates a plain Start Menu shortcut to this exe so the app shows up in Start search.
+    /// (Re)creates a plain Start Menu shortcut to this exe so the app shows up in Start search,
+    /// after removing old AppUserModelIDs from shortcuts that point at this exe
+    /// (<see cref="AppShortcuts.StripOldAppIds"/>).
     /// <para>
-    /// Deliberately has no AppUserModelID, and the process doesn't set one either: Windows then
-    /// identifies the app by its exe path, the same as any ordinary program, which is what makes
-    /// the taskbar right-click menu show the app name and "Pin to taskbar". (Earlier versions set
-    /// an explicit ID on the process and this shortcut; when the two didn't line up, the menu
-    /// showed only "Close window".) Recreating it on every launch also clears the ID from
-    /// shortcuts made by those versions and keeps the target current after republishing.
-    /// Best-effort: never throws.
+    /// The app deliberately runs without an AppUserModelID: Windows then identifies it by its exe
+    /// path, the same as any ordinary program, which is what makes the taskbar right-click menu
+    /// show the app name and "Pin to taskbar". Shortcuts made while older versions ran with an
+    /// explicit ID (taskbar pins, desktop or Start Menu shortcuts) still carry that ID; when one
+    /// points at this exe, Windows matches the window to it and the menu shows only
+    /// "Close window". Recreating the Start Menu shortcut on every launch also keeps its target
+    /// current after republishing. Best-effort: never throws.
     /// </para>
     /// </summary>
     [SupportedOSPlatform("windows")]
@@ -85,21 +88,20 @@ class Program
             var exePath = Environment.ProcessPath;
             if (string.IsNullOrEmpty(exePath)) return;
 
+            try
+            {
+                AppShortcuts.StripOldAppIds(exePath);
+            }
+            catch
+            {
+                // Best-effort.
+            }
+
             var shortcutPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Hardware Template Builder.lnk");
             if (File.Exists(shortcutPath))
                 File.Delete(shortcutPath);
-
-            var wshType = Type.GetTypeFromProgID("WScript.Shell");
-            if (wshType is null) return;
-
-            dynamic wsh = Activator.CreateInstance(wshType)!;
-            dynamic shortcut = wsh.CreateShortcut(shortcutPath);
-            shortcut.TargetPath = exePath;
-            shortcut.WorkingDirectory = Path.GetDirectoryName(exePath) ?? string.Empty;
-            shortcut.Description = "Hardware Template Builder";
-            shortcut.IconLocation = exePath + ",0";
-            shortcut.Save();
+            AppShortcuts.CreateShortcut(shortcutPath, exePath, "Hardware Template Builder");
         }
         catch
         {
