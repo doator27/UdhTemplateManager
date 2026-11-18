@@ -31,6 +31,10 @@ public sealed class HardwarePdfParseResult
 /// such as "LC  Concealed Closer 2033 2,871.00 …" with the description wrapped below and an
 /// "Openings:" line.</item>
 /// </list>
+/// <item><b>Door machining sheets</b> (one door type per page): a "Qty  Hardware Details" section in
+/// the left column with item lines "3  Ives BAA 5BB1 4 1/2" x 4 1/2" 630 NRP" (manufacturer name
+/// first) and "Prep: …" notes below, and "1 Opening (LHR): E100C" lines that say how many doors use
+/// the page.</item>
 /// Anything else (e.g. shop drawings) is left to <see cref="HardwareImportMatcher.FindKnownCallouts"/>,
 /// which looks for callouts the database already knows.
 /// </summary>
@@ -44,6 +48,16 @@ public static class HardwarePdfParser
     private static readonly Regex OpeningLineRegex = new(@"^\s*\d+\s+(Single|Pair|Double)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex CostingHeaderRegex = new(@"^\s*Mfg\s+Product Description", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex CostingItemRegex = new(@"^([A-Z][A-Z0-9]{1,4})\s+(\S.*?)\s+-?[\d,]+\.\d\d(\s|$)", RegexOptions.Compiled);
+    private static readonly Regex MachiningHeaderRegex = new(@"^(\s*)Qty\s+(Hardware Details)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex MachiningItemRegex = new(@"^(\s*)(\d{1,3})(\s+)(\S.*)$", RegexOptions.Compiled);
+    private static readonly Regex MachiningOpeningRegex = new(@"(\d{1,4})\s+Openings?\s*(?:\(([A-Z]{1,4})\))?\s*:\s*(\S+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex MachiningTypeRegex = new(@"\bType:\s*(\S.*?)\s*$", RegexOptions.Compiled);
+    private static readonly Regex ColumnGapRegex = new(@"\s{6,}", RegexOptions.Compiled);
+    private static readonly Regex DoorThicknessRegex = new(@"\s+\d\s+\d/\d$", RegexOptions.Compiled);
+
+    /// <summary>Compliance codes printed with a model ("Ives BAA 5BB1"); moved to the end of the callout.</summary>
+    private static readonly HashSet<string> ComplianceCodes = new(StringComparer.OrdinalIgnoreCase) { "BAA", "TAA", "ARRA" };
+
     private static readonly Regex ListRowRegex = new(@"^\s*(\S{1,8}(?: \S{1,4})?)\s{2,}(\S.*)$", RegexOptions.Compiled);
 
     /// <summary>Parses all pages.</summary>
@@ -53,11 +67,16 @@ public static class HardwarePdfParser
         var result = new HardwarePdfParseResult();
         ReadCodeLists(pages, result);
 
-        bool schedule = false, costing = false;
+        bool schedule = false, costing = false, machining = false;
         string? heading = null;
         for (int p = 0; p < pages.Count; p++)
         {
             var lines = pages[p];
+            if (lines.Any(l => MachiningHeaderRegex.IsMatch(l)))
+            {
+                machining |= ParseMachiningPage(lines, p + 1, result);
+                continue;
+            }
             if (lines.Any(l => CostingHeaderRegex.IsMatch(l))) costing = true;
             if (costing && lines.Any(l => CostingHeaderRegex.IsMatch(l)))
                 ParseCostingPage(lines, p + 1, result);
@@ -66,6 +85,7 @@ public static class HardwarePdfParser
         }
         if (schedule) result.Formats.Add("Hardware schedule");
         if (costing) result.Formats.Add("Component costing");
+        if (machining) result.Formats.Add("Door machining sheet");
 
         foreach (var line in result.Lines)
         {
@@ -202,6 +222,126 @@ public static class HardwarePdfParser
         line.Catalog = string.Join(" ", words.Skip(i));
         line.GenericName = string.Join(" ", words.Take(i));
     }
+
+    // ── Door machining sheets ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Reads one door machining sheet page: the item lines under "Qty  Hardware Details" (left
+    /// column only: text after a wide gap belongs to the drawing and is cut off), stopping at the
+    /// first line that starts left of the details column (e.g. "Prep for … locations."). The
+    /// page's "N Opening (hand): mark" lines give how many doors use it; quantities are
+    /// per door, so they are multiplied by that count.
+    /// </summary>
+    private static bool ParseMachiningPage(IReadOnlyList<string> lines, int page, HardwarePdfParseResult result)
+    {
+        int header = -1, detailsCol = 0;
+        for (int i = 0; i < lines.Count && header < 0; i++)
+        {
+            var m = MachiningHeaderRegex.Match(lines[i]);
+            if (!m.Success) continue;
+            header = i;
+            detailsCol = m.Groups[2].Index;
+        }
+        if (header < 0) return false;
+
+        // Openings and door type (anywhere on the page).
+        int openings = 0;
+        var marks = new List<string>();
+        string? type = null;
+        foreach (var line in lines)
+        {
+            foreach (Match o in MachiningOpeningRegex.Matches(line))
+            {
+                openings += int.Parse(o.Groups[1].Value);
+                marks.Add(o.Groups[3].Value);
+            }
+            var t = MachiningTypeRegex.Match(line);
+            if (t.Success && type == null) type = t.Groups[1].Value;
+        }
+        string? setName = marks.Count > 0
+            ? (type != null ? $"Type {type}: " : string.Empty) + string.Join(", ", marks)
+            : type != null ? $"Type {type}" : null;
+
+        var items = new List<(ParsedHardwareLine Line, string Text, List<string> Notes)>();
+        for (int i = header + 1; i < lines.Count; i++)
+        {
+            var raw = lines[i];
+            if (raw.Trim().Length == 0) continue;
+            int indent = raw.Length - raw.TrimStart().Length;
+            var item = MachiningItemRegex.Match(raw);
+            int textCol = item.Success ? item.Groups[4].Index : indent;
+
+            if (item.Success && indent < detailsCol - 2 && Math.Abs(textCol - detailsCol) <= 3)
+            {
+                var text = LeftColumn(item.Groups[4].Value);
+                int qty = int.Parse(item.Groups[2].Value);
+                items.Add((new ParsedHardwareLine { Page = page, Quantity = qty * Math.Max(1, openings), SetName = setName }, text, new List<string>()));
+            }
+            else if (items.Count > 0 && Math.Abs(indent - detailsCol) <= 3)
+            {
+                items[^1].Notes.Add(LeftColumn(raw.Trim()));
+            }
+            else if (indent > detailsCol + 3)
+            {
+                // Drawing text (dimensions) between the items.
+                continue;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        foreach (var (line, text, notes) in items)
+        {
+            SplitMachiningText(line, text);
+            var prep = notes.FirstOrDefault(n => n.StartsWith("Prep:", StringComparison.OrdinalIgnoreCase));
+            if (prep != null)
+                line.GenericName = Regex.Split(prep.Substring(5).Trim(), @",|\s-\s")[0].Trim();
+            if (line.Catalog.Length > 0) result.Lines.Add(line);
+        }
+        return items.Count > 0;
+    }
+
+    /// <summary>The text before the first wide gap (what follows belongs to the drawing).</summary>
+    private static string LeftColumn(string text) => ColumnGapRegex.Split(text.Trim())[0].Trim();
+
+    /// <summary>
+    /// Splits "Ives BAA 5BB1 4 1/2" x 4 1/2" 630 NRP" into manufacturer "Ives" and callout
+    /// "5BB1 4 1/2" x 4 1/2" NRP BAA" (finish 630). The manufacturer is the leading capitalised
+    /// words ("Von Duprin") or one all-caps word ("LCN"); compliance codes move to the end; the
+    /// finish and handing words are taken out (never the model itself); a trailing door thickness
+    /// ("1 3/4") is dropped.
+    /// </summary>
+    private static void SplitMachiningText(ParsedHardwareLine line, string text)
+    {
+        var words = ImportText.Tidy(text).Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+        int n = 0;
+        while (n < words.Count && Regex.IsMatch(words[n], @"^[A-Z][a-z][A-Za-z&'.]*$")) n++;
+        if (n == 0 && words.Count > 1 && Regex.IsMatch(words[0], @"^[A-Z][A-Z&]{1,5}$") && !ComplianceCodes.Contains(words[0])) n = 1;
+        var name = string.Join(" ", words.Take(n));
+        line.ManufacturerName = name.Length > 0 ? name : null;
+        line.ManufacturerCode = name.Length > 0 ? Truncate(name.ToUpperInvariant(), 50) : string.Empty;
+
+        var rest = words.Skip(n).ToList();
+        var compliance = new List<string>();
+        while (rest.Count > 1 && ComplianceCodes.Contains(rest[0]))
+        {
+            compliance.Add(rest[0]);
+            rest.RemoveAt(0);
+        }
+        for (int i = rest.Count - 1; i >= 1; i--)
+        {
+            var w = rest[i];
+            if (line.Handing == null && ImportText.Handings.Contains(w)) { line.Handing = w.ToUpperInvariant(); rest.RemoveAt(i); }
+            else if (line.Finish == null && Regex.IsMatch(w, @"^\d{3}$|^US\d{1,2}[A-Z]?$", RegexOptions.IgnoreCase)) { line.Finish = w; rest.RemoveAt(i); }
+        }
+        var catalog = string.Join(" ", rest.Concat(compliance));
+        catalog = DoorThicknessRegex.Replace(catalog, string.Empty).Trim();
+        line.Catalog = catalog;
+    }
+
+    private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
 
     // ── Component costing / pricing reports ─────────────────────────────────
 

@@ -1,0 +1,132 @@
+=== PAGE 1
+                                                                                                                            5  5 7/8
+          Door Machining Sheet
+             Nominal Width: 3-0                                                                                                        6
+                 Hinge Gap: 1/8                                                                 8/7 4                                  3/8
+                 Strike Gap: 1/8
+          Actual Door Width: 2-11 3/4
+             Nominal Height: 7-0
+                   Top Gap: 1/8
+                  Undercut: 3/4
+          Actual Door Height: 6-11 1/8                                                                                                 3-0
+                                                                                                                                       1/4
+                 Thickness: 1 3/4
+                                                                                                8/1
+          Catalog: Fleming       Core: HC                                                       1-3
+           Series: D             Seam: LS
+             Matl: 18 ga. PGS    Edge:
+           Finish: GALVANNEAL     Top:                                                                                                     3-9
+                                                                                                                                           7/8
+           Label: ULMYLX.75    Bottom:
+          Qty  Hardware Details
+          3    Ives BAA 5BB1 4 1/2" x 4 1/2" 630 NRP
+               Prep: Hinge, Regular Weight - 4 1/2"
+          1    Schlage ND10 RHO 626 BAA                                                         8/3
+               Prep: Lock, 161 Lever                                                            9-5
+          1    LCN 4040XP RWPA 689 LH TBSRT 1 3/4
+               Prep: Closer, Surface - PA Mount
+               Parallel Mount
+          Prep for "Pioneer" locations.                                                                      Type: NL1 (SNAP)
+                                                                                                           Elevation: FO (HM/GL)
+                                                           1 Opening (LHR): E100C
+                                                           1 Opening (RHR): U100C
+      11/11/2026                                                                                                                                                      Page 1 of 4
+=== PAGE 2
+          Door Machining Sheet
+             Nominal Width: 3-0
+                 Hinge Gap: 1/8                                                                 8/7 4
+                 Strike Gap: 1/8
+          Actual Door Width: 2-11 3/4
+             Nominal Height: 7-0
+                   Top Gap: 1/8
+                  Undercut: 3/4
+          Actual Door Height: 6-11 1/8
+                 Thickness: 1 3/4
+                                                                                                8/1
+          Catalog: Fleming       Core: HC                                                       1-3
+           Series: D             Seam: LS
+             Matl: 18 ga. PGS    Edge:
+           Finish: GALVANNEAL     Top:                                                                                                 3-9
+                                                                                                                                       7/8
+           Label: ULMYLX.75    Bottom:
+          Qty  Hardware Details
+          3    Ives BAA 5BB1 4 1/2" x 4 1/2" 630 NRP
+               Prep: Hinge, Regular Weight - 4 1/2"
+          1    Schlage ND96 H RHO 626 BAA                                                       8/3
+               Prep: Lock, 161 Lever                                                            9-5
+          1    LCN 4040XP CUSH 689 TBSRT 1 3/4
+               Prep: Closer, Surface - PA Mount
+               Parallel Mount
+          Prep for "Pioneer" locations.                                                                          Type: M
+                                                                                                               Elevation: F
+                                                           1 Opening (LHR): E114A
+                                                           1 Opening (RHR): U111A
+      11/11/2026                                                                                                                                                      Page 2 of 4
+=== PAGE 3
+          Door Machining Sheet
+             Nominal Width: 3-0
+                 Hinge Gap: 1/8                                                                 8/7 4
+                 Strike Gap: 1/8
+          Actual Door Width: 2-11 3/4
+             Nominal Height: 7-0
+                   Top Gap: 1/8
+                  Undercut: 3/4
+          Actual Door Height: 6-11 1/8
+                 Thickness: 1 3/4
+                                                                                                8/1
+          Catalog: Fleming       Core: HC                                                       1-3
+           Series: D             Seam: LS
+             Matl: 18 ga. PGS    Edge:
+           Finish: GALVANNEAL     Top:                                                                                                 3-9
+                                                                                                                                       7/8
+           Label: ULMYLX.75    Bottom:
+          Qty  Hardware Details
+          3    Ives BAA 5BB1 4 1/2" x 4 1/2" 630
+               Prep: Hinge, Regular Weight - 4 1/2"
+          1    Schlage ND96 H RHO 626 BAA                                                       8/3
+               Prep: Lock, 161 Lever                                                            9-5
+          1    LCN 4040XP RWPA 689 RH TBSRT 1 3/4
+               Prep: Closer, Surface - Reg Mount
+               Regular Mount
+          Prep for "Pioneer" locations.                                                                          Type: M
+                                                                                                               Elevation: F
+                                                           1 Opening (LH): E113B
+                                                           1 Opening (RH): U110B
+      11/11/2026                                                                                                                                                      Page 3 of 4
+=== PAGE 4
+                 Door Machining Sheet
+                       Nominal Width:           3-0
+                                                                                                                                                                         8/7
+                              Hinge Gap:        1/8
+                                                                                                                                                                         4
+                              Strike Gap:       1/8
+                  Actual Door Width:            2-11 3/4
+                      Nominal Height:           7-0
+                                 Top Gap:       1/8
+                                Undercut:       3/4
+                 Actual Door Height:            6-11 1/8
+                              Thickness:        1 3/4
+                                                                                                                                                                         8/1
+                 Catalog:      Fleming                     Core:     HC                                                                                                  1-3
+                   Series:     D                          Seam:      LS
+                      Matl:    18 ga. PGS                 Edge:
+                   Finish:     GALVANNEAL                   Top:
+                    Label:     ULMYLX1.5               Bottom:
+                 Qty      Hardware Details
+                 2        Ives BAA 5BB1 4 1/2" x 4 1/2" 630 NRP
+                          Prep: Hinge, Regular Weight - 4 1/2"
+                 1        Ives BAA 5BB1 4 1/2" x 4 1/2" 630 TW4 CON
+                          Prep: Hinge, Regular Weight - 4 1/2"
+                          Prep at 2nd hinge from the bottom.
+                 1        Von Duprin RX-98-NL-F- CON-630-3-0 x 7-0 Door 1 3/4-RHR-996L-NL-R/626-06 SS - SNB
+                          Prep: Rim Exit Device - w/Function Holes                                                                                                       8/3
+                 1        Schlage M490P 450/490-ATS/LED                                                                                                                  9-5
+                          Reinforce for Mag-lock.
+                 1        LCN 4040XP RWPA 689 LH TBSRT 1 3/4
+                          Prep: Closer, Surface - Reg Mount
+                          Regular Mount
+                 Prep for "Pioneer" locations.
+                                                                                                                                                                                                       Type: M
+                                                                                                                                                                                                    Elevation: F
+                                                                                                         1 Opening (RHR): A220
+           11/11/2026                                                                                                                                                                                                                                                                               Page 4 of 4

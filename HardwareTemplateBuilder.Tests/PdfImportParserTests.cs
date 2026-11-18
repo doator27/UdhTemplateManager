@@ -10,6 +10,60 @@ public class PdfImportParserTests
     private static IReadOnlyList<IReadOnlyList<string>> Load(string name) =>
         new[] { (IReadOnlyList<string>)File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "TestData", "PdfImport", name)) };
 
+    /// <summary>Loads a multi-page fixture ("=== PAGE n" separators).</summary>
+    private static IReadOnlyList<IReadOnlyList<string>> LoadPages(string name)
+    {
+        var pages = new List<List<string>>();
+        foreach (var line in File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "TestData", "PdfImport", name)))
+        {
+            if (line.StartsWith("=== PAGE", StringComparison.Ordinal)) pages.Add(new List<string>());
+            else if (pages.Count > 0) pages[^1].Add(line);
+        }
+        return pages;
+    }
+
+    [Fact]
+    public void MachiningSheet_ReadsTheHardwareSection()
+    {
+        var r = HardwarePdfParser.Parse(LoadPages("machining_sheet.txt"));
+
+        Assert.Contains("Door machining sheet", r.Formats);
+        Assert.Equal(14, r.Lines.Count); // 3 + 3 + 3 items, then 5 on the last page
+
+        var hinge = r.Lines[0];
+        Assert.Equal("Ives", hinge.ManufacturerName);
+        Assert.Equal("5BB1 4 1/2\" x 4 1/2\" NRP BAA", hinge.Catalog);
+        Assert.Equal("630", hinge.Finish);
+        Assert.Equal("Hinge", hinge.GenericName);
+        Assert.Equal(6, hinge.Quantity);                     // 3 per door x 2 openings
+        Assert.Equal("Type NL1 (SNAP): E100C, U100C", hinge.SetName);
+
+        var lockset = r.Lines[1];
+        Assert.Equal("Schlage", lockset.ManufacturerName);
+        Assert.Equal("ND10 RHO BAA", lockset.Catalog);
+        Assert.Equal("626", lockset.Finish);
+        Assert.Equal("Lock", lockset.GenericName);
+
+        var closer = r.Lines[2];
+        Assert.Equal("LCN", closer.ManufacturerName);
+        Assert.Equal("4040XP RWPA TBSRT", closer.Catalog);     // finish, handing and door thickness out
+        Assert.Equal("LH", closer.Handing);
+        Assert.Equal("689", closer.Finish);
+        Assert.Equal("Closer", closer.GenericName);
+
+        var last = r.Lines.Where(l => l.Page == 4).ToList();
+        Assert.Equal(5, last.Count);
+        var exit = Assert.Single(last, l => l.ManufacturerName == "Von Duprin");
+        Assert.StartsWith("RX-98-NL-F-", exit.Catalog);
+        Assert.Equal("Rim Exit Device", exit.GenericName);
+        Assert.Equal(1, exit.Quantity);
+        Assert.Equal("Type M: A220", exit.SetName);
+        Assert.Contains(last, l => l.ManufacturerName == "Schlage" && l.Catalog == "M490P 450/490-ATS/LED");
+        Assert.Contains(last, l => l.Catalog == "5BB1 4 1/2\" x 4 1/2\" TW4 CON BAA" && l.Quantity == 1);
+        // Nothing from the drawing (dimensions) or the notes below the list.
+        Assert.DoesNotContain(r.Lines, l => l.Catalog.Contains("Pioneer") || l.Catalog.Contains("8/3"));
+    }
+
     private static ParsedHardwareLine Find(HardwarePdfParseResult r, string catalogStart) =>
         r.Lines.First(l => l.Catalog.StartsWith(catalogStart, StringComparison.Ordinal));
 
