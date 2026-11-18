@@ -30,6 +30,22 @@
                 <ListBox x:Name="SummaryList" FontFamily="Consolas" FontSize="11"/>
             </DockPanel>
 
+            <!-- Similar callouts: keep which, one item or separate items -->
+            <DockPanel x:Name="ClusterPanel" Visibility="Collapsed">
+                <TextBlock DockPanel.Dock="Top" x:Name="ClusterIntro" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <GroupBox DockPanel.Dock="Bottom" Header="These callouts are" Padding="6" Margin="0,8,0,0">
+                    <ui:Stack Spacing="4">
+                        <RadioButton x:Name="CombineRadio" GroupName="Similar" IsChecked="True"
+                                     Content="The same item: combine the ticked ones into one"/>
+                        <RadioButton x:Name="SeparateRadio" GroupName="Similar"
+                                     Content="Different items: keep the ticked ones as separate items"/>
+                    </ui:Stack>
+                </GroupBox>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ui:Stack x:Name="ClusterList" Spacing="4"/>
+                </ScrollViewer>
+            </DockPanel>
+
             <!-- Page 2..n: one callout -->
             <DockPanel x:Name="StepPanel" Visibility="Collapsed">
                 <GroupBox DockPanel.Dock="Top" Header="From the PDF" Margin="0,0,0,8">

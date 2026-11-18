@@ -27,6 +27,22 @@
                 <ListBox Name="SummaryList" FontFamily="Consolas,Menlo,monospace" FontSize="11"/>
             </DockPanel>
 
+            <!-- Similar callouts: keep which, one item or separate items -->
+            <DockPanel Name="ClusterPanel" IsVisible="False">
+                <TextBlock DockPanel.Dock="Top" Name="ClusterIntro" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <Border DockPanel.Dock="Bottom" Classes="panel" Margin="0,8,0,0">
+                    <StackPanel Spacing="4">
+                        <RadioButton Name="CombineRadio" GroupName="Similar" IsChecked="True"
+                                     Content="They're the same item: combine the ticked ones into one"/>
+                        <RadioButton Name="SeparateRadio" GroupName="Similar"
+                                     Content="They're different items: keep the ticked ones as separate items"/>
+                    </StackPanel>
+                </Border>
+                <ScrollViewer>
+                    <StackPanel Name="ClusterList" Spacing="4"/>
+                </ScrollViewer>
+            </DockPanel>
+
             <!-- Page 2..n: one callout -->
             <DockPanel Name="StepPanel" IsVisible="False">
                 <Border DockPanel.Dock="Top" Classes="panel" Margin="0,0,0,8">

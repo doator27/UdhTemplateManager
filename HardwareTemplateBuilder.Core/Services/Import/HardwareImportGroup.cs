@@ -48,11 +48,35 @@ public sealed class HardwareImportGroup
     /// <summary>Gets the PDF lines this callout appears on.</summary>
     public List<ParsedHardwareLine> Lines { get; } = new();
 
-    /// <summary>Gets the total quantity across all lines.</summary>
-    public int TotalQuantity => Lines.Sum(l => l.Quantity);
+    /// <summary>Gets the lines of this callout and of the similar callouts combined into it.</summary>
+    public IEnumerable<ParsedHardwareLine> AllLines => Lines.Concat(MergedGroups.SelectMany(m => m.Lines));
 
-    /// <summary>Gets the distinct sets/headings it appears in.</summary>
-    public IReadOnlyList<string> Sets => Lines.Select(l => l.SetName).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList()!;
+    /// <summary>Gets the total quantity across all lines (including combined similar callouts).</summary>
+    public int TotalQuantity => AllLines.Sum(l => l.Quantity);
+
+    /// <summary>Gets the distinct sets/headings it appears in (including combined similar callouts).</summary>
+    public IReadOnlyList<string> Sets => AllLines.Select(l => l.SetName).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList()!;
+
+    /// <summary>
+    /// Gets or sets why this callout is already on the job (active release) or in its Bulk Add
+    /// draft; non-null = it is left out of the wizard and not added again.
+    /// </summary>
+    public string? AlreadyAddedReason { get; set; }
+
+    /// <summary>True when the callout is already on the job or in Bulk Add.</summary>
+    public bool IsAlreadyAdded => AlreadyAddedReason != null;
+
+    /// <summary>
+    /// Gets or sets the similar callout this one was combined into (the user said they are the
+    /// same item); it then takes that callout's answer and isn't reviewed on its own.
+    /// </summary>
+    public HardwareImportGroup? MergedInto { get; set; }
+
+    /// <summary>Gets the similar callouts combined into this one.</summary>
+    public List<HardwareImportGroup> MergedGroups { get; } = new();
+
+    /// <summary>Gets or sets whether the user unticked it on a "similar items" page (left out for this job only).</summary>
+    public bool LeftOutAsSimilar { get; set; }
 
     /// <summary>Gets or sets the manufacturer the code resolved to (null = unknown).</summary>
     public int? ManufacturerId { get; set; }

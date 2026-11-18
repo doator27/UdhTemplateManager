@@ -34,6 +34,14 @@ public sealed class ImportItemChoice
 /// <param name="HardwareItemId">The existing item, or null for a new one.</param>
 public sealed record ImportDraftLine(int ManufacturerId, int DescriptionId, string ModelNumber, string Label, int? HardwareItemId);
 
+/// <summary>A line already on the job (active release) or in its Bulk Add draft.</summary>
+/// <param name="ItemId">The hardware item, when known.</param>
+/// <param name="ManufacturerId">Manufacturer.</param>
+/// <param name="ModelNumber">Model number.</param>
+/// <param name="Label">Label (empty = none).</param>
+/// <param name="Where">"on the job" or "in Bulk Add", for display.</param>
+public sealed record ExistingJobLine(int? ItemId, int ManufacturerId, string ModelNumber, string Label, string Where);
+
 /// <summary>
 /// The non-UI side of the "Parse PDF into Bulk Add" wizard, shared by both desktop apps: lookups
 /// for display, the summary, the list of items to offer for a callout, recording what the user
@@ -45,12 +53,18 @@ public sealed class HardwareImportSession
     private readonly Dictionary<int, string> _manufacturers;
     private readonly Dictionary<int, Description> _descriptions;
     private readonly HashSet<(int ItemId, string Label)> _onJob;
+    private readonly List<ExistingJobLine> _existing = new();
 
-    /// <summary>Loads the lookups for a job (and release) from the database.</summary>
+    /// <summary>
+    /// Loads the lookups for a job (and release) from the database, marks the callouts that are
+    /// already on the job or in its Bulk Add draft (they are left out of the wizard), and finds
+    /// the similar callouts to ask about.
+    /// </summary>
     /// <param name="analysis">The analysed PDF.</param>
     /// <param name="jobId">The job being added to.</param>
     /// <param name="releaseId">The active release (null = base list).</param>
-    public HardwareImportSession(HardwarePdfAnalysis analysis, int jobId, int? releaseId)
+    /// <param name="draftLines">What is already in the release's Bulk Add draft (model number + label per line).</param>
+    public HardwareImportSession(HardwarePdfAnalysis analysis, int jobId, int? releaseId, IEnumerable<ImportDraftLine>? draftLines = null)
     {
         Analysis = analysis;
         using var ctx = DatabaseInitializer.CreateContext();
@@ -66,6 +80,45 @@ public sealed class HardwareImportSession
             .ToList()
             .Select(x => (x.HardwareItemId, NormLabel(x.CustomDescription)))
             .ToHashSet();
+
+        foreach (var (itemId, label) in _onJob)
+            if (_items.TryGetValue(itemId, out var item))
+                _existing.Add(new ExistingJobLine(itemId, item.ManufacturerId, item.ModelNumber, label, "on the job"));
+        foreach (var d in draftLines ?? Enumerable.Empty<ImportDraftLine>())
+            _existing.Add(new ExistingJobLine(d.HardwareItemId, d.ManufacturerId, d.ModelNumber, d.Label, "in Bulk Add"));
+
+        MarkAlreadyAdded(Analysis.Groups, _existing, Item);
+        Clusters = HardwareImportSimilarity.FindClusters(Analysis.Groups);
+    }
+
+    /// <summary>Gets the sets of similar callouts to ask about, in PDF order.</summary>
+    public List<SimilarCluster> Clusters { get; }
+
+    /// <summary>
+    /// Marks callouts already on the job or in Bulk Add (<see cref="HardwareImportGroup.AlreadyAddedReason"/>):
+    /// the item and label it resolves to are there, a line's label is this callout, or an
+    /// unlabelled line's model number is this callout (same manufacturer when known).
+    /// </summary>
+    /// <param name="groups">The callouts.</param>
+    /// <param name="existing">The lines already on the job (active release) and in Bulk Add.</param>
+    /// <param name="item">Looks up an active hardware item.</param>
+    public static void MarkAlreadyAdded(IEnumerable<HardwareImportGroup> groups, IReadOnlyList<ExistingJobLine> existing, Func<int?, ImportItemInfo?> item)
+    {
+        if (existing.Count == 0) return;
+        var lines = existing.Select(e => (Line: e, ModelKey: ImportText.Key(e.ModelNumber), Label: NormLabel(e.Label), LabelKey: ImportText.Key(e.Label))).ToList();
+        foreach (var g in groups)
+        {
+            var stripped = ImportText.Key(ImportText.StripNotesAndSize(g.Catalog));
+            var mfr = g.ManufacturerId ?? g.NewManufacturerId;
+            var chosen = item(g.HardwareItemId);
+            var label = NormLabel(g.Label);
+            var hit = lines.FirstOrDefault(e =>
+                (chosen != null && label == e.Label &&
+                 (e.Line.ItemId == chosen.Id || (e.Line.ItemId == null && e.Line.ManufacturerId == chosen.ManufacturerId && e.ModelKey == ImportText.Key(chosen.ModelNumber)))) ||
+                ((mfr == null || e.Line.ManufacturerId == mfr) && e.LabelKey.Length > 0 && (e.LabelKey == g.SourceKey || e.LabelKey == stripped)) ||
+                ((mfr == null || e.Line.ManufacturerId == mfr) && e.Label.Length == 0 && e.ModelKey.Length > 0 && e.ModelKey == stripped));
+            if (hit.Line != null) g.AlreadyAddedReason = $"Already {hit.Line.Where}";
+        }
     }
 
     /// <summary>Gets the analysis.</summary>
@@ -99,7 +152,11 @@ public sealed class HardwareImportSession
     }
 
     /// <summary>Gets the groups that need the user.</summary>
-    public int ReviewCount => Analysis.Groups.Count(g => g.Status == ImportMatchStatus.NeedsReview);
+    public int ReviewCount => Analysis.Groups.Count(g => g.Status == ImportMatchStatus.NeedsReview && InPlay(g));
+
+    /// <summary>True when the callout is still to be added (not already there, not combined into another, not unticked).</summary>
+    /// <param name="g">The callout.</param>
+    public static bool InPlay(HardwareImportGroup g) => !g.IsAlreadyAdded && g.MergedInto == null && !g.LeftOutAsSimilar;
 
     /// <summary>Summary for the wizard's first page.</summary>
     public string SummaryText
@@ -116,11 +173,15 @@ public sealed class HardwareImportSession
             {
                 var format = a.Formats.Count > 0 ? string.Join(" + ", a.Formats).ToLowerInvariant() : "callouts already in the database";
                 sb.Append($"Read {a.LineCount} hardware line(s) ({format}): {a.Groups.Count} distinct item(s). ");
-                sb.Append($"{a.Groups.Count(g => g.Status == ImportMatchStatus.Matched)} identified automatically, ");
+                int already = a.Groups.Count(g => g.IsAlreadyAdded);
+                if (already > 0) sb.Append($"{already} already on the job or in Bulk Add (skipped), ");
+                sb.Append($"{a.Groups.Count(g => g.Status == ImportMatchStatus.Matched && !g.IsAlreadyAdded)} identified automatically, ");
                 sb.Append($"{ReviewCount} need you");
                 int skipped = a.Groups.Count(g => g.Status == ImportMatchStatus.Skipped);
                 if (skipped > 0) sb.Append($", {skipped} skipped (you've skipped them {a.Threshold}+ times)");
                 sb.Append('.');
+                if (Clusters.Count > 0)
+                    sb.Append($"\n{Clusters.Count} set(s) of similar items: you'll be asked which to keep and whether they're one item or separate items.");
             }
             if (a.RecognizedPages.Count > 0)
                 sb.Append($"\nScanned page(s) {Pages(a.RecognizedPages)} were read with text recognition: check those items closely.");
@@ -134,8 +195,10 @@ public sealed class HardwareImportSession
     /// <param name="g">The group.</param>
     public string SummaryLine(HardwareImportGroup g)
     {
-        var mark = g.Status switch { ImportMatchStatus.Matched => "OK", ImportMatchStatus.Skipped => "skip", _ => "??" };
-        string target = g.Skip ? "(left out)"
+        var mark = g.IsAlreadyAdded ? "have" : g.Status switch { ImportMatchStatus.Matched => "OK", ImportMatchStatus.Skipped => "skip", _ => "??" };
+        string target = g.IsAlreadyAdded ? $"({g.AlreadyAddedReason!.ToLowerInvariant()})"
+            : g.MergedInto != null ? $"(same item as {g.MergedInto.Catalog})"
+            : g.Skip ? "(left out)"
             : g.CreateNew ? $"new: {ManufacturerName(g.NewManufacturerId)} {g.NewModelNumber}"
             : Item(g.HardwareItemId) is { } item ? $"{ManufacturerName(item.ManufacturerId)} {item.ModelNumber}" : "(not identified)";
         var label = !g.Skip && !string.IsNullOrWhiteSpace(g.Label) ? $"  [{g.Label}]" : string.Empty;
@@ -145,7 +208,19 @@ public sealed class HardwareImportSession
     /// <summary>The groups to step through: those needing review, plus the automatic ones if asked.</summary>
     /// <param name="includeAutomatic">Also step through matched and learned-skip groups.</param>
     public List<HardwareImportGroup> BuildSteps(bool includeAutomatic) =>
-        Analysis.Groups.Where(g => includeAutomatic || g.Status == ImportMatchStatus.NeedsReview).ToList();
+        Analysis.Groups.Where(g => InPlay(g) && (includeAutomatic || g.Status == ImportMatchStatus.NeedsReview)).ToList();
+
+    /// <summary>One line for a callout on a "similar items" page.</summary>
+    /// <param name="g">The callout.</param>
+    public string ClusterLine(HardwareImportGroup g)
+    {
+        var sets = g.Lines.Select(l => l.SetName).Where(x => !string.IsNullOrEmpty(x)).Distinct().ToList();
+        var where = sets.Count > 0 ? $", sets {string.Join(", ", sets.Take(4))}{(sets.Count > 4 ? ", ..." : string.Empty)}" : string.Empty;
+        var known = g.Status == ImportMatchStatus.Matched && Item(g.HardwareItemId) is { } item
+            ? $"   -> {ManufacturerName(item.ManufacturerId)} {item.ModelNumber}{(string.IsNullOrWhiteSpace(g.Label) ? string.Empty : $" [{g.Label}]")}"
+            : string.Empty;
+        return $"{g.GenericName}  {g.Catalog}   (qty {g.Lines.Sum(l => l.Quantity)}{where}){known}";
+    }
 
     /// <summary>Multi-line description of what the PDF says about a callout.</summary>
     /// <param name="g">The group.</param>
@@ -159,10 +234,12 @@ public sealed class HardwareImportSession
         var handings = g.Lines.Select(l => l.Handing).Where(h => !string.IsNullOrEmpty(h)).Distinct().ToList();
         if (finishes.Count > 0 || handings.Count > 0)
             sb.AppendLine($"Finish: {string.Join(", ", finishes)}   Handing: {string.Join(", ", handings)}");
+        if (g.MergedGroups.Count > 0)
+            sb.AppendLine($"Also covers (same item): {string.Join("; ", g.MergedGroups.Select(m => m.Catalog))}");
         var sets = g.Sets;
-        sb.Append($"Qty {g.TotalQuantity} on {g.Lines.Count} line(s)");
+        sb.Append($"Qty {g.TotalQuantity} on {g.AllLines.Count()} line(s)");
         if (sets.Count > 0) sb.Append($", sets {string.Join(", ", sets.Take(6))}{(sets.Count > 6 ? ", ..." : string.Empty)}");
-        sb.Append($", page(s) {Pages(g.Lines.Select(l => l.Page))}");
+        sb.Append($", page(s) {Pages(g.AllLines.Select(l => l.Page))}");
         return sb.ToString();
     }
 
@@ -222,8 +299,14 @@ public sealed class HardwareImportSession
     /// <param name="reviewed">The reviewed groups.</param>
     public void RecordLearning(IEnumerable<HardwareImportGroup> reviewed)
     {
+        // Callouts combined into a reviewed one learn the same answer; unticked similar callouts
+        // are left out for this job only, so they teach nothing.
+        HardwareImportSimilarity.CopyCombinedAnswers(Analysis.Groups);
+        var list = reviewed.ToList();
+        list.AddRange(list.SelectMany(g => g.MergedGroups).Where(m => !list.Contains(m)).ToList());
         using var ctx = DatabaseInitializer.CreateContext();
-        HardwareImportLearningService.Record(ctx, reviewed, id => Item(id) is { } i ? (i.ManufacturerId, i.ModelNumber) : null);
+        HardwareImportLearningService.Record(ctx, list.Where(g => !g.LeftOutAsSimilar),
+            id => Item(id) is { } i ? (i.ManufacturerId, i.ModelNumber) : null);
     }
 
     /// <summary>
@@ -236,7 +319,7 @@ public sealed class HardwareImportSession
         var seen = new HashSet<(int, int, string, string)>();
         foreach (var g in Analysis.Groups)
         {
-            if (g.Skip) continue;
+            if (g.Skip || !InPlay(g)) continue;
             ImportDraftLine? line = null;
             if (g.CreateNew && g.NewManufacturerId is int mfr && g.NewDescriptionId is int desc && !string.IsNullOrWhiteSpace(g.NewModelNumber))
                 line = new ImportDraftLine(mfr, desc, g.NewModelNumber.Trim(), g.Label.Trim(), null);

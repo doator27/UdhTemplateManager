@@ -14,8 +14,10 @@ namespace HardwareTemplateBuilder.Wpf.Views;
 
 /// <summary>
 /// "Parse PDF into Bulk Add" wizard. Reads the selected job attachment
-/// (<see cref="HardwarePdfImportService"/>), shows a summary, then steps through each distinct
-/// callout that couldn't be identified (existing item + label, new item, or leave out). Finish
+/// (<see cref="HardwarePdfImportService"/>), shows a summary (callouts already on the job or in
+/// Bulk Add are skipped), asks about each set of similar callouts (which to keep, one item or
+/// separate items), then steps through each distinct callout that couldn't be identified
+/// (existing item + label, new item, or leave out). Finish
 /// records the answers so they're recognised next time and adds everything to the job's Bulk Add
 /// draft (skipping lines already in the draft or on the job). Returns true when lines were added.
 /// </summary>
@@ -27,7 +29,8 @@ public partial class PdfImportWizardWindow : Win95Window
     private readonly CancellationTokenSource _cts = new();
     private HardwareImportSession? _session;
     private List<HardwareImportGroup> _steps = new();
-    private int _index = -1; // -1 = summary page
+    private int _index = -1; // -1 = summary, then one page per similar set, then one per callout
+    private bool _loadingCluster;
     private bool _loadingStep;
 
     /// <summary>Parameterless constructor for the XAML designer.</summary>
@@ -56,6 +59,8 @@ public partial class PdfImportWizardWindow : Win95Window
         FinishButton.Click += async (_, _) => await FinishAsync();
         CancelButton.Click += (_, _) => CloseWith(false);
         ReviewAllCheck.Click += (_, _) => UpdateButtons();
+        CombineRadio.Checked += (_, _) => SaveCluster();
+        SeparateRadio.Checked += (_, _) => SaveCluster();
         ExistingRadio.Checked += (_, _) => ShowMode();
         NewRadio.Checked += (_, _) => ShowMode();
         SkipRadio.Checked += (_, _) => ShowMode();
@@ -84,7 +89,12 @@ public partial class PdfImportWizardWindow : Win95Window
             ocr = new HardwareTemplateBuilder.Shared.WindowsPdfOcrEngine();
 #endif
             var analysis = await Task.Run(() => HardwarePdfImportService.AnalyzeAsync(_pdfPath, ocr, progress, _cts.Token));
-            _session = await Task.Run(() => new HardwareImportSession(analysis, _jobId, _releaseId));
+            var draft = BulkDraftService.Load(_jobId, _releaseId);
+            var draftLines = draft.Items
+                .SelectMany(i => (i.Labels.Count > 0 ? i.Labels.Select(l => l.CustomLabel) : new[] { string.Empty })
+                    .Select(label => new ImportDraftLine(i.ManufacturerId, i.DescriptionId ?? 0, i.ModelNumber, label ?? string.Empty, null)))
+                .ToList();
+            _session = await Task.Run(() => new HardwareImportSession(analysis, _jobId, _releaseId, draftLines));
         }
         catch (OperationCanceledException)
         {
@@ -101,7 +111,12 @@ public partial class PdfImportWizardWindow : Win95Window
         ShowSummary();
     }
 
-    private HardwareImportGroup? Current => _index >= 0 && _index < _steps.Count ? _steps[_index] : null;
+    private int ClusterCount => _session?.Clusters.Count ?? 0;
+
+    private SimilarCluster? CurrentCluster => _index >= 0 && _index < ClusterCount ? _session!.Clusters[_index] : null;
+
+    private HardwareImportGroup? Current =>
+        _index >= ClusterCount && _index - ClusterCount < _steps.Count ? _steps[_index - ClusterCount] : null;
 
     // ── Pages ───────────────────────────────────────────────────────────────
 
@@ -110,6 +125,7 @@ public partial class PdfImportWizardWindow : Win95Window
         _index = -1;
         SummaryPanel.SetVisible(true);
         StepPanel.SetVisible(false);
+        ClusterPanel.SetVisible(false);
         HeaderText.Text = "Summary";
         SummaryText.Text = _session!.SummaryText;
         SummaryList.ItemsSource = _session.Analysis.Groups.Select(_session.SummaryLine).ToList();
@@ -119,29 +135,79 @@ public partial class PdfImportWizardWindow : Win95Window
     private void Go(int delta)
     {
         if (_session == null) return;
-        if (_index >= 0 && delta > 0 && !SaveStep()) return;
-        if (_index >= 0 && delta < 0) SaveStep(validate: false);
+        if (CurrentCluster != null) SaveCluster();
+        else if (_index >= 0 && delta > 0 && !SaveStep()) return;
+        else if (_index >= 0 && delta < 0) SaveStep(validate: false);
 
-        if (_index == -1 && delta > 0)
-        {
-            _steps = _session.BuildSteps(ReviewAllCheck.IsChecked == true);
-            if (_steps.Count == 0) return;
-            ShowStep(0);
-            return;
-        }
         int next = _index + delta;
-        if (next < 0) ShowSummary();
-        else if (next < _steps.Count) ShowStep(next);
+        if (next < 0) { ShowSummary(); return; }
+        if (next < ClusterCount) { ShowCluster(next); return; }
+        if (_index < ClusterCount)
+        {
+            // Leaving the summary or the similar-items pages: the callouts to step through
+            // depend on what was kept and combined.
+            _steps = _session.BuildSteps(ReviewAllCheck.IsChecked == true);
+        }
+        if (next - ClusterCount < _steps.Count) ShowStep(next - ClusterCount);
+        else UpdateButtons();
+    }
+
+    /// <summary>Shows one set of similar callouts with a tick box each.</summary>
+    private void ShowCluster(int index)
+    {
+        _index = index;
+        var c = _session!.Clusters[index];
+        _loadingCluster = true;
+        try
+        {
+            SummaryPanel.SetVisible(false);
+            StepPanel.SetVisible(false);
+            ClusterPanel.SetVisible(true);
+            var first = c.Groups[0];
+            var who = first.ManufacturerId is int m ? _session.ManufacturerName(m) : first.ManufacturerCode;
+            HeaderText.Text = $"Similar items {index + 1} of {ClusterCount}";
+            ClusterIntro.Text =
+                $"These {c.Groups.Count} {who} callouts look alike. Untick any you don't want on this job, " +
+                "then say whether they're the same item (one line, one answer) or different items (each one asked separately).";
+            ClusterList.Children.Clear();
+            foreach (var g in c.Groups)
+            {
+                var box = new CheckBox { Content = new TextBlock { Text = _session.ClusterLine(g), TextWrapping = TextWrapping.Wrap }, IsChecked = c.Keep.Contains(g), Tag = g };
+                box.Click += (_, _) => SaveCluster();
+                ClusterList.Children.Add(box);
+            }
+            CombineRadio.IsChecked = c.Combine;
+            SeparateRadio.IsChecked = !c.Combine;
+        }
+        finally
+        {
+            _loadingCluster = false;
+        }
+        StatusLabel.Text = string.Empty;
+        UpdateButtons();
+    }
+
+    /// <summary>Copies the similar-items page into its cluster and applies it.</summary>
+    private void SaveCluster()
+    {
+        if (_loadingCluster || CurrentCluster is not { } c) return;
+        c.Keep.Clear();
+        foreach (var box in ClusterList.Children.OfType<CheckBox>())
+            if (box.IsChecked == true && box.Tag is HardwareImportGroup g) c.Keep.Add(g);
+        c.Combine = CombineRadio.IsChecked == true;
+        HardwareImportSimilarity.Apply(c);
+        UpdateButtons();
     }
 
     private void ShowStep(int index)
     {
-        _index = index;
+        _index = ClusterCount + index;
         var g = _steps[index];
         _loadingStep = true;
         try
         {
             SummaryPanel.SetVisible(false);
+            ClusterPanel.SetVisible(false);
             StepPanel.SetVisible(true);
             HeaderText.Text = $"Item {index + 1} of {_steps.Count}: {g.GenericName}";
             SourceText.Text = _session!.SourceText(g);
@@ -269,16 +335,24 @@ public partial class PdfImportWizardWindow : Win95Window
         BackButton.IsEnabled = _index >= 0;
         if (_index < 0)
         {
-            int toReview = ready ? _session!.BuildSteps(ReviewAllCheck.IsChecked == true).Count : 0;
+            int toReview = ready ? ClusterCount + _session!.BuildSteps(ReviewAllCheck.IsChecked == true).Count : 0;
             NextButton.IsEnabled = toReview > 0;
             NextButton.Content = toReview > 0 ? $"Review {toReview} item(s) >" : "Next >";
-            FinishButton.IsEnabled = ready && _session!.ReviewCount == 0 && ReviewAllCheck.IsChecked != true;
+            FinishButton.IsEnabled = ready && _session!.ReviewCount == 0 && ClusterCount == 0 && ReviewAllCheck.IsChecked != true;
+        }
+        else if (_index < ClusterCount)
+        {
+            bool more = _index < ClusterCount - 1 || _session!.BuildSteps(ReviewAllCheck.IsChecked == true).Count > 0;
+            NextButton.IsEnabled = more;
+            NextButton.Content = "Next >";
+            FinishButton.IsEnabled = !more;
         }
         else
         {
-            NextButton.IsEnabled = _index < _steps.Count - 1;
+            int step = _index - ClusterCount;
+            NextButton.IsEnabled = step < _steps.Count - 1;
             NextButton.Content = "Next >";
-            FinishButton.IsEnabled = _index == _steps.Count - 1;
+            FinishButton.IsEnabled = step >= _steps.Count - 1;
         }
     }
 
@@ -287,11 +361,12 @@ public partial class PdfImportWizardWindow : Win95Window
     private async Task FinishAsync()
     {
         if (_session == null) return;
-        if (_index >= 0 && !SaveStep()) return;
+        if (CurrentCluster != null) SaveCluster();
+        else if (Current != null && !SaveStep()) return;
 
         try
         {
-            if (_steps.Count > 0) _session.RecordLearning(_steps);
+            _session.RecordLearning(_steps);
 
             var lines = _session.DraftLines();
             int added = 0, alreadyThere = 0;
@@ -321,10 +396,12 @@ public partial class PdfImportWizardWindow : Win95Window
             }
             BulkDraftService.Save(_jobId, _releaseId, draft);
 
-            int left = _session.Analysis.Groups.Count(g => g.Skip);
+            int left = _session.Analysis.Groups.Count(g => g.Skip && !g.IsAlreadyAdded);
+            int had = _session.Analysis.Groups.Count(g => g.IsAlreadyAdded);
             await DialogHelper.ShowInfoAsync(this,
                 $"Added {added} line(s) to Bulk Add." +
                 (alreadyThere > 0 ? $"\n{alreadyThere} were already in Bulk Add or on the job, so they were skipped." : string.Empty) +
+                (had > 0 ? $"\n{had} PDF item(s) were already on the job or in Bulk Add." : string.Empty) +
                 (left > 0 ? $"\n{left} PDF item(s) were left out." : string.Empty),
                 "Parse PDF into Bulk Add");
             CloseWith(added > 0 || alreadyThere > 0);
