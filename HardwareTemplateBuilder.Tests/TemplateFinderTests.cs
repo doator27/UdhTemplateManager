@@ -101,3 +101,44 @@ public class RobotsRulesTests
         Assert.True(RobotsRules.Parse(null).IsAllowed("/anything"));
     }
 }
+
+/// <summary>Tests for <see cref="HardwareTemplateBuilder.Core.Services.TemplatePageInfo"/>.</summary>
+public class TemplatePageInfoTests
+{
+    [Fact]
+    public void AllPages_AndRangeCounts()
+    {
+        Assert.Equal("1", HardwareTemplateBuilder.Core.Services.TemplatePageInfo.AllPages(1));
+        Assert.Equal("1-6", HardwareTemplateBuilder.Core.Services.TemplatePageInfo.AllPages(6));
+        Assert.Equal(4, HardwareTemplateBuilder.Core.Services.TemplatePageInfo.CountInRange("1,3-5"));
+        Assert.Null(HardwareTemplateBuilder.Core.Services.TemplatePageInfo.CountInRange("1-"));
+        Assert.Null(HardwareTemplateBuilder.Core.Services.TemplatePageInfo.CountInRange(""));
+    }
+
+    [Fact]
+    public void DefaultMaterial_IsBoth()
+    {
+        var materials = new[] { new HardwareTemplateBuilder.Core.Models.DoorMaterial { Id = 1, Material = "Metal" }, new HardwareTemplateBuilder.Core.Models.DoorMaterial { Id = 3, Material = "Both" } };
+        Assert.Equal(3, HardwareTemplateBuilder.Core.Services.TemplatePageInfo.DefaultMaterial(materials)!.Id);
+    }
+
+    [Fact]
+    public async Task CountPages_ReadsALocalPdf_AndRejectsOtherFiles()
+    {
+        var pdf = Path.Combine(Path.GetTempPath(), $"htb_pages_{Guid.NewGuid():N}.pdf");
+        var txt = Path.ChangeExtension(pdf, ".txt");
+        try
+        {
+            using (var doc = new PdfSharp.Pdf.PdfDocument()) { doc.AddPage(); doc.AddPage(); doc.AddPage(); doc.Save(pdf); }
+            File.WriteAllText(txt, "not a pdf");
+            Assert.Equal(3, await HardwareTemplateBuilder.Core.Services.TemplatePageInfo.CountPagesAsync(pdf, null));
+            Assert.Null(await HardwareTemplateBuilder.Core.Services.TemplatePageInfo.CountPagesAsync(txt, null));
+            Assert.Null(await HardwareTemplateBuilder.Core.Services.TemplatePageInfo.CountPagesAsync(null, "not a link"));
+        }
+        finally
+        {
+            File.Delete(pdf);
+            File.Delete(txt);
+        }
+    }
+}

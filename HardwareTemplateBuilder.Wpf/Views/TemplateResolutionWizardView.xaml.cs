@@ -59,19 +59,18 @@ public partial class TemplateResolutionWizardView : UserControl
 
         TplMaterialCombo.ItemsSource = _doorMaterials;
         TplMaterialCombo.DisplayMemberPath = "Material";
-        if (_doorMaterials.Count > 0) TplMaterialCombo.SelectedIndex = 0;
+        TplMaterialCombo.SelectedItem = TemplatePageInfo.DefaultMaterial(_doorMaterials) ?? _doorMaterials.FirstOrDefault();
 
         PrevButton.Click   += (_, _) => Navigate(-1);
         NextButton.Click   += (_, _) => Navigate(+1);
         FinishButton.Click += (_, _) => OnFinish();
 
-        AddTemplateButton.Click             += (_, _) => AddPendingTemplate();
+        _tplPagesHelper = new TemplatePagesHelper(TplOnlineLinkBox, TplLocalLinkBox, TplNumPagesBox, TplPagesBox);
+        AddTemplateButton.Click             += async (_, _) => await AddPendingTemplateAsync();
         RemovePendingTemplateButton.Click   += (_, _) => RemovePendingTemplate();
         RemoveImportedTemplateButton.Click  += (_, _) => RemoveImportedTemplate();
         TplBrowseButton.Click               += async (_, _) => await BrowseLocalFileAsync();
         TplFindOnlineButton.Click += async (_, _) => await FindTemplateOnlineForRowAsync();
-        TplPagesBox.TextChanged             += (_, _) => RecalculateNumPagesFromRange();
-        TplOnlineLinkBox.LostFocus          += async (_, _) => await DetectPageCountFromOnlineLinkAsync();
 
         ToggleSearchButton.Click      += (_, _) => ToggleSearchPanel();
         StageSearchResultButton.Click += (_, _) => StageSearchResult();
@@ -199,7 +198,7 @@ public partial class TemplateResolutionWizardView : UserControl
         var found = await TemplateFinderFlow.FindAsync(window, request);
         if (found == null) return;
         TplOnlineLinkBox.Text = found.Url;
-        if (found.PageCount > 0) TplNumPagesBox.Text = found.PageCount.ToString();
+        if (found.PageCount > 0) _tplPagesHelper?.ApplyCount(found.PageCount);
         if (string.IsNullOrWhiteSpace(TplNumberBox.Text)) TplNumberBox.Text = GuessTemplateNumber(found);
         ItemStatusLabel.Text = "Link filled in from Find Online. Check the template details below.";
     }
@@ -231,7 +230,11 @@ public partial class TemplateResolutionWizardView : UserControl
         }
         TplDescCombo.ItemsSource = descItems.Count > 0 ? descItems : _descComboItems;
         TplDescCombo.DisplayMemberPath = "DisplayText";
+        // Default to the item's own description.
         if (TplDescCombo.Items.Count > 0) TplDescCombo.SelectedIndex = 0;
+        if (TplDescCombo.ItemsSource is System.Collections.IEnumerable tplDescs &&
+            tplDescs.OfType<DescriptionComboItem>().FirstOrDefault(d => d.Id == descId) is { } own)
+            TplDescCombo.SelectedItem = own;
 
         // Populate the search description combo with the same subtree filter + an "(Any)" sentinel.
         var searchDescItems = new List<DescriptionComboItem> { new() { Id = 0, DisplayText = "(Any)" } };
@@ -252,7 +255,9 @@ public partial class TemplateResolutionWizardView : UserControl
 
     // ── Template staging (Case B) ────────────────────────────────────────────
 
-    private void AddPendingTemplate()
+    private TemplatePagesHelper? _tplPagesHelper;
+
+    private async Task AddPendingTemplateAsync()
     {
         AddTemplateStatusLabel.Foreground = AppColors.Danger;
         var row = _rows[_currentIndex];
@@ -272,7 +277,13 @@ public partial class TemplateResolutionWizardView : UserControl
         if (desc == null)                              { AddTemplateStatusLabel.Text = "Select a description."; return; }
         if (material == null)                          { AddTemplateStatusLabel.Text = "Select a door material."; return; }
         if (string.IsNullOrEmpty(number))              { AddTemplateStatusLabel.Text = "Enter a template number."; return; }
-        if (string.IsNullOrEmpty(pages)) pages = "1";
+        if (string.IsNullOrEmpty(pages))
+        {
+            // Blank Pages To Print = all pages of the PDF.
+            pages = _tplPagesHelper != null ? await _tplPagesHelper.EnsurePagesAsync() : null;
+            if (string.IsNullOrEmpty(pages)) { AddTemplateStatusLabel.Text = "Couldn't read the PDF to count its pages. Enter Pages To Print (e.g. 1-3)."; return; }
+            numPages = TemplatePageInfo.CountInRange(pages) ?? numPages;
+        }
         if (string.IsNullOrEmpty(online) && string.IsNullOrEmpty(local))
         { AddTemplateStatusLabel.Text = "Provide at least an online link or a local file path."; return; }
 
@@ -318,13 +329,14 @@ public partial class TemplateResolutionWizardView : UserControl
         AddTemplateStatusLabel.Text = $"Staged: {saved.TemplateNumber}";
 
         TplNumberBox.Text              = "";
-        TplNumPagesBox.Text            = "1";
+        TplNumPagesBox.Text            = "";
         TplPagesBox.Text               = "";
         TplPagesToRotateBox.Text       = "";
         TplRotationDirectionBox.Text   = "";
         TplOnlineLinkBox.Text          = "";
         TplLocalLinkBox.Text           = "";
         TplJobSpecificCheck.IsChecked  = false;
+        _tplPagesHelper?.Reset();
     }
 
     private void RemovePendingTemplate()
@@ -451,7 +463,7 @@ public partial class TemplateResolutionWizardView : UserControl
         {
             var path = files[0];
             TplLocalLinkBox.Text = path;
-            DetectPageCount(path);
+            if (_tplPagesHelper != null) await _tplPagesHelper.DetectAsync(force: true);
         }
     }
 

@@ -96,7 +96,9 @@ public partial class HardwareItemDetailView : UserControl
 
         BackButton.Click           += (_, _) => NavigationRequested?.Invoke(_returnRoute ?? "HardwareItems");
         RemoveTemplateButton.Click += (_, _) => RemoveTemplate();
-        AddTemplateButton.Click    += (_, _) => AddLinkTemplate();
+        _pagesHelper = new TemplatePagesHelper(AddOnlineLinkBox, AddLocalLinkBox, AddNumPagesBox, AddPagesToPrintBox);
+        ApplyAddDefaults();
+        AddTemplateButton.Click    += async (_, _) => await AddLinkTemplateAsync();
         FindOnlineButton.Click     += async (_, _) => await FindTemplateOnlineAsync();
         RequestedFromManufacturerButton.Click += (_, _) => AddRequestedFromManufacturerLink();
         BrowseLocalLinkButton.Click += async (_, _) => await BrowseLocalLinkAsync();
@@ -107,7 +109,7 @@ public partial class HardwareItemDetailView : UserControl
             await SearchPreviewPanel.LoadTemplateAsync(TemplateSearchList.SelectedItem as IndividualTemplate);
 
         LinkedTemplatesList.SelectionChanged += (_, _) => OnLinkedTemplateSelected();
-        SaveTemplateChangesButton.Click += (_, _) => SaveTemplateChanges();
+        SaveTemplateChangesButton.Click += async (_, _) => await SaveTemplateChangesAsync();
         CancelEditButton.Click += (_, _) => CancelEdit();
 
         ImportSourceItemCombo.SelectionChanged += (_, _) => LoadImportCandidateTemplates();
@@ -137,6 +139,7 @@ public partial class HardwareItemDetailView : UserControl
         AddOnlineLinkBox.Text        = t.OnlineLink ?? "";
         AddLocalLinkBox.Text         = t.LocalLink ?? "";
         AddStatusLabel.Text          = "";
+        _pagesHelper?.Reset();
 
         AddTemplateButton.IsVisible         = false;
         SaveTemplateChangesButton.IsVisible = true;
@@ -144,19 +147,31 @@ public partial class HardwareItemDetailView : UserControl
     }
 
     /// <summary>Resets the Add/Edit panel back to its blank "add a new template" state.</summary>
+    private TemplatePagesHelper? _pagesHelper;
+
+    /// <summary>
+    /// New-template defaults: the item's own description and door material "Both".
+    /// </summary>
+    private void ApplyAddDefaults()
+    {
+        if (AddDescCombo.ItemsSource is System.Collections.IEnumerable items)
+            AddDescCombo.SelectedItem = items.OfType<DescriptionComboItem>().FirstOrDefault(d => d.Id == _itemDescriptionId);
+        AddDoorMatCombo.SelectedItem = TemplatePageInfo.DefaultMaterial(_doorMaterials);
+    }
+
     private void ResetAddForm()
     {
         _editingTemplateId = 0;
         AddPanelHeader.Text          = "Add Template";
         AddTemplateNumBox.Text       = "";
-        AddPagesToPrintBox.Text      = "1";
-        AddNumPagesBox.Text          = "1";
+        AddPagesToPrintBox.Text      = "";
+        AddNumPagesBox.Text          = "";
         AddPagesToRotateBox.Text     = "";
         AddRotationDirectionBox.Text = "0";
         AddOnlineLinkBox.Text        = "";
         AddLocalLinkBox.Text         = "";
-        AddDescCombo.SelectedItem    = null;
-        AddDoorMatCombo.SelectedItem = null;
+        ApplyAddDefaults();
+        _pagesHelper?.Reset();
 
         AddTemplateButton.IsVisible         = true;
         SaveTemplateChangesButton.IsVisible = false;
@@ -174,7 +189,7 @@ public partial class HardwareItemDetailView : UserControl
     /// Saves in-place edits to the template currently selected in the Linked Templates list
     /// (an update to the existing <see cref="IndividualTemplate"/> row — not a new record).
     /// </summary>
-    private void SaveTemplateChanges()
+    private async Task SaveTemplateChangesAsync()
     {
         if (_editingTemplateId == 0) return;
         if (AddDescCombo.SelectedItem is not DescriptionComboItem desc) { AddStatusLabel.Text = "Description is required."; return; }
@@ -183,8 +198,9 @@ public partial class HardwareItemDetailView : UserControl
         var templateNum = AddTemplateNumBox.Text?.Trim();
         if (string.IsNullOrEmpty(templateNum)) { AddStatusLabel.Text = "Template # is required."; return; }
 
-        var pagesToPrint = AddPagesToPrintBox.Text?.Trim();
-        if (string.IsNullOrEmpty(pagesToPrint)) pagesToPrint = "1";
+        // Blank Pages To Print = all pages of the PDF.
+        var pagesToPrint = _pagesHelper != null ? await _pagesHelper.EnsurePagesAsync() : AddPagesToPrintBox.Text?.Trim();
+        if (string.IsNullOrEmpty(pagesToPrint)) { AddStatusLabel.Text = "Couldn't read the PDF to count its pages. Enter Pages To Print (e.g. 1-3)."; return; }
         try { new PageRangeParser().Parse(pagesToPrint); }
         catch { AddStatusLabel.Text = "Pages To Print format invalid. Use e.g. 1,3-5,8."; return; }
 
@@ -278,7 +294,7 @@ public partial class HardwareItemDetailView : UserControl
         if (found == null) return;
 
         AddOnlineLinkBox.Text = found.Url;
-        if (found.PageCount > 0) AddNumPagesBox.Text = found.PageCount.ToString();
+        if (found.PageCount > 0) _pagesHelper?.ApplyCount(found.PageCount);
         if (string.IsNullOrWhiteSpace(AddTemplateNumBox.Text)) AddTemplateNumBox.Text = GuessTemplateNumber(found);
         AddStatusLabel.Foreground = AppColors.Success;
         AddStatusLabel.Text = "Link filled in from Find Online. Check the template details, then add or save the template.";
@@ -291,7 +307,7 @@ public partial class HardwareItemDetailView : UserControl
         return name.Length > 50 ? name[..50] : name;
     }
 
-    private void AddLinkTemplate()
+    private async Task AddLinkTemplateAsync()
     {
         if (_itemManufacturerId == 0)                              { AddStatusLabel.Text = "Hardware item has no manufacturer."; return; }
         if (AddDescCombo.SelectedItem is not DescriptionComboItem desc) { AddStatusLabel.Text = "Description is required."; return; }
@@ -300,8 +316,9 @@ public partial class HardwareItemDetailView : UserControl
         var templateNum = AddTemplateNumBox.Text?.Trim();
         if (string.IsNullOrEmpty(templateNum)) { AddStatusLabel.Text = "Template # is required."; return; }
 
-        var pagesToPrint = AddPagesToPrintBox.Text?.Trim();
-        if (string.IsNullOrEmpty(pagesToPrint)) pagesToPrint = "1";
+        // Blank Pages To Print = all pages of the PDF.
+        var pagesToPrint = _pagesHelper != null ? await _pagesHelper.EnsurePagesAsync() : AddPagesToPrintBox.Text?.Trim();
+        if (string.IsNullOrEmpty(pagesToPrint)) { AddStatusLabel.Text = "Couldn't read the PDF to count its pages. Enter Pages To Print (e.g. 1-3)."; return; }
 
         if (!int.TryParse(AddNumPagesBox.Text?.Trim(), out var numPages) || numPages < 1)
         { AddStatusLabel.Text = "Num Pages must be a positive integer."; return; }
@@ -361,8 +378,8 @@ public partial class HardwareItemDetailView : UserControl
 
         // Clear fields for next entry.
         AddTemplateNumBox.Text        = "";
-        AddPagesToPrintBox.Text       = "1";
-        AddNumPagesBox.Text           = "1";
+        AddPagesToPrintBox.Text       = "";
+        AddNumPagesBox.Text           = "";
         AddPagesToRotateBox.Text      = "";
         AddRotationDirectionBox.Text  = "0";
         AddOnlineLinkBox.Text         = "";
@@ -437,6 +454,7 @@ public partial class HardwareItemDetailView : UserControl
 
         if (files.Count > 0)
             AddLocalLinkBox.Text = files[0].Path.LocalPath;
+            if (_pagesHelper != null) await _pagesHelper.DetectAsync(force: true);
     }
 
     // --- Search and link (secondary) ---

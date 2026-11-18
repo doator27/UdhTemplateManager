@@ -67,7 +67,7 @@ public partial class IndividualTemplatesView : UserControl
         DescriptionCombo.SelectedItem = _descComboItems.FirstOrDefault();
         DoorMaterialCombo.ItemsSource = _doorMaterials;
         DoorMaterialCombo.DisplayMemberPath = "Material";
-        DoorMaterialCombo.SelectedItem = _doorMaterials.FirstOrDefault();
+        DoorMaterialCombo.SelectedItem = TemplatePageInfo.DefaultMaterial(_doorMaterials) ?? _doorMaterials.FirstOrDefault();
 
         MfrList.ItemsSource = _manufacturers;
         MfrList.DisplayMemberPath = "ManufacturerName";
@@ -81,7 +81,8 @@ public partial class IndividualTemplatesView : UserControl
         RefreshDescList();
         RefreshTemplateNumberList();
 
-        SaveButton.Click += (_, _) => Save();
+        _pagesHelper = new TemplatePagesHelper(OnlineLinkBox, LocalLinkBox, NumPagesBox, PagesToPrintBox);
+        SaveButton.Click += async (_, _) => await SaveAsync();
         NewButton.Click += (_, _) => ClearForm();
         BrowseLocalLinkButton.Click += async (_, _) => await BrowseLocalLink();
         DeleteButton.Click += async (_, _) =>
@@ -218,11 +219,14 @@ public partial class IndividualTemplatesView : UserControl
             DoorMaterialCombo.SelectedItem = _doorMaterials.FirstOrDefault(dm => dm.Id == t.DoorMaterialId);
             OnlineLinkBox.Text = t.OnlineLink ?? "";
             LocalLinkBox.Text = t.LocalLink ?? "";
+            _pagesHelper?.Reset();
             StatusLabel.Text = "";
         }
     }
 
-    private void Save()
+    private TemplatePagesHelper? _pagesHelper;
+
+    private async Task SaveAsync()
     {
         if (ManufacturerCombo.SelectedItem is not Manufacturer mfr) { StatusLabel.Text = "Manufacturer is required."; return; }
         if (DescriptionCombo.SelectedItem is not DescriptionComboItem desc) { StatusLabel.Text = "Description is required."; return; }
@@ -231,11 +235,12 @@ public partial class IndividualTemplatesView : UserControl
         var templateNumber = TemplateNumberBox.Text?.Trim();
         if (string.IsNullOrEmpty(templateNumber)) { StatusLabel.Text = "Template Number is required."; return; }
 
+        // Blank Pages To Print = all pages of the PDF.
+        var pagesToPrint = _pagesHelper != null ? await _pagesHelper.EnsurePagesAsync() : PagesToPrintBox.Text?.Trim();
+        if (string.IsNullOrEmpty(pagesToPrint)) { StatusLabel.Text = "Couldn't read the PDF to count its pages. Enter Pages To Print (e.g. 1-3)."; return; }
+
         if (!int.TryParse(NumPagesBox.Text?.Trim(), out var numPages) || numPages < 1)
         { StatusLabel.Text = "Num Pages must be a positive integer."; return; }
-
-        var pagesToPrint = PagesToPrintBox.Text?.Trim();
-        if (string.IsNullOrEmpty(pagesToPrint)) { StatusLabel.Text = "Pages To Print is required."; return; }
         try { _pageRangeParser.Parse(pagesToPrint); }
         catch { StatusLabel.Text = "Pages To Print format invalid. Use e.g. 1,3-5,8."; return; }
 
@@ -379,10 +384,11 @@ public partial class IndividualTemplatesView : UserControl
         PagesToPrintBox.Text = "";
         PagesToRotateBox.Text = "";
         RotationDirectionBox.Text = "0";
-        DoorMaterialCombo.SelectedItem = _doorMaterials.FirstOrDefault();
+        DoorMaterialCombo.SelectedItem = TemplatePageInfo.DefaultMaterial(_doorMaterials) ?? _doorMaterials.FirstOrDefault();
         OnlineLinkBox.Text = "";
         LocalLinkBox.Text = "";
         StatusLabel.Text = "";
         TemplateNumberList.SelectedItem = null;
+        _pagesHelper?.Reset();
     }
 }

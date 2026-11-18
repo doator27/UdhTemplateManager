@@ -35,8 +35,8 @@
 							<ComboBox  Grid.Row="3" Grid.Column="1" Name="AddDoorMatCombo" HorizontalAlignment="Stretch" Margin="0,0,8,8"/>
 							<TextBlock Grid.Row="4" Grid.Column="0" Text="Num Pages:" Margin="0,0,8,2"/>
 							<TextBlock Grid.Row="4" Grid.Column="1" Text="Pages To Print:" Margin="0,0,8,2"/>
-							<TextBox   Grid.Row="5" Grid.Column="0" Name="AddNumPagesBox" Text="1" Margin="0,0,8,8"/>
-							<TextBox   Grid.Row="5" Grid.Column="1" Name="AddPagesToPrintBox" Text="1" Margin="0,0,8,8"/>
+							<TextBox   Grid.Row="5" Grid.Column="0" Name="AddNumPagesBox" Text="" Margin="0,0,8,8"/>
+							<TextBox   Grid.Row="5" Grid.Column="1" Name="AddPagesToPrintBox" Text="" Watermark="blank = all pages" Margin="0,0,8,8"/>
 							<TextBlock Grid.Row="6" Grid.Column="0" Text="Pages To Rotate (optional):" Margin="0,0,0,2"/>
 							<TextBlock Grid.Row="6" Grid.Column="1" Text="Rotation Direction (degrees):" Margin="0,0,8,2"/>
 							<TextBox   Grid.Row="7" Grid.Column="0" Name="AddPagesToRotateBox" Watermark="e.g. 1,3-5" Margin="0,0,8,8"/>
