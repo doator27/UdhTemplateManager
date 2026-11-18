@@ -17,6 +17,8 @@ using HardwareTemplateBuilder.Core.Services;
 using HardwareTemplateBuilder.Core.Services.Pdf;
 using Microsoft.EntityFrameworkCore;
 
+using HardwareTemplateBuilder.Core.Services.TemplateFinder;
+
 namespace HardwareTemplateBuilder.Wpf.Views;
 
 /// <summary>
@@ -67,6 +69,7 @@ public partial class TemplateResolutionWizardView : UserControl
         RemovePendingTemplateButton.Click   += (_, _) => RemovePendingTemplate();
         RemoveImportedTemplateButton.Click  += (_, _) => RemoveImportedTemplate();
         TplBrowseButton.Click               += async (_, _) => await BrowseLocalFileAsync();
+        TplFindOnlineButton.Click += async (_, _) => await FindTemplateOnlineForRowAsync();
         TplPagesBox.TextChanged             += (_, _) => RecalculateNumPagesFromRange();
         TplOnlineLinkBox.LostFocus          += async (_, _) => await DetectPageCountFromOnlineLinkAsync();
 
@@ -168,6 +171,44 @@ public partial class TemplateResolutionWizardView : UserControl
             ImportedTemplatesList.ItemsSource  = null;
             ImportedTemplatesList.ItemsSource  = row.PendingTemplates;
         }
+    }
+
+    /// <summary>
+    /// Opens "Find Template Online" for the new item on this step (manufacturer, model number,
+    /// description, labels) and fills the template form with the chosen PDF for the user to check.
+    /// </summary>
+    private async Task FindTemplateOnlineForRowAsync()
+    {
+        var row = _rows[_currentIndex];
+        var window = this.OwnerWindow();
+        if (window == null) return;
+        if (row.SelectedManufacturer == null)
+        {
+            ItemStatusLabel.Text = "This item has no manufacturer, so there's nothing to search for.";
+            return;
+        }
+        var request = new TemplateSearchRequest
+        {
+            ManufacturerId = row.SelectedManufacturer.Id,
+            ManufacturerName = row.SelectedManufacturer.ManufacturerName,
+            ModelNumber = row.ModelNumber,
+            Description = row.SelectedDescription?.DescriptionText,
+        };
+        request.Labels.AddRange(row.Labels.Select(l => l.CustomLabel).Where(l => !string.IsNullOrWhiteSpace(l)));
+
+        var found = await TemplateFinderFlow.FindAsync(window, request);
+        if (found == null) return;
+        TplOnlineLinkBox.Text = found.Url;
+        if (found.PageCount > 0) TplNumPagesBox.Text = found.PageCount.ToString();
+        if (string.IsNullOrWhiteSpace(TplNumberBox.Text)) TplNumberBox.Text = GuessTemplateNumber(found);
+        ItemStatusLabel.Text = "Link filled in from Find Online. Check the template details below.";
+    }
+
+    /// <summary>A template number to suggest for a found PDF: the search term it mentions, else its file name.</summary>
+    private static string GuessTemplateNumber(TemplateCandidate found)
+    {
+        var name = found.MatchedTerm ?? System.IO.Path.GetFileNameWithoutExtension(found.FileName);
+        return name.Length > 50 ? name[..50] : name;
     }
 
     private void ShowNewCase(BulkHardwareRow row)

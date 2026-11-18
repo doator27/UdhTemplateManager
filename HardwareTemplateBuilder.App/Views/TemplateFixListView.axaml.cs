@@ -8,6 +8,8 @@ using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
 using HardwareTemplateBuilder.Core.Services;
 
+using HardwareTemplateBuilder.Core.Services.TemplateFinder;
+
 namespace HardwareTemplateBuilder.App.Views;
 
 /// <summary>
@@ -138,12 +140,32 @@ public partial class TemplateFixListView : UserControl
             LoadItems();
         };
 
-        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("220,150,*,Auto,Auto") };
+        // One "Find New Link" per failed template.
+        var findPanel = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Avalonia.Thickness(4, 0, 4, 0) };
+        foreach (var failed in item.FailedTemplates)
+        {
+            var findButton = new Button
+            {
+                Content = item.FailedTemplates.Count == 1 ? "Find New Link..." : $"Find Link: {failed.TemplateNumber}",
+                Margin = new Avalonia.Thickness(0, 1, 0, 1),
+            };
+            var templateId = failed.TemplateId;
+            findButton.Click += async (_, _) =>
+            {
+                var window = TopLevel.GetTopLevel(this) as Window;
+                if (window != null && await TemplateFinderFlow.FixBrokenTemplateAsync(window, templateId)) LoadItems();
+            };
+            findPanel.Children.Add(findButton);
+        }
+
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("220,150,*,Auto,Auto,Auto") };
         Grid.SetColumn(descText, 0); row.Children.Add(descText);
         Grid.SetColumn(modelText, 1); row.Children.Add(modelText);
         Grid.SetColumn(problemText, 2); row.Children.Add(problemText);
-        Grid.SetColumn(editButton, 3); row.Children.Add(editButton);
-        Grid.SetColumn(dismissButton, 4); row.Children.Add(dismissButton);
+        row.Children.Add(editButton);
+        Grid.SetColumn(findPanel, 3); row.Children.Add(findPanel);
+        Grid.SetColumn(editButton, 4);
+        Grid.SetColumn(dismissButton, 5); row.Children.Add(dismissButton);
 
         return new Border
         {

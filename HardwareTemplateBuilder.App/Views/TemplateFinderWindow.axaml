@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:HardwareTemplateBuilder.App.Views"
+        x:Class="HardwareTemplateBuilder.App.Views.TemplateFinderWindow"
+        Title="Find Template Online"
+        Width="1100" Height="720" MinWidth="820" MinHeight="520"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Name="HeaderText" Text="Find Template Online" FontSize="16" FontWeight="Bold" Margin="0,0,0,6"/>
+        <TextBlock DockPanel.Dock="Top" Name="InfoText" TextWrapping="Wrap" Foreground="#A7ADB8" FontSize="11" Margin="0,0,0,8"/>
+
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" Margin="6,0,0,0">
+                <Button Name="CheckLinkButton" Content="Check Link"/>
+                <Button Name="SearchButton" Content="Search Again"/>
+                <Button Name="StopButton" Content="Stop" IsEnabled="False"/>
+                <Button Name="GoogleButton" Content="Search Google in Browser"/>
+            </StackPanel>
+            <TextBox Name="PasteBox" Watermark="Paste a link from your browser and click Check Link..."/>
+        </DockPanel>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                <Button Name="OpenLinkButton" Content="Open in Browser" IsEnabled="False"/>
+                <Button Name="UseButton" Content="Use This Link" IsEnabled="False" IsDefault="True" Classes="dashboard-primary"/>
+                <Button Name="CancelButton" Content="Cancel" IsCancel="True"/>
+            </StackPanel>
+            <TextBox Name="SelectedUrlBox" IsReadOnly="True" Margin="0,0,6,0"/>
+        </DockPanel>
+        <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" TextWrapping="Wrap" Margin="0,6,0,0"/>
+
+        <Grid ColumnDefinitions="2*,8,3*">
+            <DockPanel Grid.Column="0">
+                <TextBlock DockPanel.Dock="Top" Text="PDFs found (best first; * = mentions the number):" Margin="0,0,0,4"/>
+                <ListBox Name="CandidatesList" FontSize="12"/>
+            </DockPanel>
+            <views:TemplatePreviewPanel Grid.Column="2" Name="PreviewPanel"/>
+        </Grid>
+    </DockPanel>
+</Window>

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -49,6 +50,8 @@ public partial class RefreshTemplatesView : UserControl
         OpenReportButton.Click += (_, _) => OpenReport();
         OpenTimingReportButton.Click += (_, _) => OpenTimingReport();
         FixListButton.Click += (_, _) => NavigationRequested?.Invoke(TemplateFixListView.Route);
+        FailuresList.SelectionChanged += (_, _) => FindNewLinkButton.IsEnabled = FailuresList.SelectedIndex >= 0;
+        FindNewLinkButton.Click += async (_, _) => await FindNewLinkForSelectedAsync();
         UpdateFixListButton();
     }
 
@@ -198,6 +201,34 @@ public partial class RefreshTemplatesView : UserControl
         }
     }
 
+    /// <summary>The failures from the last refresh, in list order.</summary>
+    private List<RefreshFailure> _failures = new();
+
+    private void ShowFailureList()
+    {
+        FailuresList.ItemsSource = _failures
+            .Select(f => $"[ID {f.TemplateId}] {f.TemplateName}: {f.ErrorMessage}")
+            .ToList();
+        FailuresLabel.Text = $"{_failures.Count} failure(s):";
+        FindNewLinkButton.IsEnabled = false;
+    }
+
+    /// <summary>
+    /// "Find New Link for Selected...": searches for a new link for the selected failed template,
+    /// previews it, and after confirmation saves it and downloads the template again.
+    /// </summary>
+    private async Task FindNewLinkForSelectedAsync()
+    {
+        int index = FailuresList.SelectedIndex;
+        if (index < 0 || index >= _failures.Count) return;
+        var window = this.OwnerWindow();
+        if (window == null) return;
+        if (!await TemplateFinderFlow.FixBrokenTemplateAsync(window, _failures[index].TemplateId)) return;
+        _failures.RemoveAt(index);
+        ShowFailureList();
+        UpdateFixListButton();
+    }
+
     // ---------- Timing / estimation ----------
 
     /// <summary>Starts a UI timer that updates <see cref="ElapsedText"/> once per second.</summary>
@@ -325,10 +356,8 @@ public partial class RefreshTemplatesView : UserControl
 
         if (result.Failures.Count > 0)
         {
-            FailuresLabel.Text     = $"{result.Failures.Count} failure(s):";
-            FailuresList.ItemsSource = result.Failures
-                .Select(f => $"[ID {f.TemplateId}] {f.TemplateName}: {f.ErrorMessage}")
-                .ToList();
+            _failures = result.Failures.ToList();
+            ShowFailureList();
             FailuresPanel.SetVisible(true);
             NoFailuresLabel.SetVisible(false);
 

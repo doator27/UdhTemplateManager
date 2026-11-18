@@ -87,7 +87,10 @@
 
                             <!-- Row 9–10: Online Link | Local File -->
                             <TextBlock Grid.Row="9"  Grid.Column="0" Text="Online Link (optional):" Margin="0,0,8,2"/>
-                            <TextBox   Grid.Row="10" Grid.Column="0" Name="TplOnlineLinkBox" Watermark="https://..." Margin="0,0,8,0"/>
+                            <Grid Grid.Row="10" Grid.Column="0" ColumnDefinitions="*,Auto" Margin="0,0,8,0">
+                                <TextBox Grid.Column="0" Name="TplOnlineLinkBox" Watermark="https://..."/>
+                                <Button Grid.Column="1" Name="TplFindOnlineButton" Content="Find Online..." Margin="4,0,0,0"/>
+                            </Grid>
                             <TextBlock Grid.Row="9"  Grid.Column="1" Text="Local File (optional):" Margin="0,0,0,2"/>
                             <Grid      Grid.Row="10" Grid.Column="1" ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0" Name="TplLocalLinkBox" Watermark="Path to PDF..."/>

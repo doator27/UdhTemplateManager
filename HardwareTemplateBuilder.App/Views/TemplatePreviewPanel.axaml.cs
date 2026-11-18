@@ -85,6 +85,31 @@ public partial class TemplatePreviewPanel : UserControl
         }
     }
 
+    /// <summary>
+    /// Shows a PDF that's already in memory (e.g. a link the template finder downloaded), or
+    /// clears the preview when <paramref name="pdfBytes"/> is null.
+    /// </summary>
+    /// <param name="pdfBytes">The PDF.</param>
+    public async Task ShowPdfAsync(byte[]? pdfBytes)
+    {
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+        Clear();
+        if (pdfBytes is null) return;
+        try
+        {
+            _pdfBytes = pdfBytes;
+            _pageCount = Conversion.GetPageCount(pdfBytes);
+            _pageIndex = 0;
+            await RenderPageAsync();
+        }
+        catch (Exception ex)
+        {
+            Clear();
+            PageLabel.Text = $"Could not preview PDF: {ex.Message}";
+        }
+    }
+
     private static async Task<byte[]?> LoadBytesAsync(IndividualTemplate template, CancellationToken ct)
     {
         if (!string.IsNullOrWhiteSpace(template.LocalLink) && File.Exists(template.LocalLink))

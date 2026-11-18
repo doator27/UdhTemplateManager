@@ -67,6 +67,7 @@
                                Foreground="{StaticResource DangerBrush}" FontWeight="Bold"
                                Margin="0,0,0,4"/>
                     <ListBox x:Name="FailuresList" MaxHeight="300" Margin="0,0,0,8"/>
+                    <Button x:Name="FindNewLinkButton" Content="Find New Link for Selected..." IsEnabled="False" HorizontalAlignment="Left" Margin="0,0,0,8"/>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock x:Name="ReportPathLabel" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap"
                                    VerticalAlignment="Center" Margin="0,0,8,0"/>

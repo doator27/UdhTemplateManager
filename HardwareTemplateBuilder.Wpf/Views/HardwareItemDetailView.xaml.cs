@@ -13,6 +13,8 @@ using System.Windows.Media;
 using HardwareTemplateBuilder.Wpf.Ui;
 using System.Threading.Tasks;
 
+using HardwareTemplateBuilder.Core.Services.TemplateFinder;
+
 namespace HardwareTemplateBuilder.Wpf.Views;
 
 /// <summary>
@@ -98,6 +100,7 @@ public partial class HardwareItemDetailView : UserControl
         BackButton.Click           += (_, _) => NavigationRequested?.Invoke(_returnRoute ?? "HardwareItems");
         RemoveTemplateButton.Click += (_, _) => RemoveTemplate();
         AddTemplateButton.Click    += (_, _) => AddLinkTemplate();
+        FindOnlineButton.Click     += async (_, _) => await FindTemplateOnlineAsync();
         RequestedFromManufacturerButton.Click += (_, _) => AddRequestedFromManufacturerLink();
         BrowseLocalLinkButton.Click += async (_, _) => await BrowseLocalLinkAsync();
         SearchDescCombo.SelectionChanged += (_, _) => SearchTemplates();
@@ -266,6 +269,31 @@ public partial class HardwareItemDetailView : UserControl
     /// it to this hardware item. Fully deduplicates — both the template record and the link.
     /// Manufacturer is always inherited from the parent hardware item.
     /// </summary>
+    /// <summary>
+    /// Opens "Find Template Online" for this item and fills the template form with the chosen PDF
+    /// (link, page count, a suggested template number) for the user to check and save.
+    /// </summary>
+    private async Task FindTemplateOnlineAsync()
+    {
+        var window = this.OwnerWindow();
+        if (window == null) return;
+        var found = await TemplateFinderFlow.FindForItemAsync(window, _itemId);
+        if (found == null) return;
+
+        AddOnlineLinkBox.Text = found.Url;
+        if (found.PageCount > 0) AddNumPagesBox.Text = found.PageCount.ToString();
+        if (string.IsNullOrWhiteSpace(AddTemplateNumBox.Text)) AddTemplateNumBox.Text = GuessTemplateNumber(found);
+        AddStatusLabel.Foreground = AppColors.Success;
+        AddStatusLabel.Text = "Link filled in from Find Online. Check the template details, then add or save the template.";
+    }
+
+    /// <summary>A template number to suggest for a found PDF: the search term it mentions, else its file name.</summary>
+    private static string GuessTemplateNumber(TemplateCandidate found)
+    {
+        var name = found.MatchedTerm ?? System.IO.Path.GetFileNameWithoutExtension(found.FileName);
+        return name.Length > 50 ? name[..50] : name;
+    }
+
     private void AddLinkTemplate()
     {
         if (_itemManufacturerId == 0)                              { AddStatusLabel.Text = "Hardware item has no manufacturer."; return; }

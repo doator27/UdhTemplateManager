@@ -43,7 +43,10 @@
 							<TextBox   Grid.Row="7" Grid.Column="1" Name="AddRotationDirectionBox" Text="0" Margin="0,0,8,8"/>
 							<TextBlock Grid.Row="8" Grid.Column="0" Text="Online Link (optional):" Margin="0,0,0,2"/>
 							<TextBlock Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="2" Text="Local File (optional):" Margin="0,0,0,2"/>
-							<TextBox   Grid.Row="9" Grid.Column="0" Name="AddOnlineLinkBox" Watermark="https://..." Margin="0,0,8,8"/>
+							<Grid Grid.Row="9" Grid.Column="0" ColumnDefinitions="*,Auto" Margin="0,0,8,8">
+								<TextBox Grid.Column="0" Name="AddOnlineLinkBox" Watermark="https://..."/>
+								<Button Grid.Column="1" Name="FindOnlineButton" Content="Find Online..." Margin="6,0,0,0"/>
+							</Grid>
 							<Grid Grid.Row="9" Grid.Column="1" ColumnDefinitions="*,Auto">
 								<TextBox Grid.Column="0" Name="AddLocalLinkBox" Watermark="Path to PDF..." Margin="0,0,8,8" />
 								<Button Grid.Column="1" Name="BrowseLocalLinkButton" Content="Browse..." HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,8,8"/>
