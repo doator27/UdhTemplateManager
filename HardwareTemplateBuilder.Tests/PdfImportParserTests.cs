@@ -195,6 +195,80 @@ public class PdfImportParserTests
     }
 
     [Fact]
+    public void LetterWords_SplitOnGapsWithoutSpaces()
+    {
+        // "Concealed Closer 2033" written glyph by glyph with no space characters (like GemBox).
+        var letters = new List<PdfLetter>();
+        double x = 71;
+        foreach (var word in new[] { "Concealed", "Closer", "2033" })
+        {
+            foreach (var ch in word)
+            {
+                letters.Add(new PdfLetter(x, x + 5, 100, 9, ch.ToString()));
+                x += 5;
+            }
+            x += 2.5; // the only thing that separates the words
+        }
+        letters.Add(new PdfLetter(183, 188, 100.2, 9, "2"));
+        letters.Add(new PdfLetter(40, 45, 120, 9, "L"));
+        letters.Add(new PdfLetter(45, 50, 120, 9, "C"));
+        letters.Add(new PdfLetter(50, 52, 120, 9, " "));
+        letters.Add(new PdfLetter(52, 57, 120, 9, "X"));
+
+        var words = PdfLetterWords.Group(letters);
+
+        Assert.Equal(new[] { "Concealed", "Closer", "2033", "2", "LC", "X" }, words.Select(w => w.Text));
+        Assert.Equal(71, words[0].Left);
+    }
+
+    [Fact]
+    public async Task TextReader_SplitsWordsInPdfsWithoutSpaces()
+    {
+        if (!OperatingSystem.IsWindows()) return; // PDFsharp needs Windows fonts to draw the test PDF.
+
+        var path = Path.Combine(Path.GetTempPath(), $"htb_nospace_{Guid.NewGuid():N}.pdf");
+        try
+        {
+            using (var doc = new PdfDocument())
+            {
+                var page = doc.AddPage();
+                using var gfx = XGraphics.FromPdfPage(page);
+                var font = new XFont("Arial", 9);
+                // Every word drawn on its own, 2.5pt apart, so the PDF has no space characters.
+                void Words(double x, double y, string line)
+                {
+                    foreach (var w in line.Split(' '))
+                    {
+                        gfx.DrawString(w, font, XBrushes.Black, x, y);
+                        x += gfx.MeasureString(w, font).Width + 2.5;
+                    }
+                }
+                Words(39, 60, "Mfg"); Words(71, 60, "Product Description"); Words(198, 60, "Price"); Words(502, 60, "Qty"); Words(551, 60, "Cost");
+                Words(77, 72, "Cost Group: Hardware - Closers");
+                Words(39, 84, "LC"); Words(71, 84, "Concealed Closer 2033"); Words(183, 84, "2,871.00"); Words(463, 84, "735.69"); Words(515, 84, "1"); Words(542, 84, "735.69");
+                Words(71, 96, "BUMP 639");
+                Words(81, 108, "Openings: CUSTOM.1");
+                doc.Save(path);
+            }
+
+            var text = await HardwarePdfTextReader.ReadAsync(path, null, null, CancellationToken.None);
+            Assert.Contains(text.Pages[0], l => l.Contains("Product Description", StringComparison.Ordinal));
+            var r = HardwarePdfParser.Parse(text.Pages.Select(p => (IReadOnlyList<string>)p).ToList());
+
+            Assert.Contains("Component costing", r.Formats);
+            var closer = Assert.Single(r.Lines);
+            Assert.Equal("LC", closer.ManufacturerCode);
+            Assert.Equal("Concealed Closer", closer.GenericName);
+            Assert.Equal("2033 BUMP", closer.Catalog);
+            Assert.Equal("CUSTOM.1", closer.SetName);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task TextReader_ReadsARealPdf()
     {
         if (!OperatingSystem.IsWindows()) return; // PDFsharp needs Windows fonts to draw the test PDF.

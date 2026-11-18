@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 
 namespace HardwareTemplateBuilder.Core.Services.Import;
 
@@ -49,14 +50,17 @@ public static class HardwarePdfTextReader
                 cancellationToken.ThrowIfCancellationRequested();
                 progress?.Report($"Reading page {n} of {count}...");
                 var page = document.GetPage(n);
-                var words = page.GetWords()
-                    .Select(w => new PdfWord(
-                        w.BoundingBox.Left,
-                        page.Height - w.BoundingBox.Top,
-                        w.BoundingBox.Right,
-                        page.Height - w.BoundingBox.Bottom,
-                        w.Text))
-                    .ToList();
+                // Words are built from the glyphs (PdfLetterWords): some PDFs have no space
+                // characters, and only the gaps between glyphs show where words end. Rotated
+                // text (dimensions on drawings) is left out.
+                var words = PdfLetterWords.Group(page.Letters
+                    .Where(l => l.TextOrientation == TextOrientation.Horizontal)
+                    .Select(l => new PdfLetter(
+                        l.StartBaseLine.X,
+                        Math.Max(l.EndBaseLine.X, l.StartBaseLine.X + l.Width),
+                        page.Height - l.StartBaseLine.Y,
+                        l.PointSize > 0 ? l.PointSize : Math.Max(1, l.GlyphRectangle.Height),
+                        l.Value)));
                 if (words.Count < ScannedPageWordThreshold) scanned.Add(n - 1);
                 result.Pages.Add(LayoutTextBuilder.BuildLines(words));
             }
