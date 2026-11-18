@@ -135,5 +135,12 @@ public sealed class TemplateLinkChecker
         if (candidate.MentionsTerm) candidate.Score += 200;
         if (candidate.LooksLikeTemplate) candidate.Score += 50;
         if (candidate.PageCount is > 0 and <= 12) candidate.Score += 10;
+
+        // The file name says what it is: templates/installation sheets first, ordering sheets,
+        // manuals and brochures last.
+        var file = Uri.UnescapeDataString(candidate.Url).ToLowerInvariant();
+        file = file[(file.LastIndexOf('/') + 1)..];
+        if (System.Text.RegularExpressions.Regex.IsMatch(file, "template|install|instruction|cut-?sheet|prep")) candidate.Score += 40;
+        if (System.Text.RegularExpressions.Regex.IsMatch(file, "order|price|brochure|catalog|maintenance|parts|warranty|spec-?sheet|submittal")) candidate.Score -= 40;
     }
 }
