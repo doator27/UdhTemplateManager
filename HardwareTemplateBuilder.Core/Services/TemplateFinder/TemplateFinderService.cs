@@ -45,6 +45,13 @@ public sealed class TemplateFinderService
     private readonly HttpClient _http;
     private readonly Func<AppDbContext> _contextFactory;
     private readonly TemplateLinkChecker _checker;
+    private readonly ConcurrentDictionary<string, bool> _blockedSites = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gets the websites that refused the last search (bot protection such as Cloudflare's
+    /// "Just a moment..." page, or robots.txt rules), so the window can suggest searching them in a browser.
+    /// </summary>
+    public IReadOnlyCollection<string> BlockedSites => _blockedSites.Keys.ToList();
 
     /// <summary>Creates the service.</summary>
     /// <param name="http">HTTP client (see <see cref="CreateHttpClient"/>).</param>
@@ -101,6 +108,7 @@ public sealed class TemplateFinderService
     public async Task<List<TemplateCandidate>> FindAsync(
         TemplateSearchRequest request, IProgress<string>? progress, Action<TemplateCandidate>? onFound, CancellationToken cancellationToken)
     {
+        _blockedSites.Clear();
         var terms = request.Terms();
         var found = new ConcurrentDictionary<string, TemplateCandidate>(StringComparer.OrdinalIgnoreCase);
         var tried = new ConcurrentDictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -180,6 +188,18 @@ public sealed class TemplateFinderService
         return found.Values.OrderByDescending(c => c.Score).ToList();
     }
 
+    /// <summary>The manufacturer websites a search would crawl (from past links, else a name guess).</summary>
+    /// <param name="request">The search.</param>
+    public List<string> SitesFor(TemplateSearchRequest request)
+    {
+        using var ctx = _contextFactory();
+        var links = ctx.IndividualTemplates
+            .Where(t => t.ManufacturerId == request.ManufacturerId && t.OnlineLink != null && t.OnlineLink != "")
+            .Select(t => t.OnlineLink!)
+            .ToList();
+        return Sites(request.ManufacturerName, links);
+    }
+
     // ── Past-link patterns ──────────────────────────────────────────────────
 
     /// <summary>
@@ -256,6 +276,13 @@ public sealed class TemplateFinderService
         // Site maps: robots.txt "Sitemap:" lines, else the usual names.
         var queue = new Queue<string>();
         var robots = await GetTextAsync($"https://{host}/robots.txt", ct).ConfigureAwait(false);
+        var rules = RobotsRules.Parse(robots);
+        if (_blockedSites.ContainsKey(host)) return new List<(string, int)>();
+        if (!rules.IsAllowed("/"))
+        {
+            _blockedSites.TryAdd(host, true);
+            return new List<(string, int)>();
+        }
         foreach (Match m in Regex.Matches(robots ?? string.Empty, @"(?im)^\s*Sitemap:\s*(\S+)"))
             queue.Enqueue(m.Groups[1].Value.Trim());
         if (queue.Count == 0)
@@ -278,7 +305,7 @@ public sealed class TemplateFinderService
                 childMaps.Remove(best);
                 map = best.Url;
             }
-            if (!seenMaps.Add(map)) continue;
+            if (!seenMaps.Add(map) || !rules.IsAllowed(map)) continue;
             fetched++;
             progress?.Report($"Searching {host} (site map {fetched})...");
             var xml = await GetTextAsync(map, ct).ConfigureAwait(false);
@@ -287,7 +314,7 @@ public sealed class TemplateFinderService
             foreach (Match m in Regex.Matches(xml, @"<loc>\s*(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?\s*</loc>", RegexOptions.Singleline | RegexOptions.IgnoreCase))
             {
                 var url = WebUtility.HtmlDecode(m.Groups[1].Value.Trim());
-                if (!IsHttp(url)) continue;
+                if (!IsHttp(url) || !rules.IsAllowed(url)) continue;
                 var lower = url.ToLowerInvariant();
                 bool isMap = xml.Contains("<sitemapindex", StringComparison.OrdinalIgnoreCase) || lower.EndsWith(".xml") || lower.EndsWith(".xml.gz");
                 if (isMap)
@@ -304,13 +331,13 @@ public sealed class TemplateFinderService
         }
 
         // Product pages that mention the number: read them for PDF links.
-        foreach (var page in pages.OrderByDescending(p => p.Score).DistinctBy(p => p.Url).Take(MaxPagesToRead))
+        foreach (var page in pages.Where(p => rules.IsAllowed(p.Url)).OrderByDescending(p => p.Score).DistinctBy(p => p.Url).Take(MaxPagesToRead))
         {
             ct.ThrowIfCancellationRequested();
             progress?.Report($"Reading {host} page {Shorten(page.Url)}...");
             var html = await GetTextAsync(page.Url, ct).ConfigureAwait(false);
             if (string.IsNullOrEmpty(html)) continue;
-            foreach (var link in PdfLinks(html, page.Url))
+            foreach (var link in PdfLinks(html, page.Url).Where(l => !SameHost(l, host) || rules.IsAllowed(l)))
             {
                 int score = UrlScore(link, keys) + page.Score / 2 + 5;
                 results[link] = Math.Max(results.GetValueOrDefault(link), score);
@@ -393,7 +420,19 @@ public sealed class TemplateFinderService
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             AddBrowserHeaders(request);
             using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode) return null;
+            if (!response.IsSuccessStatusCode)
+            {
+                // Bot protection (Cloudflare "Just a moment...", Akamai, ...): remember the site.
+                if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.ServiceUnavailable or (HttpStatusCode)429 &&
+                    !url.Contains("archive.org", StringComparison.OrdinalIgnoreCase))
+                {
+                    var body = await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false);
+                    if (Regex.IsMatch(body, "Just a moment|cf-challenge|challenge-platform|Access Denied|captcha", RegexOptions.IgnoreCase) &&
+                        Uri.TryCreate(url, UriKind.Absolute, out var u))
+                        _blockedSites.TryAdd(u.Host.ToLowerInvariant(), true);
+                }
+                return null;
+            }
             if (response.Content.Headers.ContentLength is > 20 * 1024 * 1024) return null;
             var bytes = await response.Content.ReadAsByteArrayAsync(timeout.Token).ConfigureAwait(false);
             if (bytes.Length > 2 && bytes[0] == 0x1f && bytes[1] == 0x8b)
@@ -413,6 +452,9 @@ public sealed class TemplateFinderService
             return null;
         }
     }
+
+    private static bool SameHost(string url, string host) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var u) && string.Equals(u.Host, host, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsHttp(string? url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps);

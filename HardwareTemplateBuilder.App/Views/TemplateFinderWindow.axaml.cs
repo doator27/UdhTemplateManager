@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -29,6 +30,7 @@ public partial class TemplateFinderWindow : Window
     private readonly TemplateFinderService _service = new(Http, DatabaseInitializer.CreateContext);
     private readonly ObservableCollection<TemplateCandidate> _candidates = new();
     private CancellationTokenSource? _cts;
+    private List<string> _sites = new();
 
     /// <summary>Parameterless constructor for the XAML designer.</summary>
     public TemplateFinderWindow() : this(new TemplateSearchRequest()) { }
@@ -55,6 +57,7 @@ public partial class TemplateFinderWindow : Window
         SearchButton.Click += async (_, _) => await SearchAsync();
         StopButton.Click += (_, _) => _cts?.Cancel();
         GoogleButton.Click += (_, _) => OpenInBrowser(_request.GoogleSearchUrl());
+        SiteGoogleButton.Click += (_, _) => { if (_sites.Count > 0) OpenInBrowser(_request.GoogleSiteSearchUrl(_sites[0])); };
         CheckLinkButton.Click += async (_, _) => await CheckPastedLinkAsync();
         OpenLinkButton.Click += (_, _) => { if (CandidatesList.SelectedItem is TemplateCandidate c) OpenInBrowser(c.Url); };
         UseButton.Click += (_, _) => { if (CandidatesList.SelectedItem is TemplateCandidate { IsPdf: true } c) Close(c); };
@@ -64,6 +67,12 @@ public partial class TemplateFinderWindow : Window
 
     private async Task SearchAsync()
     {
+        if (_sites.Count == 0)
+        {
+            try { _sites = await Task.Run(() => _service.SitesFor(_request)); } catch { /* no history */ }
+            SiteGoogleButton.IsEnabled = _sites.Count > 0;
+            SiteGoogleButton.Content = _sites.Count > 0 ? $"Search {_sites[0]} on Google" : "Search Mfr Site on Google";
+        }
         _cts?.Cancel();
         var cts = new CancellationTokenSource();
         _cts = cts;
@@ -77,6 +86,9 @@ public partial class TemplateFinderWindow : Window
             StatusLabel.Text = _candidates.Any(c => c.IsPdf)
                 ? $"Found {_candidates.Count(c => c.IsPdf)} PDF(s). Check the preview, then Use This Link."
                 : "No template PDFs found. Try Search Google in Browser, copy the PDF's link and paste it above.";
+            var blocked = _service.BlockedSites;
+            if (blocked.Count > 0)
+                StatusLabel.Text += $"\n{string.Join(", ", blocked)} blocked the automated search (bot protection), so search {(blocked.Count == 1 ? "it" : "them")} on Google instead and paste the PDF's link above.";
         }
         catch (OperationCanceledException)
         {

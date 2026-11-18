@@ -77,3 +77,27 @@ public class TemplateFinderTests
         Assert.StartsWith("https://www.google.com/search?q=LCN%204040XP%20RWPA%20template%20pdf", r.GoogleSearchUrl());
     }
 }
+
+/// <summary>Tests for <see cref="RobotsRules"/>.</summary>
+public class RobotsRulesTests
+{
+    [Fact]
+    public void StarGroupRules_AreApplied_LongestMatchWins()
+    {
+        var r = RobotsRules.Parse("User-agent: Googlebot\nDisallow:\n\nUser-agent: *\nDisallow: /admin\nDisallow: /private/\nAllow: /private/docs\nDisallow: /*.aspx$\n");
+        Assert.True(r.IsAllowed("/products/x.pdf"));
+        Assert.False(r.IsAllowed("/admin/page"));
+        Assert.False(r.IsAllowed("https://site.com/private/a"));
+        Assert.True(r.IsAllowed("https://site.com/private/docs/t.pdf"));
+        Assert.False(r.IsAllowed("/x/page.aspx"));
+        Assert.True(r.IsAllowed("/x/page.aspx?y=1"));
+    }
+
+    [Fact]
+    public void DisallowAll_BlocksEverything_AndOtherAgentsAreIgnored()
+    {
+        Assert.False(RobotsRules.Parse("User-agent: *\nDisallow: /").IsAllowed("/anything"));
+        Assert.True(RobotsRules.Parse("User-agent: badbot\nDisallow: /").IsAllowed("/anything"));
+        Assert.True(RobotsRules.Parse(null).IsAllowed("/anything"));
+    }
+}

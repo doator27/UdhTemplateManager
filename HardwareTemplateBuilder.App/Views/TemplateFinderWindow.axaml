@@ -15,6 +15,7 @@
                 <Button Name="SearchButton" Content="Search Again"/>
                 <Button Name="StopButton" Content="Stop" IsEnabled="False"/>
                 <Button Name="GoogleButton" Content="Search Google in Browser"/>
+                <Button Name="SiteGoogleButton" Content="Search Mfr Site on Google"/>
             </StackPanel>
             <TextBox Name="PasteBox" Watermark="Paste a link from your browser and click Check Link..."/>
         </DockPanel>

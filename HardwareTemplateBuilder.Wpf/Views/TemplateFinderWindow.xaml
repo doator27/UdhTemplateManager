@@ -20,6 +20,7 @@
                 <Button x:Name="SearchButton" Content="Search Again"/>
                 <Button x:Name="StopButton" Content="Stop" IsEnabled="False"/>
                 <Button x:Name="GoogleButton" Content="Search Google in Browser"/>
+                <Button x:Name="SiteGoogleButton" Content="Search Mfr Site on Google"/>
             </ui:Stack>
             <TextBox x:Name="PasteBox" ui:Watermark.Text="Paste a link from your browser and click Check Link..."/>
         </DockPanel>

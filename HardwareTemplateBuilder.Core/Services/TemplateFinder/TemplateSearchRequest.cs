@@ -76,6 +76,14 @@ public sealed class TemplateSearchRequest
         return "https://www.google.com/search?q=" + Uri.EscapeDataString(query.Trim());
     }
 
+    /// <summary>The Google search limited to one website (e.g. "site:us.allegion.com FS436 pdf").</summary>
+    /// <param name="host">The website's host name.</param>
+    public string GoogleSiteSearchUrl(string host)
+    {
+        var what = ModelNumber ?? TemplateNumber ?? string.Empty;
+        return "https://www.google.com/search?q=" + Uri.EscapeDataString($"site:{host} {what} pdf".Trim());
+    }
+
     /// <summary>Builds a request for a hardware item (model number, description, past labels).</summary>
     /// <param name="ctx">An open context.</param>
     /// <param name="hardwareItemId">The item.</param>
