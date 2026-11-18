@@ -1,3 +1,4 @@
+using HardwareTemplateBuilder.Wpf.Helpers;
 using System.Collections.Generic;
 using System;
 using System.Diagnostics;
