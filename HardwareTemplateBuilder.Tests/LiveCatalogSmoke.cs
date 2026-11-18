@@ -16,46 +16,43 @@ public class LiveCatalogSmoke
     public async Task Live()
     {
         if (Environment.GetEnvironmentVariable("LIVE_SMOKE") != "1") return;
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase("live").Options;
+        var options = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase("live2").Options;
         using var http = TemplateFinderService.CreateHttpClient();
-        var finder = new TemplateFinderService(http, () => new AppDbContext(options));
-        var all = new List<string>();
-        foreach (var (name, mfrId) in new[] { ("Trimco", 1), ("NGP", 2), ("Rockwood", 3), ("Pemko", 4), ("Hager", 5), ("LCN", 6), ("Detex", 7), ("Norton", 8) })
+        int mfrId;
+        using (var ctx = new AppDbContext(options))
         {
-            try
-            {
-                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-                var links = await finder.FindCatalogLinksAsync(mfrId, name, null, cts.Token);
-                _out.WriteLine($"== {name}: {links.Count} links; blocked: {string.Join(",", finder.BlockedSites)}");
-                foreach (var l in links.Take(8)) _out.WriteLine($"   {l.Score} {l.Url}");
-                all.AddRange(links.Take(2).Select(l => l.Url));
-            }
-            catch (Exception ex) { _out.WriteLine($"== {name}: {ex.GetType().Name} {ex.Message}"); }
+            var m = new HardwareTemplateBuilder.Core.Models.Manufacturer { ManufacturerName = "Detex" };
+            ctx.Manufacturers.Add(m);
+            ctx.Descriptions.Add(new HardwareTemplateBuilder.Core.Models.Description { DescriptionText = "Exit Devices" });
+            ctx.Descriptions.Add(new HardwareTemplateBuilder.Core.Models.Description { DescriptionText = "Closers" });
+            ctx.Descriptions.Add(new HardwareTemplateBuilder.Core.Models.Description { DescriptionText = "Alarms" });
+            ctx.SaveChanges();
+            mfrId = m.Id;
         }
-
-        foreach (var url in all.Take(4))
+        var svc = new ProductCatalogService(() => new AppDbContext(options), http);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var c1 = svc.Add(mfrId, null, "https://www.detex.com/wp-content/uploads/2022/05/Full-Price-List.pdf", null);
+        var c2 = svc.Add(mfrId, null, "https://www.detex.com/wp-content/uploads/2026/07/8-2026-ryobi-price-list.pdf", null);
+        foreach (var c in new[] { c1, c2 })
         {
-            try
-            {
-                var bytes = await http.GetByteArrayAsync(url);
-                var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pdf");
-                File.WriteAllBytes(path, bytes);
-                var text = await HardwarePdfTextReader.ReadAsync(path, null, null, CancellationToken.None);
-                _out.WriteLine($"## {url}: {bytes.Length / 1024} KB, {text.Pages.Count} pages");
-                var pages = text.Pages.Select(ProductCatalogService.PageText).ToList();
-                // pick model-like tokens from a middle page
-                var mid = pages.Skip(pages.Count / 3).FirstOrDefault(p => p.Length > 500) ?? pages[0];
-                _out.WriteLine("-- sample page --\n" + string.Join("\n", mid.Split('\n').Take(25)));
-                var models = System.Text.RegularExpressions.Regex.Matches(mid, @"\b[A-Z]{0,3}\d{2,5}[A-Z]{0,4}\b").Select(m => m.Value).Distinct().Take(4).ToList();
-                foreach (var model in models)
-                {
-                    var key = ImportText.Key(model);
-                    var best = pages.Select((p, i) => (i, s: CatalogPageAnalyzer.ScorePage(p, key, Array.Empty<string>()))).Where(x => x.s > 0).OrderByDescending(x => x.s).Take(2).ToList();
-                    foreach (var (i, s) in best)
-                        _out.WriteLine($"   {model}: page {i + 1} score {s} desc={CatalogPageAnalyzer.Description(pages[i], key, Array.Empty<string>())} templates={string.Join(",", CatalogPageAnalyzer.TemplateNumbers(pages[i], key, Array.Empty<string>()))}");
-                }
-            }
-            catch (Exception ex) { _out.WriteLine($"## {url}: {ex.Message}"); }
+            var n = await svc.IndexAsync(c.Id, null, null, CancellationToken.None);
+            _out.WriteLine($"indexed {c.Title}: {n} pages in {sw.Elapsed.TotalSeconds:0.0}s");
+        }
+        var lookup = new CatalogLookupService(() => new AppDbContext(options));
+        foreach (var callout in new[] { "ECL-230X", "ECL-230X W 28", "V40 EI KS", "10-800", "D4551DA-TP-AL", "EAX-500", "V40 x EB x 1R x 99 x 32", "ECL-230D PH", "10/30/40" })
+        {
+            sw.Restart();
+            var r = lookup.Lookup(mfrId, callout);
+            _out.WriteLine($"=== {callout} ({sw.ElapsedMilliseconds} ms)\n{r.Summary}");
+            foreach (var h in r.Hits.Take(3)) _out.WriteLine($"   - {h.DisplayText} [score {h.Score}]");
+        }
+        var best = lookup.Lookup(mfrId, "ECL-230X").Hits.FirstOrDefault();
+        if (best != null)
+        {
+            var bytes = await svc.PagePdfAsync(best.CatalogId, best.PageNumber, CancellationToken.None);
+            _out.WriteLine($"page pdf: {bytes.Length} bytes");
+            var page = new AppDbContext(options).ProductCatalogPages.First(p => p.CatalogId == best.CatalogId && p.PageNumber == best.PageNumber);
+            _out.WriteLine("-- page text --\n" + string.Join("\n", page.Text.Split('\n').Take(45)));
         }
     }
 }
