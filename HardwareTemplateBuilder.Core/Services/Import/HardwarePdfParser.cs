@@ -47,7 +47,7 @@ public static class HardwarePdfParser
     private static readonly Regex FooterRegex = new(@"^\s*([A-Z][a-z]{2} \d{1,2}, \d{4}|Page \d+ of \d+)", RegexOptions.Compiled);
     private static readonly Regex OpeningLineRegex = new(@"^\s*\d+\s+(Single|Pair|Double)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex CostingHeaderRegex = new(@"^\s*Mfg\s+Product Description", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex CostingItemRegex = new(@"^([A-Z][A-Z0-9]{1,4})\s+(\S.*?)\s+-?[\d,]+\.\d\d(\s|$)", RegexOptions.Compiled);
+    private static readonly Regex CostingItemRegex = new(@"^(\s*)([A-Z][A-Z0-9]{1,4})\s+(\S.*?)\s+-?[\d,]+\.\d\d(\s|$)", RegexOptions.Compiled);
     private static readonly Regex MachiningHeaderRegex = new(@"^(\s*)Qty\s+(Hardware Details)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex MachiningItemRegex = new(@"^(\s*)(\d{1,3})(\s+)(\S.*)$", RegexOptions.Compiled);
     private static readonly Regex MachiningOpeningRegex = new(@"(\d{1,4})\s+Openings?\s*(?:\(([A-Z]{1,4})\))?\s*:\s*(\S+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -353,6 +353,7 @@ public static class HardwarePdfParser
     {
         ParsedHardwareLine? current = null;
         string text = string.Empty;
+        int itemIndent = 0;
 
         void Finish()
         {
@@ -368,8 +369,9 @@ public static class HardwarePdfParser
             if (m.Success)
             {
                 Finish();
-                current = new ParsedHardwareLine { ManufacturerCode = ImportText.CleanManufacturerCode(m.Groups[1].Value), Page = page };
-                text = m.Groups[2].Value.Trim();
+                current = new ParsedHardwareLine { ManufacturerCode = ImportText.CleanManufacturerCode(m.Groups[2].Value), Page = page };
+                text = m.Groups[3].Value.Trim();
+                itemIndent = m.Groups[1].Value.Length;
                 var qty = Regex.Match(line, @"\s(\d{1,5})\s+([\d,]+\.\d\d)\s*$");
                 if (qty.Success)
                 {
@@ -386,7 +388,8 @@ public static class HardwarePdfParser
                 current.SetName = t.Substring("Openings:".Length).Trim();
                 Finish();
             }
-            else if (line.StartsWith("    ") && t.Length > 0 && !Regex.IsMatch(t, "Subtotal|Cost Group", RegexOptions.IgnoreCase))
+            else if (t.Length > 0 && line.Length - line.TrimStart().Length >= itemIndent + 3 &&
+                     !Regex.IsMatch(t, "Subtotal|Cost Group", RegexOptions.IgnoreCase))
             {
                 text = $"{text} {t}";
             }
