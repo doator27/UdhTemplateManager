@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:HardwareTemplateBuilder.App.Views"
+             x:Class="HardwareTemplateBuilder.App.Views.TemplateAuditView">
+    <DockPanel Margin="8">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="Template Description Audit" FontSize="16" FontWeight="Bold"/>
+            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#A7ADB8" Margin="0,2,0,0"
+                       Text="Go through templates by manufacturer and description, look at each one, and mark it OK or Needs Change (with a note). Change the description of the ticked templates in one go; the description decides where a template sorts in the package. Export the list to a spreadsheet to plan a reorganization."/>
+        </StackPanel>
+
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="Manufacturer:" VerticalAlignment="Center" Margin="0,0,6,6"/>
+            <ComboBox Name="ManufacturerCombo" Width="220" Margin="0,0,12,6"/>
+            <TextBlock Text="Status:" VerticalAlignment="Center" Margin="0,0,6,6"/>
+            <ComboBox Name="StatusCombo" Width="150" Margin="0,0,12,6"/>
+            <TextBox Name="SearchBox" Width="220" Watermark="Search number, model, note..." Margin="0,0,12,6"/>
+            <CheckBox Name="DifferCheck" Content="Only where linked items have another description" Margin="0,0,12,6"/>
+            <Button Name="ExportButton" Content="Export CSV..." Margin="0,0,6,6"/>
+            <Button Name="DescriptionsButton" Content="Edit Descriptions..." Margin="0,0,6,6"/>
+        </WrapPanel>
+
+        <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+        <Grid ColumnDefinitions="280,8,2*,8,3*">
+            <Border Grid.Column="0" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="8">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Descriptions" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <CheckBox DockPanel.Dock="Top" Name="SubtreeCheck" Content="Include sub-descriptions" IsChecked="True" Margin="0,0,0,4"/>
+                    <ListBox Name="DescriptionList" FontSize="12"/>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="2" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="8">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Name="TemplatesHeader" Text="Templates" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
+                        <Button Name="SelectAllButton" Content="Select All"/>
+                        <Button Name="NextUnreviewedButton" Content="Next Not Reviewed"/>
+                    </StackPanel>
+                    <ListBox Name="TemplateList" SelectionMode="Multiple" FontSize="12"/>
+                </DockPanel>
+            </Border>
+
+            <Grid Grid.Column="4" RowDefinitions="Auto,Auto,*">
+                <Border Grid.Row="0" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="8" Margin="0,0,0,6">
+                    <StackPanel Spacing="6">
+                        <TextBlock Name="DetailsText" TextWrapping="Wrap" FontSize="12" Text="Select a template."/>
+                        <TextBlock Text="Linked hardware items (double-click to open):" FontSize="12"/>
+                        <ListBox Name="ItemsList" Height="90" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Row="1" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="8" Margin="0,0,0,6">
+                    <StackPanel Spacing="6">
+                        <WrapPanel>
+                            <Button Name="OkButton" Content="Mark OK" Margin="0,0,6,6"/>
+                            <Button Name="NeedsChangeButton" Content="Mark Needs Change" Margin="0,0,6,6"/>
+                            <Button Name="ClearMarkButton" Content="Mark Not Reviewed" Margin="0,0,6,6"/>
+                        </WrapPanel>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Grid.Column="0" Name="NoteBox" Watermark="Note, e.g. move to Exit Devices > Rim > Concealed Vertical Rod"/>
+                            <Button Grid.Column="1" Name="SaveNoteButton" Content="Save Note" Margin="6,0,0,0"/>
+                        </Grid>
+                        <WrapPanel>
+                            <Button Name="ChangeDescriptionButton" Content="Change Description..." Classes="dashboard-primary" Margin="0,0,8,0"/>
+                            <CheckBox Name="AlsoItemsCheck" Content="Also move linked items that had the same description" VerticalAlignment="Center"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+                <views:TemplatePreviewPanel Grid.Row="2" Name="PreviewPanel"/>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</UserControl>

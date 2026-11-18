@@ -1,0 +1,71 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+             xmlns:views="clr-namespace:HardwareTemplateBuilder.Wpf.Views"
+             x:Class="HardwareTemplateBuilder.Wpf.Views.TemplateAuditView">
+    <DockPanel Margin="8">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}" Margin="0,0,0,6"><TextBlock Text="Template Description Audit" Style="{StaticResource CaptionText}"/></Border>
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Style="{StaticResource Hint}" Margin="0,0,0,6"
+                   Text="Go through templates by manufacturer and description, look at each one, and mark it OK or Needs Change (with a note). Change the description of the selected templates in one go; the description decides where a template sorts in the package. Export the list to a spreadsheet to plan a reorganization."/>
+
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="Manufacturer:" VerticalAlignment="Center" Margin="0,0,6,6"/>
+            <ComboBox x:Name="ManufacturerCombo" Width="220" Margin="0,0,12,6"/>
+            <TextBlock Text="Status:" VerticalAlignment="Center" Margin="0,0,6,6"/>
+            <ComboBox x:Name="StatusCombo" Width="150" Margin="0,0,12,6"/>
+            <TextBox x:Name="SearchBox" Width="220" ui:Watermark.Text="Search number, model, note..." Margin="0,0,12,6"/>
+            <CheckBox x:Name="DifferCheck" Content="Only where linked items have another description" VerticalAlignment="Center" Margin="0,0,12,6"/>
+            <Button x:Name="ExportButton" Content="Export CSV..." Margin="0,0,6,6"/>
+            <Button x:Name="DescriptionsButton" Content="Edit Descriptions..." Margin="0,0,6,6"/>
+        </WrapPanel>
+
+        <TextBlock DockPanel.Dock="Bottom" x:Name="StatusLabel" TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+        <Grid ui:GridEx.Columns="280,8,2*,8,3*">
+            <GroupBox Grid.Column="0" Header="Descriptions" Padding="6">
+                <DockPanel>
+                    <CheckBox DockPanel.Dock="Top" x:Name="SubtreeCheck" Content="Include sub-descriptions" IsChecked="True" Margin="0,0,0,4"/>
+                    <ListBox x:Name="DescriptionList" FontSize="11"/>
+                </DockPanel>
+            </GroupBox>
+
+            <GroupBox Grid.Column="2" x:Name="TemplatesGroup" Header="Templates" Padding="6">
+                <DockPanel>
+                    <ui:Stack DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
+                        <Button x:Name="SelectAllButton" Content="Select All"/>
+                        <Button x:Name="NextUnreviewedButton" Content="Next Not Reviewed"/>
+                    </ui:Stack>
+                    <ListBox x:Name="TemplateList" SelectionMode="Extended" FontSize="11"/>
+                </DockPanel>
+            </GroupBox>
+
+            <Grid Grid.Column="4" ui:GridEx.Rows="Auto,Auto,*">
+                <GroupBox Grid.Row="0" Header="Template" Padding="6" Margin="0,0,0,6">
+                    <ui:Stack Spacing="6">
+                        <TextBlock x:Name="DetailsText" TextWrapping="Wrap" Text="Select a template."/>
+                        <TextBlock Text="Linked hardware items (double-click to open):"/>
+                        <ListBox x:Name="ItemsList" Height="90" FontSize="11"/>
+                    </ui:Stack>
+                </GroupBox>
+                <GroupBox Grid.Row="1" Header="Audit" Padding="6" Margin="0,0,0,6">
+                    <ui:Stack Spacing="6">
+                        <WrapPanel>
+                            <Button x:Name="OkButton" Content="Mark OK" Margin="0,0,6,6"/>
+                            <Button x:Name="NeedsChangeButton" Content="Mark Needs Change" Margin="0,0,6,6"/>
+                            <Button x:Name="ClearMarkButton" Content="Mark Not Reviewed" Margin="0,0,6,6"/>
+                        </WrapPanel>
+                        <Grid ui:GridEx.Columns="*,Auto">
+                            <TextBox Grid.Column="0" x:Name="NoteBox" ui:Watermark.Text="Note, e.g. move to Exit Devices > Rim > Concealed Vertical Rod"/>
+                            <Button Grid.Column="1" x:Name="SaveNoteButton" Content="Save Note" Margin="6,0,0,0"/>
+                        </Grid>
+                        <WrapPanel>
+                            <Button x:Name="ChangeDescriptionButton" Content="Change Description..." Margin="0,0,8,0"/>
+                            <CheckBox x:Name="AlsoItemsCheck" Content="Also move linked items that had the same description" VerticalAlignment="Center"/>
+                        </WrapPanel>
+                    </ui:Stack>
+                </GroupBox>
+                <views:TemplatePreviewPanel Grid.Row="2" x:Name="PreviewPanel"/>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</UserControl>
