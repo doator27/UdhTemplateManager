@@ -121,6 +121,8 @@ public partial class JobDetailView : UserControl
         OpenAttachmentButton.Click    += (_, _) => OpenAttachment();
         RemoveAttachmentButton.Click  += (_, _) => RemoveAttachment();
         ParsePdfButton.Click          += async (_, _) => await ParsePdfIntoBulkAddAsync();
+        AllReleasesAttachmentsCheck.IsCheckedChanged += (_, _) => LoadAttachments();
+        MoveAttachmentButton.Click    += (_, _) => MoveAttachmentToActiveRelease();
 
         BackButton.Click += (_, _) => NavigationRequested?.Invoke("Jobs");
         BulkAddButton.Click += (_, _) =>
@@ -240,6 +242,7 @@ public partial class JobDetailView : UserControl
     {
         _currentReleaseId = ReleaseCombo.SelectedItem is JobRelease release ? release.Id : null;
         LoadLinkedHardware();
+        LoadAttachments();
         _ = OfferBaseListImportAsync();
 
         using var ctx = DatabaseInitializer.CreateContext();
@@ -281,6 +284,7 @@ public partial class JobDetailView : UserControl
             _currentReleaseId = existing.Id;
             LoadReleases();
             LoadLinkedHardware();
+            LoadAttachments();
             return;
         }
 
@@ -297,6 +301,7 @@ public partial class JobDetailView : UserControl
         _currentReleaseId = newRelease.Id;
         LoadReleases();
         LoadLinkedHardware();
+        LoadAttachments();
         await OfferBaseListImportAsync();
     }
 
@@ -910,41 +915,83 @@ public partial class JobDetailView : UserControl
     private static string ResolvePrimaryJobDir(AppDbContext ctx, Job? job) =>
         ResolveJobLocation(ctx, job).PrimaryRoot;
 
+    /// <summary>
+    /// Shows the active release's attachments (each release has its own), or every release's
+    /// when "Show attachments from every release" is ticked (labelled with their release).
+    /// </summary>
     private void LoadAttachments()
     {
         using var ctx = DatabaseInitializer.CreateContext();
-        var attachments = new JobAttachmentRepository(ctx).GetByJob(_jobId);
+        bool all = AllReleasesAttachmentsCheck.IsChecked == true;
+        var repo = new JobAttachmentRepository(ctx);
+        var attachments = (all ? repo.GetByJob(_jobId) : repo.GetByRelease(_jobId, _currentReleaseId)).ToList();
+        var label = JobAttachmentFolders.ReleaseLabel(ctx, _currentReleaseId);
+        if (all)
+        {
+            var labels = ctx.JobReleases.Where(r => r.JobId == _jobId).ToDictionary(r => r.Id, r => r.ReleaseLabel);
+            foreach (var a in attachments)
+                a.ReleaseText = a.ReleaseId is int id && labels.TryGetValue(id, out var l) ? l : "Base list";
+        }
         AttachmentList.ItemsSource = attachments;
+        AttachmentsHeader.Text = label == null ? "Job Attachments (base list)" : $"Job Attachments ({label})";
+        MoveAttachmentButton.IsVisible = all;
     }
 
     /// <summary>
-    /// Resolves the job's Attachments subfolder path, creating it if needed.
-    /// Returns null when the job or its save location cannot be determined.
+    /// Resolves the active release's attachments folder (<see cref="JobAttachmentFolders"/>),
+    /// creating it if needed. Returns null when the job or its save location cannot be determined.
     /// </summary>
     private string? GetAttachmentsFolder()
     {
         using var ctx = DatabaseInitializer.CreateContext();
         var job = ctx.Jobs.Find(_jobId);
         if (job == null) return null;
-        var saveDir = ResolvePrimaryJobDir(ctx, job);
-        var folder = Path.Combine(saveDir, job.JobNumber, "Attachments");
+        var folder = JobAttachmentFolders.PrimaryFolder(ctx, job, _currentReleaseId);
         Directory.CreateDirectory(folder);
         return folder;
     }
 
     /// <summary>
-    /// Resolves the job's secondary (shared App Settings) Attachments subfolder path, or null
+    /// Resolves a release's secondary (shared App Settings) attachments folder, or null
     /// when the user has no distinct custom job save location configured.
     /// </summary>
-    private string? GetSecondaryAttachmentsFolder()
+    /// <param name="releaseId">The release (null = base list).</param>
+    private string? GetSecondaryAttachmentsFolder(int? releaseId)
     {
         using var ctx = DatabaseInitializer.CreateContext();
         var job = ctx.Jobs.Find(_jobId);
-        if (job == null) return null;
-        var location = ResolveJobLocation(ctx, job);
-        return location.SecondaryRoot == null
-            ? null
-            : Path.Combine(location.SecondaryRoot, job.JobNumber, "Attachments");
+        return job == null ? null : JobAttachmentFolders.SecondaryFolder(ctx, job, releaseId);
+    }
+
+    /// <summary>Moves the selected attachment (from another release) to the active release.</summary>
+    private void MoveAttachmentToActiveRelease()
+    {
+        if (AttachmentList.SelectedItem is not JobAttachment a)
+        {
+            AttachmentStatusLabel.Foreground = AppColors.Danger;
+            AttachmentStatusLabel.Text = "Select an attachment to move.";
+            return;
+        }
+        try
+        {
+            using var ctx = DatabaseInitializer.CreateContext();
+            var label = JobAttachmentFolders.ReleaseLabel(ctx, _currentReleaseId) ?? "the base list";
+            if (a.ReleaseId == _currentReleaseId)
+            {
+                AttachmentStatusLabel.Foreground = AppColors.Muted;
+                AttachmentStatusLabel.Text = $"{a.FileName} is already in {label}.";
+                return;
+            }
+            var moved = JobAttachmentFolders.MoveToRelease(ctx, a.Id, _currentReleaseId);
+            AttachmentStatusLabel.Foreground = AppColors.Success;
+            AttachmentStatusLabel.Text = $"Moved {moved?.FileName ?? a.FileName} to {label}.";
+        }
+        catch (Exception ex)
+        {
+            AttachmentStatusLabel.Foreground = AppColors.Danger;
+            AttachmentStatusLabel.Text = $"Could not move: {ex.Message}";
+        }
+        LoadAttachments();
     }
 
     /// <summary>Determines the FileType tag stored for an attachment based on its extension.</summary>
@@ -1013,22 +1060,12 @@ public partial class JobDetailView : UserControl
                     continue;
                 }
 
-                var fileName   = Path.GetFileName(sourcePath);
-                var destPath   = Path.Combine(folder, fileName);
-
                 // If a file with that name already exists, append a counter.
-                if (File.Exists(destPath))
-                {
-                    var stem = Path.GetFileNameWithoutExtension(fileName);
-                    var ext  = Path.GetExtension(fileName);
-                    int n = 1;
-                    while (File.Exists(destPath))
-                        destPath = Path.Combine(folder, $"{stem} ({n++}){ext}");
-                }
+                var destPath = JobAttachmentFolders.UniquePath(folder, Path.GetFileName(sourcePath));
 
                 File.Copy(sourcePath, destPath);
 
-                var secondaryAttachmentsFolder = GetSecondaryAttachmentsFolder();
+                var secondaryAttachmentsFolder = GetSecondaryAttachmentsFolder(_currentReleaseId);
                 if (secondaryAttachmentsFolder != null)
                     DirectoryMirrorHelper.CopyFile(destPath, secondaryAttachmentsFolder);
 
@@ -1037,6 +1074,7 @@ public partial class JobDetailView : UserControl
                 repo.Add(new JobAttachment
                 {
                     JobId      = _jobId,
+                    ReleaseId  = _currentReleaseId,
                     FileName   = Path.GetFileName(destPath),
                     StoredPath = destPath,
                     FileType   = fileType,
@@ -1104,7 +1142,7 @@ public partial class JobDetailView : UserControl
         try { if (File.Exists(a.StoredPath)) File.Delete(a.StoredPath); } catch { }
 
         // Also remove the mirrored copy from the secondary (App Settings) location, if any.
-        var secondaryAttachmentsFolder = GetSecondaryAttachmentsFolder();
+        var secondaryAttachmentsFolder = GetSecondaryAttachmentsFolder(a.ReleaseId);
         if (secondaryAttachmentsFolder != null)
             DirectoryMirrorHelper.DeleteFile(a.FileName, secondaryAttachmentsFolder);
 

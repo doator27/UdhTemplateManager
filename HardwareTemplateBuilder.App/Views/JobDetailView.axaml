@@ -24,8 +24,9 @@
                 <!-- Job Attachments sub-panel -->
                 <Border Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                     <StackPanel>
-                        <TextBlock Text="Job Attachments" FontWeight="Bold" Margin="0,0,0,6"/>
+                        <TextBlock Name="AttachmentsHeader" Text="Job Attachments" FontWeight="Bold" Margin="0,0,0,6"/>
                         <StackPanel Name="AttachmentsBody">
+                            <CheckBox Name="AllReleasesAttachmentsCheck" Content="Show attachments from every release" Margin="0,0,0,4"/>
                             <ListBox Name="AttachmentList" Height="110" Margin="0,0,0,8"/>
                             <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,6">
                                 <TextBlock Grid.Column="0" Text="Note (optional):" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -36,6 +37,7 @@
                                 <Button Name="OpenAttachmentButton"   Content="Open"/>
                                 <Button Name="RemoveAttachmentButton" Content="Remove"/>
                                 <Button Name="ParsePdfButton" Content="Parse PDF into Bulk Add..."/>
+                                <Button Name="MoveAttachmentButton" Content="Move to This Release" IsVisible="False"/>
                             </StackPanel>
                             <TextBlock Name="AttachmentStatusLabel" Foreground="#FF6B6B" TextWrapping="Wrap"/>
                         </StackPanel>

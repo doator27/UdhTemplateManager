@@ -188,7 +188,11 @@ public sealed class DatabaseMergeImportService
             source, target, remap, plan, steps, "JobAttachments",
             e => $"{e.JobId}|{e.FileName}|{e.StoredPath}",
             describe: e => e.FileName,
-            remapForeignKeys: e => e.JobId = remap.Resolve("Jobs", e.JobId),
+            remapForeignKeys: e =>
+            {
+                e.JobId = remap.Resolve("Jobs", e.JobId);
+                e.ReleaseId = remap.ResolveNullable("JobReleases", e.ReleaseId);
+            },
             ct);
 
         await MergeBulkAddDraftsAsync(source, target, remap, plan, steps, ct);

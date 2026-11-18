@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HardwareTemplateBuilder.Core.Models;
 
@@ -18,6 +19,13 @@ public class JobAttachment
 
     /// <summary>Gets or sets the parent job.</summary>
     public Job Job { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the job release (addendum) the file belongs to: a plain id, null = the base list.
+    /// The job page shows the active release's attachments; release files are stored under
+    /// <c>Attachments/{ReleaseLabel}/</c>.
+    /// </summary>
+    public int? ReleaseId { get; set; }
 
     /// <summary>Gets or sets the original file name (used as the display label).</summary>
     [Required]
@@ -41,6 +49,13 @@ public class JobAttachment
     public DateTime DateAdded { get; set; } = DateTime.UtcNow;
 
     /// <summary>
+    /// Gets or sets the release name shown in front of the label when the list shows every
+    /// release's attachments (not stored).
+    /// </summary>
+    [NotMapped]
+    public string? ReleaseText { get; set; }
+
+    /// <summary>
     /// Returns a single-line display string combining the type tag, file name,
     /// and note (if any).
     /// </summary>
@@ -49,6 +64,7 @@ public class JobAttachment
         get
         {
             var base_ = $"[{FileType}]  {FileName}";
+            if (!string.IsNullOrEmpty(ReleaseText)) base_ = $"{ReleaseText}:  {base_}";
             return string.IsNullOrWhiteSpace(Notes) ? base_ : $"{base_}  —  {Notes}";
         }
     }

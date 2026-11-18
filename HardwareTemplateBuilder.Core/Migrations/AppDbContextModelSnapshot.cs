@@ -403,6 +403,9 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("ReleaseId")
+                        .HasColumnType("int");
+
                     b.Property<string>("StoredPath")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");

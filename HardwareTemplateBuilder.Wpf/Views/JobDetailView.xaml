@@ -23,10 +23,11 @@
             <StackPanel>
 
                 <!-- Job Attachments sub-panel -->
-                <GroupBox Header="Job Attachments" Margin="0,0,0,8">
+                <GroupBox x:Name="AttachmentsGroup" Header="Job Attachments" Margin="0,0,0,8">
                     <StackPanel>
                         
                         <StackPanel x:Name="AttachmentsBody">
+                            <CheckBox x:Name="AllReleasesAttachmentsCheck" Content="Show attachments from every release" Margin="0,0,0,4"/>
                             <ListBox x:Name="AttachmentList" Height="110" Margin="0,0,0,8"/>
                             <Grid ui:GridEx.Columns="Auto,*" Margin="0,0,0,6">
                                 <TextBlock Grid.Column="0" Text="Note (optional):" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -37,6 +38,7 @@
                                 <Button x:Name="OpenAttachmentButton"   Content="Open"/>
                                 <Button x:Name="RemoveAttachmentButton" Content="Remove"/>
                                 <Button x:Name="ParsePdfButton" Content="Parse PDF into Bulk Add..."/>
+                                <Button x:Name="MoveAttachmentButton" Content="Move to This Release" Visibility="Collapsed"/>
                             </ui:Stack>
                             <TextBlock x:Name="AttachmentStatusLabel" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"/>
                         </StackPanel>

@@ -22,6 +22,15 @@ public class JobAttachmentRepository : RepositoryBase<JobAttachment>
                 .OrderBy(a => a.DateAdded)
                 .ToList();
 
+    /// <summary>Returns the attachments of one release of the job (null = the base list), ordered by date added.</summary>
+    /// <param name="jobId">The job.</param>
+    /// <param name="releaseId">The release (null = base list).</param>
+    public IEnumerable<JobAttachment> GetByRelease(int jobId, int? releaseId) =>
+        _context.JobAttachments
+                .Where(a => a.JobId == jobId && a.ReleaseId == releaseId)
+                .OrderBy(a => a.DateAdded)
+                .ToList();
+
     /// <inheritdoc/>
     protected override JobAttachment? FindDuplicate(JobAttachment entity) =>
         _context.JobAttachments.FirstOrDefault(a => a.StoredPath == entity.StoredPath);
