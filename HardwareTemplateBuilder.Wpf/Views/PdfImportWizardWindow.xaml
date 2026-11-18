@@ -39,6 +39,13 @@
                     </StackPanel>
                 </GroupBox>
 
+                <GroupBox DockPanel.Dock="Top" x:Name="CatalogPanel" Header="From the product catalog" Padding="6" Margin="0,0,0,8" Visibility="Collapsed">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" x:Name="CatalogButton" Content="Catalog Page..." VerticalAlignment="Top" Margin="8,0,0,0"/>
+                        <TextBlock x:Name="CatalogText" TextWrapping="Wrap"/>
+                    </DockPanel>
+                </GroupBox>
+
                 <ui:Stack DockPanel.Dock="Top" Orientation="Horizontal" Spacing="16" Margin="0,0,0,6">
                     <RadioButton x:Name="ExistingRadio" Content="Existing hardware item" GroupName="Mode" IsChecked="True"/>
                     <RadioButton x:Name="NewRadio" Content="New hardware item" GroupName="Mode"/>

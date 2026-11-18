@@ -58,9 +58,21 @@ public static class HardwarePdfImportService
             knowledge = HardwareImportKnowledge.Load(ctx);
 
         var lines = parsed.Lines.Count > 0 ? parsed.Lines : HardwareImportMatcher.FindKnownCallouts(pages, knowledge);
+        var groups = HardwareImportMatcher.Match(lines, knowledge);
+
+        progress?.Report("Checking the product catalogs...");
+        try
+        {
+            Catalogs.CatalogImportHints.Apply(groups, new Catalogs.CatalogLookupService(DatabaseInitializer.CreateContext), knowledge);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Catalog hints are extra help only.
+        }
+
         return new HardwarePdfAnalysis
         {
-            Groups = HardwareImportMatcher.Match(lines, knowledge),
+            Groups = groups,
             LineCount = lines.Count,
             Formats = parsed.Formats,
             RecognizedPages = text.RecognizedPages,

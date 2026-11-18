@@ -37,6 +37,16 @@
                     </StackPanel>
                 </Border>
 
+                <Border DockPanel.Dock="Top" Name="CatalogPanel" Classes="panel" Margin="0,0,0,8" IsVisible="False">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Name="CatalogButton" Content="Catalog Page..." VerticalAlignment="Top" Margin="8,0,0,0"/>
+                        <StackPanel>
+                            <TextBlock Text="From the product catalog" FontWeight="Bold" Margin="0,0,0,4"/>
+                            <TextBlock Name="CatalogText" TextWrapping="Wrap" FontSize="11"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="16" Margin="0,0,0,6">
                     <RadioButton Name="ExistingRadio" Content="Existing hardware item" GroupName="Mode" IsChecked="True"/>
                     <RadioButton Name="NewRadio" Content="New hardware item" GroupName="Mode"/>

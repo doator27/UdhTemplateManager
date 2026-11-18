@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using HardwareTemplateBuilder.Core.Services.Catalogs;
 using HardwareTemplateBuilder.Core.Services.Import;
 using HardwareTemplateBuilder.Wpf.Helpers;
 using HardwareTemplateBuilder.Wpf.Ui;
@@ -67,6 +68,12 @@ public partial class PdfImportWizardWindow : Win95Window
                 LabelBox.Text = _session!.LabelFor(g, c);
         };
         PickDescriptionButton.Click += async (_, _) => await PickDescriptionAsync();
+        CatalogButton.Click += async (_, _) =>
+        {
+            if (Current is { CatalogInfo: { } info } g)
+                await new CatalogLookupWindow(info.ManufacturerId, _session!.ManufacturerName(info.ManufacturerId), ImportText.StripNotesAndSize(g.Catalog), allowChoose: false)
+                    .ShowDialogAsync(this);
+        };
 
         HeaderText.Text = "Reading the PDF...";
         var progress = new Progress<string>(s => SummaryText.Text = s);
@@ -138,6 +145,8 @@ public partial class PdfImportWizardWindow : Win95Window
             StepPanel.SetVisible(true);
             HeaderText.Text = $"Item {index + 1} of {_steps.Count}: {g.GenericName}";
             SourceText.Text = _session!.SourceText(g);
+            CatalogPanel.SetVisible(g.CatalogInfo != null);
+            CatalogText.Text = g.CatalogInfo?.Summary ?? string.Empty;
             ReasonText.Text = g.Status switch
             {
                 ImportMatchStatus.Matched => $"Identified automatically: {g.Reason}",

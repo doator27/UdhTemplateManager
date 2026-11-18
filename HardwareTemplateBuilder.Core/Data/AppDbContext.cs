@@ -69,6 +69,12 @@ public class AppDbContext : DbContext
     /// <summary>Gets the PDF import's learned manufacturer code → manufacturer aliases.</summary>
     public DbSet<PdfImportManufacturerAlias> PdfImportManufacturerAliases => Set<PdfImportManufacturerAlias>();
 
+    /// <summary>Gets the product catalogs (Maintenance → Product Catalogs).</summary>
+    public DbSet<ProductCatalog> ProductCatalogs => Set<ProductCatalog>();
+
+    /// <summary>Gets the text of each product catalog page.</summary>
+    public DbSet<ProductCatalogPage> ProductCatalogPages => Set<ProductCatalogPage>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -253,6 +259,21 @@ public class AppDbContext : DbContext
         {
             e.Property(a => a.Code).HasMaxLength(50).IsRequired();
             e.HasIndex(a => new { a.Code, a.ManufacturerId }).IsUnique();
+        });
+
+        // Product catalogs (plain manufacturer id); pages cascade with their catalog.
+        modelBuilder.Entity<ProductCatalog>(e =>
+        {
+            e.Property(c => c.Title).HasMaxLength(300).IsRequired();
+            e.Property(c => c.OnlineLink).HasMaxLength(2000);
+            e.Property(c => c.LocalLink).HasMaxLength(2000);
+            e.Property(c => c.LastError).HasMaxLength(1000);
+            e.HasIndex(c => c.ManufacturerId);
+        });
+        modelBuilder.Entity<ProductCatalogPage>(e =>
+        {
+            e.HasOne(p => p.Catalog).WithMany().HasForeignKey(p => p.CatalogId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(p => new { p.CatalogId, p.PageNumber }).IsUnique();
         });
 
         // JobAttachment → Job (cascade: deleting a job removes its attachments)

@@ -87,6 +87,12 @@ public sealed class HardwareImportGroup
     /// <summary>Gets or sets whether the user chose to leave this callout out.</summary>
     public bool Skip { get; set; }
 
+    /// <summary>
+    /// Gets or sets what the manufacturer's product catalogs say about this callout (template
+    /// number, option meanings, description), when it needed review and catalogs were available.
+    /// </summary>
+    public Catalogs.CatalogLookupResult? CatalogInfo { get; set; }
+
     /// <summary>One-line description for lists: "IV  Hinges  5BB1 4 1/2 x 4 1/2".</summary>
     public string DisplayText => $"{ManufacturerCode}  {GenericName}  {Catalog}".Trim();
 }

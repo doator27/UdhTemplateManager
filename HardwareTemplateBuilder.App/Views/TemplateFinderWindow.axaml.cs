@@ -10,6 +10,8 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using HardwareTemplateBuilder.App.Helpers;
 using HardwareTemplateBuilder.Core.Data;
+using HardwareTemplateBuilder.Core.Services.Catalogs;
+using HardwareTemplateBuilder.Core.Services.Import;
 using HardwareTemplateBuilder.Core.Services.TemplateFinder;
 
 namespace HardwareTemplateBuilder.App.Views;
@@ -31,6 +33,8 @@ public partial class TemplateFinderWindow : Window
     private readonly ObservableCollection<TemplateCandidate> _candidates = new();
     private CancellationTokenSource? _cts;
     private List<string> _sites = new();
+    private bool _catalogChecked;
+    private CatalogLookupResult? _catalog;
 
     /// <summary>Parameterless constructor for the XAML designer.</summary>
     public TemplateFinderWindow() : this(new TemplateSearchRequest()) { }
@@ -43,12 +47,7 @@ public partial class TemplateFinderWindow : Window
         InitializeComponent();
         Title = $"Find Template Online - {request.Summary}";
         HeaderText.Text = $"Find Template Online: {request.Summary}";
-        var terms = request.Terms();
-        InfoText.Text =
-            $"Looking for: {(terms.Count > 0 ? string.Join(", ", terms) : "(no model or template number)")}" +
-            (request.Description != null ? $"   Description: {request.Description}" : string.Empty) +
-            (request.BrokenLink != null ? $"\nOld link: {request.BrokenLink}" : string.Empty) +
-            "\nSearches your past links for this manufacturer and the manufacturer's website. Every result is downloaded and checked.";
+        ShowInfo();
 
         CandidatesList.ItemsSource = _candidates;
         Opened += async (_, _) => await SearchAsync();
@@ -63,10 +62,71 @@ public partial class TemplateFinderWindow : Window
         UseButton.Click += (_, _) => { if (CandidatesList.SelectedItem is TemplateCandidate { IsPdf: true } c) Close(c); };
         CancelButton.Click += (_, _) => Close(null);
         CandidatesList.SelectionChanged += async (_, _) => await ShowSelectedAsync();
+        CatalogButton.Click += async (_, _) =>
+        {
+            if (_catalog != null)
+                await new CatalogLookupWindow(_request.ManufacturerId, _request.ManufacturerName, _catalog.Callout, allowChoose: false)
+                    .ShowDialog<CatalogLookupChoice?>(this);
+        };
+    }
+
+    private void ShowInfo()
+    {
+        var terms = _request.Terms();
+        InfoText.Text =
+            $"Looking for: {(terms.Count > 0 ? string.Join(", ", terms) : "(no model or template number)")}" +
+            (_request.Description != null ? $"   Description: {_request.Description}" : string.Empty) +
+            (_request.BrokenLink != null ? $"\nOld link: {_request.BrokenLink}" : string.Empty) +
+            "\nSearches the product catalogs, your past links for this manufacturer and the manufacturer's website. Every result is downloaded and checked.";
+    }
+
+    /// <summary>
+    /// Looks the item up in the manufacturer's product catalogs (once): shows what the catalog
+    /// says and adds the template numbers it gives to the search.
+    /// </summary>
+    private async Task CheckCatalogAsync()
+    {
+        if (_catalogChecked) return;
+        _catalogChecked = true;
+        var callouts = new[] { _request.ModelNumber, _request.TemplateNumber }.Concat(_request.Labels)
+            .Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c!).Distinct().Take(4).ToList();
+        if (callouts.Count == 0) return;
+        try
+        {
+            StatusLabel.Foreground = AppColors.Muted;
+            StatusLabel.Text = "Checking the product catalogs...";
+            var lookup = new CatalogLookupService(DatabaseInitializer.CreateContext);
+            var result = await Task.Run(() =>
+            {
+                if (!lookup.HasCatalogs(_request.ManufacturerId)) return null;
+                CatalogLookupResult? first = null;
+                foreach (var c in callouts)
+                {
+                    var r = lookup.Lookup(_request.ManufacturerId, c);
+                    first ??= r;
+                    if (r.Found) return r;
+                }
+                return first;
+            });
+            if (result == null) return;
+            _catalog = result;
+            CatalogPanel.IsVisible = true;
+            CatalogButton.IsVisible = result.Found;
+            CatalogText.Text = result.Summary;
+            var have = _request.Terms().Select(ImportText.Key).ToHashSet();
+            foreach (var t in result.Templates)
+                if (!have.Contains(ImportText.Key(t.Number))) _request.CatalogTemplateNumbers.Add(t.Number);
+            ShowInfo();
+        }
+        catch
+        {
+            // catalog help is optional
+        }
     }
 
     private async Task SearchAsync()
     {
+        await CheckCatalogAsync();
         if (_sites.Count == 0)
         {
             try { _sites = await Task.Run(() => _service.SitesFor(_request)); } catch { /* no history */ }

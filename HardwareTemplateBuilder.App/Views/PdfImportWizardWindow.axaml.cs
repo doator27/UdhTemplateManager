@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using HardwareTemplateBuilder.App.Helpers;
+using HardwareTemplateBuilder.Core.Services.Catalogs;
 using HardwareTemplateBuilder.Core.Services.Import;
 
 namespace HardwareTemplateBuilder.App.Views;
@@ -64,6 +65,12 @@ public partial class PdfImportWizardWindow : Window
                 LabelBox.Text = _session!.LabelFor(g, c);
         };
         PickDescriptionButton.Click += async (_, _) => await PickDescriptionAsync();
+        CatalogButton.Click += async (_, _) =>
+        {
+            if (Current is { CatalogInfo: { } info } g)
+                await new CatalogLookupWindow(info.ManufacturerId, _session!.ManufacturerName(info.ManufacturerId), ImportText.StripNotesAndSize(g.Catalog), allowChoose: false)
+                    .ShowDialog<CatalogLookupChoice?>(this);
+        };
 
         HeaderText.Text = "Reading the PDF...";
         var progress = new Progress<string>(s => SummaryText.Text = s);
@@ -135,6 +142,8 @@ public partial class PdfImportWizardWindow : Window
             StepPanel.IsVisible = true;
             HeaderText.Text = $"Item {index + 1} of {_steps.Count}: {g.GenericName}";
             SourceText.Text = _session!.SourceText(g);
+            CatalogPanel.IsVisible = g.CatalogInfo != null;
+            CatalogText.Text = g.CatalogInfo?.Summary ?? string.Empty;
             ReasonText.Text = g.Status switch
             {
                 ImportMatchStatus.Matched => $"Identified automatically: {g.Reason}",

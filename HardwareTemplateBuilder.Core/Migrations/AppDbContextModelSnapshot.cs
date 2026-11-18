@@ -623,6 +623,80 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.ToTable("PdfImportManufacturerAliases");
                 });
 
+            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.ProductCatalog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AddedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("IndexedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("LocalLink")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("ManufacturerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OnlineLink")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("PageCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManufacturerId");
+
+                    b.ToTable("ProductCatalogs");
+                });
+
+            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.ProductCatalogPage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CatalogId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PageNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SearchKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CatalogId", "PageNumber")
+                        .IsUnique();
+
+                    b.ToTable("ProductCatalogPages");
+                });
+
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.ProjectManager", b =>
                 {
                     b.Property<int>("Id")
@@ -866,6 +940,17 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.Navigation("IndividualTemplate");
 
                     b.Navigation("Job");
+                });
+
+            modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.ProductCatalogPage", b =>
+                {
+                    b.HasOne("HardwareTemplateBuilder.Core.Models.ProductCatalog", "Catalog")
+                        .WithMany()
+                        .HasForeignKey("CatalogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Catalog");
                 });
 
             modelBuilder.Entity("HardwareTemplateBuilder.Core.Models.Customer", b =>

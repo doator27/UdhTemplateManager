@@ -32,6 +32,12 @@ public sealed class TemplateSearchRequest
     /// <summary>Gets the other callouts to look for: labels used on past jobs, model numbers of items using the template.</summary>
     public List<string> Labels { get; } = new();
 
+    /// <summary>
+    /// Gets the template numbers the product catalog gives for this item (filled in by the finder
+    /// window from <c>CatalogLookupService</c>); searched for right after the model number.
+    /// </summary>
+    public List<string> CatalogTemplateNumbers { get; } = new();
+
     /// <summary>Gets or sets the old link of a broken template.</summary>
     public string? BrokenLink { get; set; }
 
@@ -53,6 +59,7 @@ public sealed class TemplateSearchRequest
     public List<string> Terms()
     {
         var raw = new List<string?> { ModelNumber, TemplateNumber };
+        raw.AddRange(CatalogTemplateNumbers);
         raw.AddRange(Labels);
         var result = new List<string>();
         var seen = new HashSet<string>();

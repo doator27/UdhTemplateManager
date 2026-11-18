@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.ProductCatalogsView">
+    <DockPanel Margin="8">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="Product Catalogs" FontSize="16" FontWeight="Bold"/>
+            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#A7ADB8" Margin="0,2,0,0"
+                       Text="Save each manufacturer's catalogs here. Their text is read once, then Find Template Online, Parse PDF into Bulk Add and the hardware item page look callouts up in them: the template number, what the option codes mean, and the product description."/>
+        </StackPanel>
+
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,300" Margin="0,0,0,8">
+            <TextBlock Grid.Column="0" Text="Manufacturer:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox Grid.Column="1" Name="ManufacturerCombo" HorizontalAlignment="Stretch"/>
+        </Grid>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Right" Name="CancelButton" Content="Stop" IsEnabled="False"/>
+            <TextBlock Name="StatusLabel" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0"/>
+        </DockPanel>
+
+        <Grid ColumnDefinitions="*,8,*">
+            <Border Grid.Column="0" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Saved catalogs" FontWeight="Bold" Margin="0,0,0,6"/>
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" Spacing="6">
+                        <WrapPanel>
+                            <Button Name="AddFileButton" Content="Add PDF File..." Margin="0,0,6,6"/>
+                            <Button Name="ReadButton" Content="Read Text Again" Margin="0,0,6,6"/>
+                            <Button Name="RenameButton" Content="Rename..." Margin="0,0,6,6"/>
+                            <Button Name="OpenButton" Content="Open" Margin="0,0,6,6"/>
+                            <Button Name="RemoveButton" Content="Remove" Margin="0,0,6,6"/>
+                        </WrapPanel>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Grid.Column="0" Name="LinkBox" Watermark="Or paste a catalog link (https://...pdf)"/>
+                            <Button Grid.Column="1" Name="AddLinkButton" Content="Add Link" Margin="6,0,0,0"/>
+                        </Grid>
+                    </StackPanel>
+                    <ListBox Name="CatalogList" FontSize="12"/>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="2" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="10">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Find catalogs online" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" FontSize="11" Foreground="#A7ADB8" Margin="0,0,0,6"
+                               Text="Searches the manufacturer's website (the sites your template links use) for catalogs and price books. Select the ones you want and add them; they are downloaded into your template storage location and read."/>
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+                        <Button Name="FindOnlineButton" Content="Search Website"/>
+                        <Button Name="AddFoundButton" Content="Add Selected" IsEnabled="False" Classes="dashboard-primary"/>
+                        <Button Name="GoogleButton" Content="Search Google in Browser"/>
+                    </StackPanel>
+                    <ListBox Name="FoundList" SelectionMode="Multiple" FontSize="12"/>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

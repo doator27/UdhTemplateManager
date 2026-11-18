@@ -25,6 +25,7 @@
                 <MenuItem Header="_Transfer Job..."          Name="MenuTransferJob" />
                 <MenuItem Header="_Refresh Templates"        Name="MenuRefreshTemplates" />
                 <MenuItem Header="Templates to _Fix..."      Name="MenuTemplateFixList" />
+                <MenuItem Header="Product _Catalogs..."      Name="MenuProductCatalogs" />
                 <MenuItem Header="_Deduplicate Hardware..."  Name="MenuDeduplicateHardware" />
                 <MenuItem Header="_Relink Templates..."      Name="MenuRelinkTemplates" />
                 <Separator />

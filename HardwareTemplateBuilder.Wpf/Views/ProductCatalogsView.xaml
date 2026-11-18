@@ -1,0 +1,54 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+             x:Class="HardwareTemplateBuilder.Wpf.Views.ProductCatalogsView">
+    <DockPanel Margin="8">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}" Margin="0,0,0,6"><TextBlock Text="Product Catalogs" Style="{StaticResource CaptionText}"/></Border>
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Style="{StaticResource Hint}" Margin="0,0,0,6"
+                   Text="Save each manufacturer's catalogs here. Their text is read once, then Find Template Online, Parse PDF into Bulk Add and the hardware item page look callouts up in them: the template number, what the option codes mean, and the product description."/>
+
+        <Grid DockPanel.Dock="Top" ui:GridEx.Columns="Auto,300" Margin="0,0,0,8">
+            <TextBlock Grid.Column="0" Text="Manufacturer:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox Grid.Column="1" x:Name="ManufacturerCombo" DisplayMemberPath="ManufacturerName"/>
+        </Grid>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Right" x:Name="CancelButton" Content="Stop" IsEnabled="False"/>
+            <TextBlock x:Name="StatusLabel" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0"/>
+        </DockPanel>
+
+        <Grid ui:GridEx.Columns="*,8,*">
+            <GroupBox Grid.Column="0" Header="Saved catalogs" Padding="6">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                        <WrapPanel>
+                            <Button x:Name="AddFileButton" Content="Add PDF File..." Margin="0,0,6,6"/>
+                            <Button x:Name="ReadButton" Content="Read Text Again" Margin="0,0,6,6"/>
+                            <Button x:Name="RenameButton" Content="Rename..." Margin="0,0,6,6"/>
+                            <Button x:Name="OpenButton" Content="Open" Margin="0,0,6,6"/>
+                            <Button x:Name="RemoveButton" Content="Remove" Margin="0,0,6,6"/>
+                        </WrapPanel>
+                        <Grid ui:GridEx.Columns="*,Auto">
+                            <TextBox Grid.Column="0" x:Name="LinkBox" ui:Watermark.Text="Or paste a catalog link (https://...pdf)"/>
+                            <Button Grid.Column="1" x:Name="AddLinkButton" Content="Add Link" Margin="6,0,0,0"/>
+                        </Grid>
+                    </StackPanel>
+                    <ListBox x:Name="CatalogList" FontSize="11"/>
+                </DockPanel>
+            </GroupBox>
+
+            <GroupBox Grid.Column="2" Header="Find catalogs online" Padding="6">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Style="{StaticResource Hint}" Margin="0,0,0,6"
+                               Text="Searches the manufacturer's website (the sites your template links use) for catalogs and price books. Select the ones you want and add them; they are downloaded into your template storage location and read."/>
+                    <ui:Stack DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+                        <Button x:Name="FindOnlineButton" Content="Search Website"/>
+                        <Button x:Name="AddFoundButton" Content="Add Selected" IsEnabled="False"/>
+                        <Button x:Name="GoogleButton" Content="Search Google in Browser"/>
+                    </ui:Stack>
+                    <ListBox x:Name="FoundList" SelectionMode="Extended" FontSize="11"/>
+                </DockPanel>
+            </GroupBox>
+        </Grid>
+    </DockPanel>
+</UserControl>

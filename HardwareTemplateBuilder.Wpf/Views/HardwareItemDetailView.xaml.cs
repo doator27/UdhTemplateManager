@@ -14,6 +14,7 @@ using HardwareTemplateBuilder.Wpf.Ui;
 using System.Threading.Tasks;
 
 using HardwareTemplateBuilder.Core.Services.TemplateFinder;
+using HardwareTemplateBuilder.Core.Services.Catalogs;
 
 namespace HardwareTemplateBuilder.Wpf.Views;
 
@@ -30,6 +31,7 @@ public partial class HardwareItemDetailView : UserControl
     private int _itemManufacturerId;
     private int _itemDescriptionId;
     private string _itemModelNumber = string.Empty;
+    private string _itemManufacturerName = string.Empty;
     private int _editingTemplateId;
     private List<DescriptionComboItem> _descComboItems = new();
     private List<DoorMaterial> _doorMaterials = new();
@@ -68,6 +70,7 @@ public partial class HardwareItemDetailView : UserControl
         _itemManufacturerId = item?.ManufacturerId ?? 0;
         _itemDescriptionId  = item?.DescriptionId  ?? 0;
         _itemModelNumber    = item?.ModelNumber    ?? string.Empty;
+        _itemManufacturerName = item?.Manufacturer?.ManufacturerName ?? string.Empty;
 
         var allRawDescs = new DescriptionRepository(context).GetAll().ToList();
         _descComboItems = DescriptionHelper.BuildComboItems(allRawDescs, activeOnly: true);
@@ -103,6 +106,7 @@ public partial class HardwareItemDetailView : UserControl
         ApplyAddDefaults();
         AddTemplateButton.Click    += async (_, _) => await AddLinkTemplateAsync();
         FindOnlineButton.Click     += async (_, _) => await FindTemplateOnlineAsync();
+        CatalogLookupButton.Click  += async (_, _) => await LookUpInCatalogAsync();
         RequestedFromManufacturerButton.Click += (_, _) => AddRequestedFromManufacturerLink();
         BrowseLocalLinkButton.Click += async (_, _) => await BrowseLocalLinkAsync();
         SearchDescCombo.SelectionChanged += (_, _) => SearchTemplates();
@@ -301,6 +305,42 @@ public partial class HardwareItemDetailView : UserControl
         if (string.IsNullOrWhiteSpace(AddTemplateNumBox.Text)) AddTemplateNumBox.Text = GuessTemplateNumber(found);
         AddStatusLabel.Foreground = AppColors.Success;
         AddStatusLabel.Text = "Link filled in from Find Online. Check the template details, then add or save the template.";
+    }
+
+    /// <summary>
+    /// Opens the product catalog lookup for this item's model number. A template already in the
+    /// database is linked straight away; otherwise the template number (and the description that
+    /// fits the catalog wording) are filled into the template form for the user to finish.
+    /// </summary>
+    private async Task LookUpInCatalogAsync()
+    {
+        var window = this.OwnerWindow();
+        if (window == null || _itemManufacturerId == 0) return;
+        var choice = await new CatalogLookupWindow(_itemManufacturerId, _itemManufacturerName, _itemModelNumber, allowChoose: true)
+            .ShowDialogAsync<CatalogLookupChoice>(window);
+        if (choice == null) return;
+
+        if (choice.TemplateId is int templateId)
+        {
+            using var context = DatabaseInitializer.CreateContext();
+            var link  = new HardwareItemTemplate { HardwareItemId = _itemId, IndividualTemplateId = templateId };
+            var saved = new HardwareItemTemplateRepository(context).Add(link);
+            AddStatusLabel.Foreground = AppColors.Success;
+            AddStatusLabel.Text = ReferenceEquals(saved, link)
+                ? $"Linked template {choice.TemplateNumber} (from the product catalog)."
+                : $"Template {choice.TemplateNumber} is already linked.";
+            LoadLinkedTemplates();
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(choice.TemplateNumber)) AddTemplateNumBox.Text = choice.TemplateNumber;
+        if (choice.DescriptionId is int descId && AddDescCombo.ItemsSource is System.Collections.IEnumerable items &&
+            items.OfType<DescriptionComboItem>().FirstOrDefault(d => d.Id == descId) is { } desc)
+            AddDescCombo.SelectedItem = desc;
+        AddStatusLabel.Foreground = AppColors.Success;
+        AddStatusLabel.Text = "Template # filled in from the product catalog" +
+            (choice.Description != null ? $" ({choice.Description})" : string.Empty) +
+            ". Add the template's link or file (Find Online... can search for it), then add the template.";
     }
 
     /// <summary>A template number to suggest for a found PDF: the search term it mentions, else its file name.</summary>

@@ -151,6 +151,24 @@ public sealed class TemplateFinderService
             await CheckAll(links, "Trying the old link").ConfigureAwait(false);
         }
 
+        // 1b. Templates already in the database under a number the product catalog gives.
+        if (request.CatalogTemplateNumbers.Count > 0)
+        {
+            var keys = request.CatalogTemplateNumbers.Select(ImportText.Key).Where(k => k.Length > 0).ToHashSet();
+            List<(string Number, string Link)> mine;
+            using (var ctx = _contextFactory())
+            {
+                mine = ctx.IndividualTemplates
+                    .Where(t => t.ManufacturerId == request.ManufacturerId && t.OnlineLink != null && t.OnlineLink != "")
+                    .Select(t => new { t.TemplateNumber, t.OnlineLink })
+                    .ToList()
+                    .Where(t => keys.Contains(ImportText.Key(t.TemplateNumber)))
+                    .Select(t => (t.TemplateNumber, t.OnlineLink!))
+                    .ToList();
+            }
+            await CheckAll(mine.Select(m => (m.Link, $"Your template {m.Number} (from the catalog)", 60)), "Trying your templates the catalog names").ConfigureAwait(false);
+        }
+
         // 2. Patterns from this manufacturer's past links.
         List<(string Number, string Link)> history;
         using (var ctx = _contextFactory())
@@ -171,7 +189,8 @@ public sealed class TemplateFinderService
             progress?.Report($"Searching {site}...");
             try
             {
-                var links = await CrawlSiteAsync(site, terms, request.Description, progress, cancellationToken).ConfigureAwait(false);
+                var keys = terms.Select(ImportText.Key).Where(k => k.Length >= 3).Distinct().ToList();
+                var links = await CrawlSiteAsync(site, url => UrlScore(url, keys), MapScore, progress, cancellationToken).ConfigureAwait(false);
                 await CheckAll(links.Select(l => (l.Url, $"{site} website", l.Score)), $"Searching {site}").ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -266,10 +285,14 @@ public sealed class TemplateFinderService
         return hosts;
     }
 
+    /// <summary>
+    /// Walks a site's site maps (robots.txt rules obeyed) and the best-scoring pages they list,
+    /// and returns the PDF links found with their scores. <paramref name="urlScore"/> scores PDF
+    /// and page URLs (0 = not interesting); <paramref name="mapScore"/> orders child site maps.
+    /// </summary>
     private async Task<List<(string Url, int Score)>> CrawlSiteAsync(
-        string host, IReadOnlyList<string> terms, string? description, IProgress<string>? progress, CancellationToken ct)
+        string host, Func<string, int> urlScore, Func<string, int> mapScore, IProgress<string>? progress, CancellationToken ct)
     {
-        var keys = terms.Select(ImportText.Key).Where(k => k.Length >= 3).Distinct().ToList();
         var results = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var pages = new List<(string Url, int Score)>();
 
@@ -319,11 +342,10 @@ public sealed class TemplateFinderService
                 bool isMap = xml.Contains("<sitemapindex", StringComparison.OrdinalIgnoreCase) || lower.EndsWith(".xml") || lower.EndsWith(".xml.gz");
                 if (isMap)
                 {
-                    int s = Regex.IsMatch(lower, "pdf|document|asset|media|file|literature|resource|product|download") ? 10 : 1;
-                    childMaps.Add((url, s));
+                    childMaps.Add((url, mapScore(lower)));
                     continue;
                 }
-                int score = UrlScore(url, keys);
+                int score = urlScore(url);
                 if (score <= 0) continue;
                 if (lower.Contains(".pdf")) results[url] = Math.Max(results.GetValueOrDefault(url), score + 20);
                 else pages.Add((url, score));
@@ -339,12 +361,79 @@ public sealed class TemplateFinderService
             if (string.IsNullOrEmpty(html)) continue;
             foreach (var link in PdfLinks(html, page.Url).Where(l => !SameHost(l, host) || rules.IsAllowed(l)))
             {
-                int score = UrlScore(link, keys) + page.Score / 2 + 5;
+                int score = urlScore(link) + page.Score / 2 + 5;
                 results[link] = Math.Max(results.GetValueOrDefault(link), score);
             }
         }
         return results.Select(r => (r.Key, r.Value)).OrderByDescending(r => r.Value).ToList();
     }
+
+    private static int MapScore(string lowerUrl) =>
+        Regex.IsMatch(lowerUrl, "pdf|document|asset|media|file|literature|resource|product|download") ? 10 : 1;
+
+    // ── Product catalogs ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Looks for product catalog PDFs (catalogs, price books, product guides) on the
+    /// manufacturer's website(s), the same way the template search crawls them. Links are not
+    /// downloaded: the user picks which ones to add. Sites with bot protection end up in
+    /// <see cref="BlockedSites"/>.
+    /// </summary>
+    /// <param name="manufacturerId">The manufacturer (its past template links tell which sites to search).</param>
+    /// <param name="manufacturerName">Its name (used to guess the site when there are no past links).</param>
+    /// <param name="progress">Status text.</param>
+    /// <param name="cancellationToken">Cancels the search.</param>
+    public async Task<List<(string Url, int Score)>> FindCatalogLinksAsync(
+        int manufacturerId, string manufacturerName, IProgress<string>? progress, CancellationToken cancellationToken)
+    {
+        _blockedSites.Clear();
+        var sites = SitesFor(new TemplateSearchRequest { ManufacturerId = manufacturerId, ManufacturerName = manufacturerName });
+        var found = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var site in sites)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report($"Searching {site} for catalogs...");
+            try
+            {
+                foreach (var (url, score) in await CrawlSiteAsync(site, CatalogUrlScore, CatalogMapScore, progress, cancellationToken).ConfigureAwait(false))
+                {
+                    if (!url.Contains(".pdf", StringComparison.OrdinalIgnoreCase) || CatalogUrlScore(url) <= 0) continue;
+                    found[url] = Math.Max(found.GetValueOrDefault(url), score);
+                }
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // site too slow: move on
+            }
+            catch (HttpRequestException)
+            {
+                // site unreachable: move on
+            }
+        }
+        progress?.Report(found.Count == 0 ? "No catalogs found." : $"Found {found.Count} catalog link(s).");
+        return found.Select(f => (f.Key, f.Value)).OrderByDescending(f => f.Item2).ThenBy(f => f.Item1).ToList();
+    }
+
+    /// <summary>Scores a URL as a product catalog: "catalog", "price book", "product guide" and similar; 0 = not a catalog.</summary>
+    /// <param name="url">The URL.</param>
+    public static int CatalogUrlScore(string url)
+    {
+        var lower = Uri.UnescapeDataString(url).ToLowerInvariant();
+        int score = 0;
+        if (Regex.IsMatch(lower, "catalog|catalogue")) score += 30;
+        if (Regex.IsMatch(lower, @"price[\s_\-]?(book|list)|pricebook")) score += 25;
+        if (Regex.IsMatch(lower, @"product[\s_\-]?(guide|line|selection)|specifier|selection[\s_\-]?guide|ordering[\s_\-]?(guide|info)")) score += 15;
+        if (score == 0)
+        {
+            // Pages that usually link to catalogs (read for their PDF links, never added themselves).
+            return lower.Contains(".pdf") ? 0 : Regex.IsMatch(lower, "literature|catalog|download|resource|document|library") ? 8 : 0;
+        }
+        if (Regex.IsMatch(lower, "template|install|instruction|warranty|certificate|declaration|msds|sds")) score -= 20;
+        return Math.Max(score, 1);
+    }
+
+    private static int CatalogMapScore(string lowerUrl) =>
+        Regex.IsMatch(lowerUrl, "pdf|document|asset|media|file|literature|resource|download|catalog") ? 10 : 1;
 
     /// <summary>Scores a URL: contains a search term (longer = better), mentions template/instructions.</summary>
     /// <param name="url">The URL.</param>
