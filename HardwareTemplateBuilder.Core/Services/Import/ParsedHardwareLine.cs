@@ -27,6 +27,9 @@ public sealed class ParsedHardwareLine
     /// <summary>Gets or sets the hardware set / heading (or openings) the line belongs to.</summary>
     public string? SetName { get; set; }
 
+    /// <summary>Gets or sets the line's extended (total) cost on a costing report, if printed.</summary>
+    public decimal? ExtendedCost { get; set; }
+
     /// <summary>Gets or sets the 1-based page number.</summary>
     public int Page { get; set; }
 }

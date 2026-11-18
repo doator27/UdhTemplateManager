@@ -157,6 +157,28 @@ public class PdfImportParserTests
     }
 
     [Fact]
+    public void Costing_NamesCodesFromTheCostSummary()
+    {
+        var r = HardwarePdfParser.Parse(LoadPages("costing_full.txt"));
+
+        Assert.Contains("Component costing", r.Formats);
+        Assert.Equal("Accurate Lock", r.ManufacturerCodes["AC01"]);
+        Assert.Equal("SIMONSWERK North America", r.ManufacturerCodes["S701"]);
+        Assert.Equal("Hafele America Co.", r.ManufacturerCodes["HF01"]);
+        Assert.Equal("Rajack Hardware", r.ManufacturerCodes["RA01"]);
+        Assert.Equal("Marks Locks", r.ManufacturerCodes["MK01"]);
+        Assert.Equal("LCN Closers", r.ManufacturerCodes["LC"]);
+        Assert.Equal("Various", r.ManufacturerCodes["VA01"]);
+        Assert.All(r.Lines.Where(l => l.ManufacturerCode == "AC01"), l => Assert.Equal("Accurate Lock", l.ManufacturerName));
+
+        // Every priced line is read (the summary pages add none), finishes come off the locks.
+        Assert.Equal(60817.00m, r.Lines.Sum(l => l.ExtendedCost ?? 0));
+        var privacy = r.Lines.Where(l => l.Catalog.StartsWith("9539ML.212", StringComparison.Ordinal)).ToList();
+        Assert.Equal(5, privacy.Count);
+        Assert.Single(privacy.Select(l => ImportText.Key(l.Catalog)).Distinct());
+    }
+
+    [Fact]
     public void LayoutBuilder_KeepsColumns()
     {
         var words = new List<PdfWord>

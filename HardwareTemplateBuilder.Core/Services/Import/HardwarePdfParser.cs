@@ -84,7 +84,11 @@ public static class HardwarePdfParser
                 schedule |= ParseSchedulePage(lines, p + 1, result, ref heading);
         }
         if (schedule) result.Formats.Add("Hardware schedule");
-        if (costing) result.Formats.Add("Component costing");
+        if (costing)
+        {
+            result.Formats.Add("Component costing");
+            MatchCostSummaryNames(pages, result);
+        }
         if (machining) result.Formats.Add("Door machining sheet");
 
         foreach (var line in result.Lines)
@@ -366,8 +370,12 @@ public static class HardwarePdfParser
                 Finish();
                 current = new ParsedHardwareLine { ManufacturerCode = ImportText.CleanManufacturerCode(m.Groups[1].Value), Page = page };
                 text = m.Groups[2].Value.Trim();
-                var qty = Regex.Match(line, @"\s(\d{1,5})\s+[\d,]+\.\d\d\s*$");
-                if (qty.Success) current.Quantity = int.Parse(qty.Groups[1].Value);
+                var qty = Regex.Match(line, @"\s(\d{1,5})\s+([\d,]+\.\d\d)\s*$");
+                if (qty.Success)
+                {
+                    current.Quantity = int.Parse(qty.Groups[1].Value);
+                    current.ExtendedCost = decimal.Parse(qty.Groups[2].Value.Replace(",", string.Empty), System.Globalization.CultureInfo.InvariantCulture);
+                }
                 continue;
             }
             if (current == null) continue;
@@ -388,6 +396,46 @@ public static class HardwarePdfParser
             }
         }
         Finish();
+    }
+
+    private static readonly Regex SummaryTotalRegex = new(@"^\s*(\S.*?)\s+Total:\s+.*?([\d,]+\.\d\d)\s*$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Works out the manufacturer names behind a costing report's codes ("AC01", "S701") from its
+    /// "Project Cost Summary": each manufacturer's net total there equals the sum of its code's
+    /// extended costs ("Accurate Lock Total: … 27,944.00" = every AC01 line). Only totals that
+    /// match exactly one name and one code are used; codes the PDF already names are kept.
+    /// </summary>
+    private static void MatchCostSummaryNames(IReadOnlyList<IReadOnlyList<string>> pages, HardwarePdfParseResult result)
+    {
+        var names = new List<(string Name, decimal Total)>();
+        foreach (var lines in pages)
+        {
+            if (!lines.Any(l => l.Contains("Cost Summary", StringComparison.OrdinalIgnoreCase))) continue;
+            foreach (var line in lines)
+            {
+                var m = SummaryTotalRegex.Match(line);
+                if (!m.Success) continue;
+                var name = m.Groups[1].Value.Trim();
+                if (name.Length < 2 || !name.Any(char.IsLetter)) continue;
+                names.Add((name, decimal.Parse(m.Groups[2].Value.Replace(",", string.Empty), System.Globalization.CultureInfo.InvariantCulture)));
+            }
+        }
+        if (names.Count == 0) return;
+
+        var codeTotals = result.Lines
+            .Where(l => l.ManufacturerCode.Length > 0 && l.ExtendedCost != null)
+            .GroupBy(l => l.ManufacturerCode, StringComparer.OrdinalIgnoreCase)
+            .Select(g => (Code: g.Key, Total: g.Sum(l => l.ExtendedCost!.Value)))
+            .ToList();
+        foreach (var (code, total) in codeTotals)
+        {
+            if (result.ManufacturerCodes.ContainsKey(code)) continue;
+            var byName = names.Where(n => Math.Abs(n.Total - total) < 0.02m).ToList();
+            var byCode = codeTotals.Count(c => Math.Abs(c.Total - total) < 0.02m);
+            if (byName.Count == 1 && byCode == 1)
+                result.ManufacturerCodes[code] = Regex.Replace(byName[0].Name, @"\s+-\s+'.*'$", string.Empty);
+        }
     }
 
     /// <summary>
