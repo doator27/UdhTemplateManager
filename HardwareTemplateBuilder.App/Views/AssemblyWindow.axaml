@@ -8,9 +8,11 @@
         <TextBlock DockPanel.Dock="Top" Name="HeaderText" FontSize="16" FontWeight="Bold" TextWrapping="Wrap" Margin="0,0,0,4"/>
         <TextBlock DockPanel.Dock="Top" Name="IntroText" TextWrapping="Wrap" Foreground="#A7ADB8" FontSize="12" Margin="0,0,0,8"/>
 
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
             <TextBlock Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <TextBox Grid.Column="1" Name="DescriptionBox" Watermark="Starts the label, e.g. Exit Device Assembly (blank = callouts only)"/>
+            <TextBox Grid.Column="1" Name="DescriptionBox" IsReadOnly="True" Watermark="Starts the label (none = callouts only)"/>
+            <Button Grid.Column="2" Name="ChooseDescriptionButton" Content="Choose..." Margin="6,0,0,0"/>
+            <Button Grid.Column="3" Name="ClearDescriptionButton" Content="Clear" Margin="6,0,0,0"/>
         </Grid>
 
         <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,8,0,0">

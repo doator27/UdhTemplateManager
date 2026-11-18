@@ -30,6 +30,9 @@ public sealed class LearnedAssembly
     /// <summary>Gets or sets the description that started its label.</summary>
     public string Description { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the description (category) it was given, if any.</summary>
+    public int? DescriptionId { get; set; }
+
     /// <summary>Gets or sets how many times it was made.</summary>
     public int Count { get; set; }
 
@@ -94,7 +97,8 @@ public static class HardwareImportAssemblies
     /// <param name="anchor">The assembly's callout.</param>
     /// <param name="parts">The parts.</param>
     /// <param name="description">The description that starts the label.</param>
-    public static void Apply(HardwareImportGroup anchor, IEnumerable<HardwareImportGroup> parts, string? description)
+    /// <param name="descriptionId">The description (category) it comes from, if any.</param>
+    public static void Apply(HardwareImportGroup anchor, IEnumerable<HardwareImportGroup> parts, string? description, int? descriptionId = null)
     {
         string oldLabel = anchor.IsAssembly ? Label(anchor.AssemblyDescription, anchor, anchor.AssemblyParts) : string.Empty;
         foreach (var p in anchor.AssemblyParts) p.PartOfAssembly = null;
@@ -107,6 +111,8 @@ public static class HardwareImportAssemblies
             anchor.AssemblyParts.Add(p);
         }
         anchor.AssemblyDescription = (description ?? string.Empty).Trim();
+        anchor.AssemblyDescriptionId = anchor.IsAssembly ? descriptionId : null;
+        anchor.LabelChoices.Clear();
         if (anchor.IsAssembly)
             anchor.Label = Label(anchor.AssemblyDescription, anchor, anchor.AssemblyParts);
         else if (oldLabel.Length > 0 && string.Equals(anchor.Label, oldLabel, StringComparison.Ordinal))
@@ -135,7 +141,11 @@ public static class HardwareImportAssemblies
                     string.Equals(ImportText.CleanManufacturerCode(c.ManufacturerCode), ImportText.CleanManufacturerCode(part.Code), StringComparison.OrdinalIgnoreCase));
                 if (hit != null && !anchor.SuggestedAssemblyParts.Contains(hit)) anchor.SuggestedAssemblyParts.Add(hit);
             }
-            if (anchor.SuggestedAssemblyParts.Count > 0) anchor.SuggestedAssemblyDescription = a.Description;
+            if (anchor.SuggestedAssemblyParts.Count > 0)
+            {
+                anchor.SuggestedAssemblyDescription = a.Description;
+                anchor.SuggestedAssemblyDescriptionId = a.DescriptionId;
+            }
         }
     }
 
@@ -157,6 +167,7 @@ public static class HardwareImportAssemblies
             }
             existing.Parts = parts;
             existing.Description = g.AssemblyDescription;
+            existing.DescriptionId = g.AssemblyDescriptionId;
             existing.Count++;
             existing.LastUsedUtc = DateTime.UtcNow;
         }

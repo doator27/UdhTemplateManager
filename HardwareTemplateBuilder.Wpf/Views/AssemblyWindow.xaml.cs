@@ -9,12 +9,13 @@ namespace HardwareTemplateBuilder.Wpf.Views;
 
 /// <summary>What the user chose in the <see cref="AssemblyWindow"/>.</summary>
 /// <param name="Parts">The parts (empty = not an assembly).</param>
-/// <param name="Description">The description that starts the label.</param>
-public sealed record AssemblyChoice(List<HardwareImportGroup> Parts, string Description);
+/// <param name="Description">The description text that starts the label.</param>
+/// <param name="DescriptionId">The description (category) chosen from the tree, if any.</param>
+public sealed record AssemblyChoice(List<HardwareImportGroup> Parts, string Description, int? DescriptionId = null);
 
 /// <summary>
 /// Parse PDF into Bulk Add: makes a callout an assembly. Lists the other callouts in the same
-/// heading/set (or every heading) with tick boxes, takes a description, and shows the label the
+/// heading/set (or every heading) with tick boxes, takes a description from the Description tree, and shows the label the
 /// assembly line will get (description, then each callout, joined with " | ",
 /// <see cref="HardwareImportAssemblies.Label"/>). Returns an <see cref="AssemblyChoice"/>
 /// (no parts = "Not an Assembly"), or null when cancelled.
@@ -24,6 +25,8 @@ public partial class AssemblyWindow : Win95Window
     private readonly HardwareImportSession? _session;
     private readonly HardwareImportGroup? _anchor;
     private readonly HashSet<HardwareImportGroup> _ticked = new();
+    private int? _descriptionId;
+    private string _descriptionText = string.Empty;
 
     /// <summary>Parameterless constructor for the XAML designer.</summary>
     public AssemblyWindow() => InitializeComponent();
@@ -39,9 +42,13 @@ public partial class AssemblyWindow : Win95Window
 
         bool suggested = !anchor.IsAssembly && anchor.SuggestedAssemblyParts.Count > 0;
         foreach (var p in anchor.IsAssembly ? anchor.AssemblyParts : anchor.SuggestedAssemblyParts) _ticked.Add(p);
-        DescriptionBox.Text = anchor.IsAssembly ? anchor.AssemblyDescription
-            : suggested ? anchor.SuggestedAssemblyDescription ?? string.Empty
-            : anchor.GenericName;
+        if (anchor.IsAssembly) SetDescription(anchor.AssemblyDescriptionId, anchor.AssemblyDescription);
+        else if (suggested) SetDescription(anchor.SuggestedAssemblyDescriptionId, anchor.SuggestedAssemblyDescription ?? string.Empty);
+        else
+        {
+            int? id = anchor.CreateNew ? anchor.NewDescriptionId : session.Item(anchor.HardwareItemId)?.DescriptionId ?? anchor.NewDescriptionId;
+            SetDescription(id, string.Empty);
+        }
         var sets = anchor.Sets;
         HeaderText.Text = $"Assembly: {anchor.GenericName}  {anchor.Catalog}";
         IntroText.Text =
@@ -53,7 +60,12 @@ public partial class AssemblyWindow : Win95Window
         AllHeadingsCheck.IsChecked = _ticked.Any(p => !HardwareImportAssemblies.Candidates(anchor, session.Analysis.Groups, false).Contains(p));
 
         AllHeadingsCheck.Click += (_, _) => BuildList();
-        DescriptionBox.TextChanged += (_, _) => UpdatePreview();
+        ChooseDescriptionButton.Click += async (_, _) =>
+        {
+            var picker = new DescriptionPickerWindow(session.Descriptions.Where(d => d.IsActive), leafOnly: false);
+            if (await picker.ShowDialogAsync<int?>(this) is int picked) SetDescription(picked, string.Empty);
+        };
+        ClearDescriptionButton.Click += (_, _) => SetDescription(null, string.Empty);
         OkButton.Click += (_, _) =>
         {
             if (_ticked.Count == 0)
@@ -93,8 +105,18 @@ public partial class AssemblyWindow : Win95Window
         UpdatePreview();
     }
 
+    /// <summary>Sets the description: from the tree when <paramref name="id"/> is known, else the old text.</summary>
+    private void SetDescription(int? id, string fallbackText)
+    {
+        var d = id == null ? null : _session?.Descriptions.FirstOrDefault(x => x.Id == id);
+        _descriptionId = d?.Id;
+        _descriptionText = d?.DescriptionText ?? fallbackText.Trim();
+        DescriptionBox.Text = d != null ? _session!.DescriptionPath(d.Id) : _descriptionText;
+        UpdatePreview();
+    }
+
     private AssemblyChoice Result() =>
-        new(_session!.Analysis.Groups.Where(_ticked.Contains).ToList(), (DescriptionBox.Text ?? string.Empty).Trim());
+        new(_session!.Analysis.Groups.Where(_ticked.Contains).ToList(), _descriptionText, _descriptionId);
 
     private void UpdatePreview()
     {

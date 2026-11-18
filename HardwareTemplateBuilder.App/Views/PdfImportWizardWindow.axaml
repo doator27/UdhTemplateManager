@@ -27,15 +27,18 @@
                 <ListBox Name="SummaryList" FontFamily="Consolas,Menlo,monospace" FontSize="11"/>
             </DockPanel>
 
-            <!-- Similar callouts: keep which, one item or separate items -->
+            <!-- Similar callouts: sort them into items -->
             <DockPanel Name="ClusterPanel" IsVisible="False">
                 <TextBlock DockPanel.Dock="Top" Name="ClusterIntro" TextWrapping="Wrap" Margin="0,0,0,8"/>
                 <Border DockPanel.Dock="Bottom" Classes="panel" Margin="0,8,0,0">
-                    <StackPanel Spacing="4">
-                        <RadioButton Name="CombineRadio" GroupName="Similar" IsChecked="True"
-                                     Content="They're the same item: combine the ticked ones into one"/>
-                        <RadioButton Name="SeparateRadio" GroupName="Similar"
-                                     Content="They're different items: keep the ticked ones as separate items"/>
+                    <StackPanel Spacing="6">
+                        <TextBlock Name="ClusterProgress" TextWrapping="Wrap" FontWeight="Bold"/>
+                        <WrapPanel>
+                            <Button Name="SameItemButton" Content="Ticked Are the Same Item" Classes="dashboard-primary" Margin="0,0,6,6"/>
+                            <Button Name="EachItemButton" Content="Each Ticked Is Its Own Item" Margin="0,0,6,6"/>
+                            <Button Name="LeaveOutButton" Content="Leave Ticked Out" Margin="0,0,6,6"/>
+                            <Button Name="ResetClusterButton" Content="Start Over" Margin="0,0,6,6"/>
+                        </WrapPanel>
                     </StackPanel>
                 </Border>
                 <ScrollViewer>
@@ -78,9 +81,16 @@
                 <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,0,0,6">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer:" VerticalAlignment="Center" Margin="0,0,8,4"/>
                     <ComboBox Grid.Row="0" Grid.Column="1" Name="ManufacturerCombo" Margin="0,0,0,4" HorizontalAlignment="Stretch"/>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Label:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Name="LabelCaption" Text="Label:" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBox Grid.Row="1" Grid.Column="1" Name="LabelBox" Watermark="Label on the job (blank = none)"/>
                 </Grid>
+
+                <Border DockPanel.Dock="Top" Name="LabelsPanel" Classes="panel" Margin="0,0,0,6" IsVisible="False">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Labels for the cover sheet (each ticked label is its own line; edit as needed)" FontWeight="Bold"/>
+                        <StackPanel Name="LabelRows" Spacing="4"/>
+                    </StackPanel>
+                </Border>
 
                 <Grid DockPanel.Dock="Top" Name="NewPanel" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,6" IsVisible="False">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Description:" VerticalAlignment="Center" Margin="0,0,8,4"/>

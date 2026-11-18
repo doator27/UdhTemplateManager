@@ -6,27 +6,69 @@ namespace HardwareTemplateBuilder.Core.Services.Import;
 
 /// <summary>
 /// A set of callouts from one PDF that look like variations of the same product
-/// ("TE 640 3D A8 038" / "… 144" / "… 174", "4040XP RWPA" / "4040XP CUSH"). The wizard asks
-/// which ones to keep and whether they are one item or separate items.
+/// ("TE 640 3D A8 038" / "… 144" / "… 174", "4040XP RWPA" / "4040XP CUSH"). On its wizard page
+/// the user sorts them: ticks the ones that are the same item and groups them (repeatedly),
+/// makes some their own item, or leaves some out. The page is done when at most one callout is
+/// still unsorted (it becomes its own item).
 /// </summary>
 public sealed class SimilarCluster
 {
-    /// <summary>Creates a cluster; all callouts are kept and combined by default.</summary>
+    /// <summary>Creates a cluster with nothing sorted yet.</summary>
     /// <param name="groups">The callouts, in PDF order.</param>
-    public SimilarCluster(IEnumerable<HardwareImportGroup> groups)
-    {
-        Groups = groups.ToList();
-        foreach (var g in Groups) Keep.Add(g);
-    }
+    public SimilarCluster(IEnumerable<HardwareImportGroup> groups) => Groups = groups.ToList();
 
     /// <summary>Gets the callouts, in PDF order.</summary>
     public List<HardwareImportGroup> Groups { get; }
 
-    /// <summary>Gets the callouts to keep (the others are left out of this job).</summary>
-    public HashSet<HardwareImportGroup> Keep { get; } = new();
+    /// <summary>Gets the groups made so far: each is one item (a single callout = its own item).</summary>
+    public List<List<HardwareImportGroup>> Items { get; } = new();
 
-    /// <summary>Gets or sets whether the kept callouts are the same item (combined into one) rather than separate items.</summary>
-    public bool Combine { get; set; } = true;
+    /// <summary>Gets the callouts left out of this job.</summary>
+    public HashSet<HardwareImportGroup> LeftOut { get; } = new();
+
+    /// <summary>The callouts not sorted yet, in PDF order.</summary>
+    public List<HardwareImportGroup> Unsorted =>
+        Groups.Where(g => !LeftOut.Contains(g) && !Items.Any(i => i.Contains(g))).ToList();
+
+    /// <summary>True when the page can be left: at most one callout is unsorted.</summary>
+    public bool IsDone => Unsorted.Count <= 1;
+
+    /// <summary>Makes the given callouts one item (they are the same item).</summary>
+    /// <param name="sameItem">The callouts.</param>
+    public void AddItem(IEnumerable<HardwareImportGroup> sameItem)
+    {
+        var list = Groups.Where(sameItem.Contains).Where(g => Unsorted.Contains(g)).ToList();
+        if (list.Count > 0) Items.Add(list);
+    }
+
+    /// <summary>Makes each of the given callouts its own item.</summary>
+    /// <param name="each">The callouts.</param>
+    public void AddEach(IEnumerable<HardwareImportGroup> each)
+    {
+        foreach (var g in Groups.Where(each.Contains).Where(g => Unsorted.Contains(g)).ToList()) Items.Add(new List<HardwareImportGroup> { g });
+    }
+
+    /// <summary>Leaves the given callouts out of this job.</summary>
+    /// <param name="callouts">The callouts.</param>
+    public void Leave(IEnumerable<HardwareImportGroup> callouts)
+    {
+        foreach (var g in Groups.Where(callouts.Contains).Where(g => Unsorted.Contains(g)).ToList()) LeftOut.Add(g);
+    }
+
+    /// <summary>Puts a made item (or a left-out callout) back among the unsorted ones.</summary>
+    /// <param name="g">Any callout of the item.</param>
+    public void Undo(HardwareImportGroup g)
+    {
+        LeftOut.Remove(g);
+        Items.RemoveAll(i => i.Contains(g));
+    }
+
+    /// <summary>Starts the page over.</summary>
+    public void Reset()
+    {
+        Items.Clear();
+        LeftOut.Clear();
+    }
 }
 
 /// <summary>Finds callouts that look like variations of the same product.</summary>
@@ -85,9 +127,9 @@ public static class HardwareImportSimilarity
     }
 
     /// <summary>
-    /// Applies the user's answer for a cluster: unticked callouts are left out; with
-    /// <see cref="SimilarCluster.Combine"/> the kept ones are combined into the first kept one
-    /// (an automatically identified one when there is one). Can be applied again after a change.
+    /// Applies a cluster's page: each multi-callout item is combined into its first callout (an
+    /// automatically identified one when there is one); left-out callouts are skipped for this job;
+    /// unsorted and single callouts stay their own items. Can be applied again after a change.
     /// </summary>
     /// <param name="cluster">The cluster.</param>
     public static void Apply(SimilarCluster cluster)
@@ -102,18 +144,19 @@ public static class HardwareImportSimilarity
                 g.Skip = false;
             }
         }
-        var kept = cluster.Groups.Where(cluster.Keep.Contains).ToList();
-        foreach (var g in cluster.Groups.Where(g => !cluster.Keep.Contains(g)))
+        foreach (var g in cluster.LeftOut)
         {
             g.LeftOutAsSimilar = true;
             g.Skip = true;
         }
-        if (!cluster.Combine || kept.Count < 2) return;
-        var primary = kept.FirstOrDefault(g => g.Status == ImportMatchStatus.Matched) ?? kept[0];
-        foreach (var g in kept.Where(g => g != primary))
+        foreach (var item in cluster.Items.Where(i => i.Count > 1))
         {
-            g.MergedInto = primary;
-            primary.MergedGroups.Add(g);
+            var primary = item.FirstOrDefault(g => g.Status == ImportMatchStatus.Matched) ?? item[0];
+            foreach (var g in item.Where(g => g != primary))
+            {
+                g.MergedInto = primary;
+                primary.MergedGroups.Add(g);
+            }
         }
     }
 
@@ -127,7 +170,8 @@ public static class HardwareImportSimilarity
             g.Skip = p.Skip;
             g.CreateNew = p.CreateNew;
             g.HardwareItemId = p.HardwareItemId;
-            g.Label = p.Label;
+            var row = p.LabelChoices.FirstOrDefault(r => r.Source == g);
+            g.Label = row != null ? row.Text : p.Label;
             g.NewManufacturerId = p.NewManufacturerId;
             g.NewDescriptionId = p.NewDescriptionId;
             g.NewModelNumber = p.NewModelNumber;

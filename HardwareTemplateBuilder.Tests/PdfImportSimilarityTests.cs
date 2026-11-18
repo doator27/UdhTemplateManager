@@ -28,8 +28,8 @@ public class PdfImportSimilarityTests
         Assert.Equal(2, clusters.Count);
         Assert.Equal(hinges, clusters[0].Groups);
         Assert.Equal(closers, clusters[1].Groups);
-        Assert.True(clusters[0].Combine);
-        Assert.Equal(3, clusters[0].Keep.Count);
+        Assert.Equal(3, clusters[0].Unsorted.Count);
+        Assert.False(clusters[0].IsDone);
     }
 
     [Fact]
@@ -40,37 +40,68 @@ public class PdfImportSimilarityTests
     }
 
     [Fact]
-    public void ApplyCombinesKeepsAndLeavesOut()
+    public void SortingSimilarCalloutsIntoItems()
     {
         var a = G("S701", "TE 640 3D A8 038", qty: 6);
         var b = G("S701", "TE 640 3D A8 144", qty: 60);
         var c = G("S701", "TE 640 3D A8 174", qty: 12);
-        var cluster = HardwareImportSimilarity.FindClusters(new[] { a, b, c }).Single();
+        var d = G("S701", "TE 640 3D A8 200", qty: 2);
+        var cluster = HardwareImportSimilarity.FindClusters(new[] { a, b, c, d }).Single();
 
-        cluster.Keep.Remove(c);
+        // a + b are the same item; c is left out; d is the last one, so the page is done.
+        cluster.AddItem(new[] { a, b });
+        Assert.False(cluster.IsDone);
+        cluster.Leave(new[] { c });
+        Assert.True(cluster.IsDone);
+        Assert.Equal(new[] { d }, cluster.Unsorted);
         HardwareImportSimilarity.Apply(cluster);
         Assert.True(c.LeftOutAsSimilar && c.Skip);
         Assert.Same(a, b.MergedInto);
         Assert.Equal(66, a.TotalQuantity);
         Assert.False(HardwareImportSession.InPlay(b));
         Assert.True(HardwareImportSession.InPlay(a));
+        Assert.True(HardwareImportSession.InPlay(d));
 
-        // Changing the answer: separate items, all kept.
-        cluster.Keep.Add(c);
-        cluster.Combine = false;
+        // Undo the left-out one and make each remaining callout its own item.
+        cluster.Undo(c);
+        cluster.AddEach(new[] { c, d });
         HardwareImportSimilarity.Apply(cluster);
-        Assert.All(new[] { a, b, c }, g => Assert.True(HardwareImportSession.InPlay(g)));
+        Assert.Empty(cluster.Unsorted);
         Assert.False(c.Skip);
-        Assert.Empty(a.MergedGroups);
+        Assert.True(HardwareImportSession.InPlay(c));
+        Assert.Null(d.MergedInto);
 
-        // Combined callouts take the answer of the one they were combined into.
-        cluster.Combine = true;
-        HardwareImportSimilarity.Apply(cluster);
+        // Combined callouts take the answer of the one they were combined into (and their own label row).
         a.HardwareItemId = 42;
         a.Label = "TE640";
-        HardwareImportSimilarity.CopyCombinedAnswers(new[] { a, b, c });
-        Assert.Equal(42, c.HardwareItemId);
-        Assert.Equal("TE640", b.Label);
+        a.LabelChoices.Add(new ImportLabelChoice { Source = b, Text = "TE640 144", DefaultText = "TE 640 3D A8 144" });
+        HardwareImportSimilarity.CopyCombinedAnswers(new[] { a, b, c, d });
+        Assert.Equal(42, b.HardwareItemId);
+        Assert.Equal("TE640 144", b.Label);
+
+        // Start over clears everything.
+        cluster.Reset();
+        HardwareImportSimilarity.Apply(cluster);
+        Assert.Equal(4, cluster.Unsorted.Count);
+        Assert.Empty(a.MergedGroups);
+    }
+
+    [Fact]
+    public void LabelLearningRemovesWordsAndAddsText()
+    {
+        var data = new LabelLearningData();
+        var key = HardwareImportLabelLearning.ItemKey(3, "TE640");
+        for (int i = 0; i < 5; i++)
+            HardwareImportLabelLearning.Observe(data, "TE640 4.5 X 4.5 BAA", "HINGE TE640 4.5 X 4.5", key);
+
+        Assert.Equal(5, data.Words["BAA"].Removed);
+        Assert.Equal("HINGE TE640 4.5 X 4.5", HardwareImportLabelLearning.Apply(data, "TE640 4.5 X 4.5 BAA", key, threshold: 5));
+        // Below the threshold nothing changes; other items don't get this item's prefix.
+        Assert.Equal("TE640 BAA", HardwareImportLabelLearning.Apply(data, "TE640 BAA", key, threshold: 6));
+        Assert.Equal("4040XP", HardwareImportLabelLearning.Apply(data, "4040XP BAA", HardwareImportLabelLearning.ItemKey(3, "4040XP"), threshold: 5));
+        // Unchanged labels teach nothing.
+        HardwareImportLabelLearning.Observe(data, "X", "X", key);
+        Assert.False(data.Words.ContainsKey("X"));
     }
 
     [Fact]

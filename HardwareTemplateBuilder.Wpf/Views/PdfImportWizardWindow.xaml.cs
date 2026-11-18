@@ -30,7 +30,7 @@ public partial class PdfImportWizardWindow : Win95Window
     private HardwareImportSession? _session;
     private List<HardwareImportGroup> _steps = new();
     private int _index = -1; // -1 = summary, then one page per similar set, then one per callout
-    private bool _loadingCluster;
+    private readonly List<(ImportLabelChoice Choice, CheckBox Box, TextBox Text)> _labelRows = new();
     private bool _loadingStep;
 
     /// <summary>Parameterless constructor for the XAML designer.</summary>
@@ -59,18 +59,24 @@ public partial class PdfImportWizardWindow : Win95Window
         FinishButton.Click += async (_, _) => await FinishAsync();
         CancelButton.Click += (_, _) => CloseWith(false);
         ReviewAllCheck.Click += (_, _) => UpdateButtons();
-        CombineRadio.Checked += (_, _) => SaveCluster();
-        SeparateRadio.Checked += (_, _) => SaveCluster();
+        SameItemButton.Click += (_, _) => SortCluster(c => c.AddItem(TickedInCluster()));
+        EachItemButton.Click += (_, _) => SortCluster(c => c.AddEach(TickedInCluster()));
+        LeaveOutButton.Click += (_, _) => SortCluster(c => c.Leave(TickedInCluster()));
+        ResetClusterButton.Click += (_, _) => SortCluster(c => c.Reset());
+        ModelBox.LostFocus += (_, _) => { if (!_loadingStep) RefreshLabelRows(); };
         ExistingRadio.Checked += (_, _) => ShowMode();
         NewRadio.Checked += (_, _) => ShowMode();
         SkipRadio.Checked += (_, _) => ShowMode();
-        ManufacturerCombo.SelectionChanged += (_, _) => { if (!_loadingStep) RefreshItems(keepSelection: false); };
+        ManufacturerCombo.SelectionChanged += (_, e) => { e.Handled = true; if (!_loadingStep) { RefreshItems(keepSelection: false); RefreshLabelRows(); } };
         SearchBox.TextChanged += (_, _) => { if (!_loadingStep) RefreshItems(keepSelection: true); };
         ItemsList.SelectionChanged += (_, e) =>
         {
             e.Handled = true;
             if (!_loadingStep && ItemsList.SelectedItem is ImportItemChoice c && Current is { } g)
+            {
                 LabelBox.Text = _session!.LabelFor(g, c);
+                RefreshLabelRows();
+            }
         };
         PickDescriptionButton.Click += async (_, _) => await PickDescriptionAsync();
         AssemblyButton.Click += async (_, _) => await MakeAssemblyAsync();
@@ -136,7 +142,15 @@ public partial class PdfImportWizardWindow : Win95Window
     private void Go(int delta)
     {
         if (_session == null) return;
-        if (CurrentCluster != null) SaveCluster();
+        if (CurrentCluster is { } cur)
+        {
+            if (delta > 0 && !cur.IsDone)
+            {
+                StatusLabel.Text = "Sort these items first: tick the ones that are the same item, or make them their own items or leave them out.";
+                return;
+            }
+            HardwareImportSimilarity.Apply(cur);
+        }
         else if (_index >= 0 && delta > 0 && !SaveStep()) return;
         else if (_index >= 0 && delta < 0) SaveStep(validate: false);
 
@@ -159,50 +173,71 @@ public partial class PdfImportWizardWindow : Win95Window
         else UpdateButtons();
     }
 
-    /// <summary>Shows one set of similar callouts with a tick box each.</summary>
+    /// <summary>Shows one set of similar callouts: the unsorted ones with tick boxes, then the items made so far.</summary>
     private void ShowCluster(int index)
     {
         _index = index;
         var c = _session!.Clusters[index];
-        _loadingCluster = true;
-        try
-        {
-            SummaryPanel.SetVisible(false);
-            StepPanel.SetVisible(false);
-            ClusterPanel.SetVisible(true);
-            var first = c.Groups[0];
-            var who = first.ManufacturerId is int m ? _session.ManufacturerName(m) : first.ManufacturerCode;
-            HeaderText.Text = $"Similar items {index + 1} of {ClusterCount}";
-            ClusterIntro.Text =
-                $"These {c.Groups.Count} {who} callouts look alike. Untick any you don't want on this job, " +
-                "then say whether they're the same item (one line, one answer) or different items (each one asked separately).";
-            ClusterList.Children.Clear();
-            foreach (var g in c.Groups)
-            {
-                var box = new CheckBox { Content = new TextBlock { Text = _session.ClusterLine(g), TextWrapping = TextWrapping.Wrap }, IsChecked = c.Keep.Contains(g), Tag = g };
-                box.Click += (_, _) => SaveCluster();
-                ClusterList.Children.Add(box);
-            }
-            CombineRadio.IsChecked = c.Combine;
-            SeparateRadio.IsChecked = !c.Combine;
-        }
-        finally
-        {
-            _loadingCluster = false;
-        }
+        SummaryPanel.SetVisible(false);
+        StepPanel.SetVisible(false);
+        ClusterPanel.SetVisible(true);
+        var first = c.Groups[0];
+        var who = first.ManufacturerId is int m ? _session.ManufacturerName(m) : first.ManufacturerCode;
+        HeaderText.Text = $"Similar items {index + 1} of {ClusterCount}";
+        ClusterIntro.Text =
+            $"These {c.Groups.Count} {who} callouts look alike. Tick the ones that are the same item and click " +
+            "\"Ticked Are the Same Item\"; repeat until they're all sorted. You can also make ticked ones their own items " +
+            "or leave them out of this job. When only one is left it becomes its own item.";
+        RenderCluster(c);
         StatusLabel.Text = string.Empty;
         UpdateButtons();
     }
 
-    /// <summary>Copies the similar-items page into its cluster and applies it.</summary>
-    private void SaveCluster()
+    private void RenderCluster(SimilarCluster c)
     {
-        if (_loadingCluster || CurrentCluster is not { } c) return;
-        c.Keep.Clear();
-        foreach (var box in ClusterList.Children.OfType<CheckBox>())
-            if (box.IsChecked == true && box.Tag is HardwareImportGroup g) c.Keep.Add(g);
-        c.Combine = CombineRadio.IsChecked == true;
+        ClusterList.Children.Clear();
+        var unsorted = c.Unsorted;
+        if (unsorted.Count > 0)
+            ClusterList.Children.Add(new TextBlock { Text = "Not sorted yet:", FontWeight = FontWeights.Bold });
+        foreach (var g in unsorted)
+            ClusterList.Children.Add(new CheckBox
+            {
+                Content = new TextBlock { Text = _session!.ClusterLine(g), TextWrapping = TextWrapping.Wrap },
+                Tag = g,
+            });
+
+        var sorted = c.Items.Select(i => (Text: i.Count == 1 ? $"Own item: {i[0].Catalog}" : $"Same item: {string.Join("  +  ", i.Select(g => g.Catalog))}", First: i[0]))
+            .Concat(c.Groups.Where(c.LeftOut.Contains).Select(g => (Text: $"Left out: {g.Catalog}", First: g)))
+            .ToList();
+        if (sorted.Count > 0)
+            ClusterList.Children.Add(new TextBlock { Text = "Sorted:", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 8, 0, 0) });
+        foreach (var (text, firstOf) in sorted)
+        {
+            var undo = new Button { Content = "Undo", Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(8, 1, 8, 1) };
+            undo.Click += (_, _) => SortCluster(x => x.Undo(firstOf));
+            var row = new DockPanel();
+            DockPanel.SetDock(undo, Dock.Right);
+            row.Children.Add(undo);
+            row.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center });
+            ClusterList.Children.Add(row);
+        }
+        ClusterProgress.Text = c.IsDone
+            ? (unsorted.Count == 1 ? $"Done: \"{unsorted[0].Catalog}\" will be its own item." : "All sorted.")
+            : $"{unsorted.Count} still to sort.";
+        SameItemButton.IsEnabled = EachItemButton.IsEnabled = LeaveOutButton.IsEnabled = unsorted.Count > 0;
+    }
+
+    private List<HardwareImportGroup> TickedInCluster() =>
+        ClusterList.Children.OfType<CheckBox>().Where(b => b.IsChecked == true).Select(b => (HardwareImportGroup)b.Tag).ToList();
+
+    /// <summary>Changes the current similar-items page's sorting, applies it and redraws the page.</summary>
+    private void SortCluster(Action<SimilarCluster> change)
+    {
+        if (CurrentCluster is not { } c) return;
+        change(c);
         HardwareImportSimilarity.Apply(c);
+        RenderCluster(c);
+        StatusLabel.Text = string.Empty;
         UpdateButtons();
     }
 
@@ -245,6 +280,7 @@ public partial class PdfImportWizardWindow : Win95Window
             else ExistingRadio.IsChecked = true;
 
             RefreshItems(keepSelection: false, preferItemId: g.HardwareItemId, preferLabel: g.Label);
+            _labelRows.Clear();
         }
         finally
         {
@@ -262,6 +298,65 @@ public partial class PdfImportWizardWindow : Win95Window
         bool skip = SkipRadio.IsChecked == true;
         ManufacturerCombo.IsEnabled = !skip;
         LabelBox.IsEnabled = !skip;
+        if (!_loadingStep) RefreshLabelRows();
+    }
+
+    /// <summary>Copies the label rows' ticks and texts into their choices.</summary>
+    private void SyncLabelRows()
+    {
+        foreach (var (choice, box, text) in _labelRows)
+        {
+            choice.Include = box.IsChecked == true;
+            choice.Text = (text.Text ?? string.Empty).Trim();
+        }
+    }
+
+    /// <summary>
+    /// Shows a tick box and editable label per label when the item covers several (combined
+    /// look-alike callouts, or labels used with the chosen item before); otherwise the single label box.
+    /// </summary>
+    private void RefreshLabelRows()
+    {
+        if (_session == null || Current is not { } g) return;
+        SyncLabelRows();
+        var previous = _labelRows.Select(r => r.Choice).ToList();
+        if (previous.Count == 0) previous = g.LabelChoices.ToList();
+
+        List<ImportLabelChoice> rows = new();
+        if (SkipRadio.IsChecked != true)
+        {
+            if (NewRadio.IsChecked == true)
+            {
+                int? mfr = ManufacturerCombo.SelectedItem is KeyValuePair<int, string> kv && kv.Key != 0 ? kv.Key : null;
+                rows = _session.BuildLabelChoices(g, null, mfr, (ModelBox.Text ?? string.Empty).Trim(), previous);
+            }
+            else if (ItemsList.SelectedItem is ImportItemChoice c && _session.Item(c.ItemId) is { } item)
+            {
+                rows = _session.BuildLabelChoices(g, c.ItemId, item.ManufacturerId, item.ModelNumber, previous, c.Label);
+            }
+        }
+
+        _labelRows.Clear();
+        LabelRows.Children.Clear();
+        foreach (var r in rows)
+        {
+            var box = new CheckBox { IsChecked = r.Include, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+            var text = new TextBox { Text = r.Text };
+            Watermark.SetText(text, "Label (blank = none)");
+            var origin = new TextBlock { Text = r.Origin, Foreground = AppColors.Muted, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), MaxWidth = 260, TextTrimming = TextTrimming.CharacterEllipsis };
+            var row = new DockPanel();
+            DockPanel.SetDock(box, Dock.Left);
+            DockPanel.SetDock(origin, Dock.Right);
+            row.Children.Add(box);
+            row.Children.Add(origin);
+            row.Children.Add(text);
+            LabelRows.Children.Add(row);
+            _labelRows.Add((r, box, text));
+        }
+        bool many = rows.Count > 0;
+        LabelsPanel.SetVisible(many);
+        LabelBox.SetVisible(!many);
+        LabelCaption.SetVisible(!many);
     }
 
     private void RefreshItems(bool keepSelection, int? preferItemId = null, string? preferLabel = null)
@@ -310,8 +405,7 @@ public partial class PdfImportWizardWindow : Win95Window
             g.NewManufacturerId = mfr;
             g.NewDescriptionId = desc;
             g.NewModelNumber = model;
-            g.Label = LabelBox.Text.Trim();
-            return true;
+            return SaveLabels(g, validate);
         }
         if (ItemsList.SelectedItem is not ImportItemChoice choice)
         {
@@ -321,7 +415,27 @@ public partial class PdfImportWizardWindow : Win95Window
         g.Skip = false;
         g.CreateNew = false;
         g.HardwareItemId = choice.ItemId;
-        g.Label = LabelBox.Text.Trim();
+        return SaveLabels(g, validate);
+    }
+
+    /// <summary>Saves the label box, or the ticked label rows (one line each) when shown.</summary>
+    private bool SaveLabels(HardwareImportGroup g, bool validate)
+    {
+        g.LabelChoices.Clear();
+        if (_labelRows.Count == 0)
+        {
+            g.Label = LabelBox.Text.Trim();
+            return true;
+        }
+        SyncLabelRows();
+        g.LabelChoices.AddRange(_labelRows.Select(r => r.Choice));
+        var ticked = g.LabelChoices.Where(r => r.Include).ToList();
+        if (validate && ticked.Count == 0)
+        {
+            StatusLabel.Text = "Tick at least one label for the cover sheet (or choose Leave this out).";
+            return false;
+        }
+        g.Label = ticked.FirstOrDefault()?.Text ?? string.Empty;
         return true;
     }
 
@@ -347,8 +461,17 @@ public partial class PdfImportWizardWindow : Win95Window
         SaveStep(validate: false);
         var choice = await new AssemblyWindow(_session, g).ShowDialogAsync<AssemblyChoice>(this);
         if (choice == null) return;
-        HardwareImportAssemblies.Apply(g, choice.Parts, choice.Description);
+        HardwareImportAssemblies.Apply(g, choice.Parts, choice.Description, choice.DescriptionId);
+        if (g.IsAssembly && choice.DescriptionId is int did && DescriptionBox.Tag is not int)
+        {
+            // A new item for the assembly starts with the assembly's description.
+            g.NewDescriptionId = did;
+            DescriptionBox.Tag = did;
+            DescriptionBox.Text = _session.DescriptionPath(did);
+        }
         LabelBox.Text = g.Label;
+        _labelRows.Clear();
+        RefreshLabelRows();
         SourceText.Text = _session.SourceText(g);
         ShowAssembly(g);
         StatusLabel.Text = g.IsAssembly && SkipRadio.IsChecked == true
@@ -382,10 +505,11 @@ public partial class PdfImportWizardWindow : Win95Window
         }
         else if (_index < ClusterCount)
         {
+            bool done = CurrentCluster!.IsDone;
             bool more = _index < ClusterCount - 1 || _session!.BuildSteps(ReviewAllCheck.IsChecked == true).Count > 0;
-            NextButton.IsEnabled = more;
+            NextButton.IsEnabled = done && more;
             NextButton.Content = "Next >";
-            FinishButton.IsEnabled = !more;
+            FinishButton.IsEnabled = done && !more;
         }
         else
         {
@@ -402,7 +526,11 @@ public partial class PdfImportWizardWindow : Win95Window
     private async Task FinishAsync()
     {
         if (_session == null) return;
-        if (CurrentCluster != null) SaveCluster();
+        if (CurrentCluster is { } cur)
+        {
+            if (!cur.IsDone) return;
+            HardwareImportSimilarity.Apply(cur);
+        }
         else if (Current != null && !SaveStep()) return;
 
         try

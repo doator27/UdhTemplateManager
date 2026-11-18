@@ -54,6 +54,7 @@ public sealed class HardwareImportSession
     private readonly Dictionary<int, Description> _descriptions;
     private readonly HashSet<(int ItemId, string Label)> _onJob;
     private readonly List<ExistingJobLine> _existing = new();
+    private readonly LabelLearningData _labelLearning = new();
 
     /// <summary>
     /// Loads the lookups for a job (and release) from the database, marks the callouts that are
@@ -96,6 +97,22 @@ public sealed class HardwareImportSession
         catch
         {
             // Suggestions are extra help only.
+        }
+
+        // Learned label edits apply to labels the app made up (not to labels used before).
+        try
+        {
+            _labelLearning = HardwareImportLabelLearning.Load(ctx);
+        }
+        catch
+        {
+            _labelLearning = new LabelLearningData();
+        }
+        foreach (var g in Analysis.Groups)
+        {
+            if (Item(g.HardwareItemId) is { } item && g.Label == HardwareImportMatcher.DefaultLabel(g.Catalog, item.ModelNumber))
+                g.Label = LearnedLabel(g.Label, item.ManufacturerId, item.ModelNumber);
+            g.OfferedLabel = g.Label;
         }
     }
 
@@ -303,8 +320,70 @@ public sealed class HardwareImportSession
     /// <summary>The label to fill in when a choice is picked.</summary>
     /// <param name="g">The group.</param>
     /// <param name="choice">The picked item.</param>
-    public string LabelFor(HardwareImportGroup g, ImportItemChoice choice) =>
-        choice.Label ?? HardwareImportMatcher.DefaultLabel(g.Catalog, Item(choice.ItemId)?.ModelNumber);
+    public string LabelFor(HardwareImportGroup g, ImportItemChoice choice)
+    {
+        var item = Item(choice.ItemId);
+        var label = choice.Label ?? LearnedLabel(HardwareImportMatcher.DefaultLabel(g.Catalog, item?.ModelNumber), item?.ManufacturerId, item?.ModelNumber);
+        g.OfferedLabel = label;
+        return label;
+    }
+
+    /// <summary>A label with what was learned from the user's edits applied (words removed, text added).</summary>
+    /// <param name="label">The label.</param>
+    /// <param name="manufacturerId">The item's manufacturer.</param>
+    /// <param name="modelNumber">The item's model number.</param>
+    public string LearnedLabel(string label, int? manufacturerId, string? modelNumber) =>
+        HardwareImportLabelLearning.Apply(_labelLearning, label, HardwareImportLabelLearning.ItemKey(manufacturerId, modelNumber), Analysis.Threshold);
+
+    /// <summary>
+    /// The label choices for an item that covers several labels: one per callout it covers (this
+    /// callout and the look-alikes combined into it), plus labels used with the chosen item before
+    /// (unticked). Edited texts and ticks in <paramref name="previous"/> are kept. Fewer than two
+    /// distinct labels = an empty list (the single label box is used).
+    /// </summary>
+    /// <param name="g">The callout.</param>
+    /// <param name="itemId">The chosen existing item (null for a new item).</param>
+    /// <param name="manufacturerId">The item's manufacturer.</param>
+    /// <param name="modelNumber">The item's model number.</param>
+    /// <param name="previous">The current choices, if any.</param>
+    /// <param name="chosenLabel">The label picked with the item in the list (used for this callout's own row).</param>
+    public List<ImportLabelChoice> BuildLabelChoices(HardwareImportGroup g, int? itemId, int? manufacturerId, string? modelNumber, IReadOnlyList<ImportLabelChoice>? previous, string? chosenLabel = null)
+    {
+        var rows = new List<ImportLabelChoice>();
+        var seen = new HashSet<string>();
+        if (g.IsAssembly) return rows;
+
+        foreach (var src in new[] { g }.Concat(g.MergedGroups))
+        {
+            var offered = src == g && chosenLabel != null
+                ? chosenLabel
+                : LearnedLabel(HardwareImportMatcher.DefaultLabel(src.Catalog, modelNumber), manufacturerId, modelNumber);
+            var old = previous?.FirstOrDefault(r => r.Source == src);
+            bool edited = old != null && old.Text != old.DefaultText;
+            var row = new ImportLabelChoice
+            {
+                Source = src,
+                DefaultText = offered,
+                Text = edited ? old!.Text : offered,
+                Include = old?.Include ?? true,
+                Origin = $"{src.Catalog}  (qty {src.Lines.Sum(l => l.Quantity)})",
+            };
+            if (seen.Add(NormLabel(row.Text))) rows.Add(row);
+        }
+        foreach (var s in g.Suggestions.Where(s => s.HardwareItemId == itemId && !string.IsNullOrWhiteSpace(s.Label)))
+        {
+            if (!seen.Add(NormLabel(s.Label))) continue;
+            var old = previous?.FirstOrDefault(r => r.Source == null && r.DefaultText == s.Label);
+            rows.Add(new ImportLabelChoice
+            {
+                DefaultText = s.Label!,
+                Text = old?.Text ?? s.Label!,
+                Include = old?.Include ?? false,
+                Origin = "used with this item before",
+            });
+        }
+        return rows.Count >= 2 ? rows : new List<ImportLabelChoice>();
+    }
 
     /// <summary>Records the user's decisions for the groups they stepped through.</summary>
     /// <param name="reviewed">The reviewed groups.</param>
@@ -314,10 +393,19 @@ public sealed class HardwareImportSession
         // are left out for this job only, so they teach nothing.
         HardwareImportSimilarity.CopyCombinedAnswers(Analysis.Groups);
         var list = reviewed.Where(g => g.PartOfAssembly == null).ToList();
+        ObserveLabelEdits(list);
         list.AddRange(list.SelectMany(g => g.MergedGroups).Where(m => !list.Contains(m)).ToList());
         using var ctx = DatabaseInitializer.CreateContext();
         HardwareImportLearningService.Record(ctx, list.Where(g => !g.LeftOutAsSimilar),
             id => Item(id) is { } i ? (i.ManufacturerId, i.ModelNumber) : null);
+        try
+        {
+            HardwareImportLabelLearning.Save(ctx, _labelLearning);
+        }
+        catch
+        {
+            // Label learning is extra help only.
+        }
         // Assemblies made this time are offered again when the same callouts come up.
         var assemblies = Analysis.Groups.Where(g => g.IsAssembly && !g.Skip && InPlay(g)).ToList();
         if (assemblies.Count > 0)
@@ -325,6 +413,28 @@ public sealed class HardwareImportSession
             var learned = HardwareImportAssemblies.Load(ctx);
             HardwareImportAssemblies.Record(learned, assemblies);
             HardwareImportAssemblies.Save(ctx, learned);
+        }
+    }
+
+    /// <summary>Feeds the user's label edits on the reviewed callouts to the label learning.</summary>
+    private void ObserveLabelEdits(IEnumerable<HardwareImportGroup> reviewed)
+    {
+        foreach (var g in reviewed)
+        {
+            if (g.Skip || g.IsAssembly) continue;
+            int? mfr = g.CreateNew ? g.NewManufacturerId : Item(g.HardwareItemId)?.ManufacturerId;
+            string? model = g.CreateNew ? g.NewModelNumber : Item(g.HardwareItemId)?.ModelNumber;
+            if (mfr == null || string.IsNullOrWhiteSpace(model)) continue;
+            var key = HardwareImportLabelLearning.ItemKey(mfr, model);
+            if (g.LabelChoices.Count > 0)
+            {
+                foreach (var row in g.LabelChoices.Where(r => r.Include && r.Source != null))
+                    HardwareImportLabelLearning.Observe(_labelLearning, row.DefaultText, row.Text, key);
+            }
+            else if (!string.IsNullOrEmpty(g.OfferedLabel) || !string.IsNullOrEmpty(g.Label))
+            {
+                HardwareImportLabelLearning.Observe(_labelLearning, g.OfferedLabel, g.Label, key);
+            }
         }
     }
 
@@ -345,8 +455,16 @@ public sealed class HardwareImportSession
             else if (!g.CreateNew && Item(g.HardwareItemId) is { } item)
                 line = new ImportDraftLine(item.ManufacturerId, item.DescriptionId, item.ModelNumber, g.Label.Trim(), item.Id);
             if (line == null) continue;
-            if (seen.Add((line.ManufacturerId, line.DescriptionId, line.ModelNumber.ToUpperInvariant(), NormLabel(line.Label))))
-                result.Add(line);
+            // An item covering several labels: one line per ticked label.
+            var labels = g.LabelChoices.Count > 0
+                ? g.LabelChoices.Where(r => r.Include).Select(r => r.Text.Trim()).ToList()
+                : new List<string> { line.Label };
+            foreach (var label in labels)
+            {
+                var one = line with { Label = label };
+                if (seen.Add((one.ManufacturerId, one.DescriptionId, one.ModelNumber.ToUpperInvariant(), NormLabel(one.Label))))
+                    result.Add(one);
+            }
         }
         return result;
     }

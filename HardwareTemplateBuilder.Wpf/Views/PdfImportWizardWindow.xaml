@@ -30,15 +30,18 @@
                 <ListBox x:Name="SummaryList" FontFamily="Consolas" FontSize="11"/>
             </DockPanel>
 
-            <!-- Similar callouts: keep which, one item or separate items -->
+            <!-- Similar callouts: sort them into items -->
             <DockPanel x:Name="ClusterPanel" Visibility="Collapsed">
                 <TextBlock DockPanel.Dock="Top" x:Name="ClusterIntro" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                <GroupBox DockPanel.Dock="Bottom" Header="These callouts are" Padding="6" Margin="0,8,0,0">
-                    <ui:Stack Spacing="4">
-                        <RadioButton x:Name="CombineRadio" GroupName="Similar" IsChecked="True"
-                                     Content="The same item: combine the ticked ones into one"/>
-                        <RadioButton x:Name="SeparateRadio" GroupName="Similar"
-                                     Content="Different items: keep the ticked ones as separate items"/>
+                <GroupBox DockPanel.Dock="Bottom" Header="Sort the ticked callouts" Padding="6" Margin="0,8,0,0">
+                    <ui:Stack Spacing="6">
+                        <TextBlock x:Name="ClusterProgress" TextWrapping="Wrap" FontWeight="Bold"/>
+                        <WrapPanel>
+                            <Button x:Name="SameItemButton" Content="Ticked Are the Same Item" Margin="0,0,6,6"/>
+                            <Button x:Name="EachItemButton" Content="Each Ticked Is Its Own Item" Margin="0,0,6,6"/>
+                            <Button x:Name="LeaveOutButton" Content="Leave Ticked Out" Margin="0,0,6,6"/>
+                            <Button x:Name="ResetClusterButton" Content="Start Over" Margin="0,0,6,6"/>
+                        </WrapPanel>
                     </ui:Stack>
                 </GroupBox>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -77,9 +80,13 @@
                 <Grid DockPanel.Dock="Top" ui:GridEx.Columns="Auto,*" ui:GridEx.Rows="Auto,Auto" Margin="0,0,0,6">
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer:" VerticalAlignment="Center" Margin="0,0,8,4"/>
                     <ComboBox Grid.Row="0" Grid.Column="1" x:Name="ManufacturerCombo" Margin="0,0,0,4" IsEditable="False"/>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Label:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" x:Name="LabelCaption" Text="Label:" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBox Grid.Row="1" Grid.Column="1" x:Name="LabelBox" ui:Watermark.Text="Label on the job (blank = none)"/>
                 </Grid>
+
+                <GroupBox DockPanel.Dock="Top" x:Name="LabelsPanel" Header="Labels for the cover sheet (each ticked label is its own line; edit as needed)" Padding="6" Margin="0,0,0,6" Visibility="Collapsed">
+                    <ui:Stack x:Name="LabelRows" Spacing="4"/>
+                </GroupBox>
 
                 <!-- New item fields -->
                 <Grid DockPanel.Dock="Top" x:Name="NewPanel" ui:GridEx.Columns="Auto,*,Auto" ui:GridEx.Rows="Auto,Auto" Margin="0,0,0,6" Visibility="Collapsed">

@@ -23,6 +23,25 @@ public enum ImportMatchStatus
 /// <param name="Score">Ranking score (higher first).</param>
 public sealed record ImportSuggestion(int HardwareItemId, string? Label, string Reason, int Score);
 
+/// <summary>One label offered for an item that covers several labels.</summary>
+public sealed class ImportLabelChoice
+{
+    /// <summary>Gets or sets the label (as edited).</summary>
+    public string Text { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the label as first offered (to tell edits apart).</summary>
+    public string DefaultText { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets whether it goes on the cover sheet (its own line).</summary>
+    public bool Include { get; set; } = true;
+
+    /// <summary>Gets or sets the callout it came from (null = a label used with the item before).</summary>
+    public HardwareImportGroup? Source { get; set; }
+
+    /// <summary>Gets or sets where it came from, for display ("TE 640 3D A8 144", "used before").</summary>
+    public string Origin { get; set; } = string.Empty;
+}
+
 /// <summary>
 /// One distinct callout from the PDF (same manufacturer code and catalog number; handing and
 /// finish ignored), with every line it came from and how it was resolved. The wizard edits the
@@ -99,6 +118,19 @@ public sealed class HardwareImportGroup
     /// <summary>Gets or sets the description the suggested assembly had.</summary>
     public string? SuggestedAssemblyDescription { get; set; }
 
+    /// <summary>Gets or sets the description (category) the suggested assembly had.</summary>
+    public int? SuggestedAssemblyDescriptionId { get; set; }
+
+    /// <summary>Gets or sets the description (category) chosen for the assembly's label, if any.</summary>
+    public int? AssemblyDescriptionId { get; set; }
+
+    /// <summary>
+    /// Gets the label choices when this item covers several labels (combined look-alike callouts,
+    /// or labels used with the chosen item before): each ticked one is its own line for the item
+    /// in Bulk Add and on the cover sheet. Empty = the single <see cref="Label"/>.
+    /// </summary>
+    public List<ImportLabelChoice> LabelChoices { get; } = new();
+
     /// <summary>Gets or sets the manufacturer the code resolved to (null = unknown).</summary>
     public int? ManufacturerId { get; set; }
 
@@ -116,6 +148,9 @@ public sealed class HardwareImportGroup
 
     /// <summary>Gets or sets the chosen label (empty = no label).</summary>
     public string Label { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the label the app offered (to learn from the user's edits).</summary>
+    public string OfferedLabel { get; set; } = string.Empty;
 
     /// <summary>Gets or sets whether the user chose to add this as a new hardware item.</summary>
     public bool CreateNew { get; set; }
