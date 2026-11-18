@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
+using HardwareTemplateBuilder.Core.Data;
+using HardwareTemplateBuilder.Core.Services.Pdf;
 using HardwareTemplateBuilder.Core.Models;
 
 namespace HardwareTemplateBuilder.Wpf;
@@ -98,6 +101,22 @@ public static class BulkAddSession
     /// <see cref="HardwareTemplateBuilder.Wpf.Views.JobDetailView"/> before entering the bulk-add flow.
     /// </summary>
     public static int? ReleaseId { get; set; }
+
+    /// <summary>
+    /// The job number as the bulk-add screens show it: "24117" for the base list, or
+    /// "24117 Addendum 1" when adding to a release (each release has its own bulk add).
+    /// </summary>
+    /// <param name="ctx">An open context.</param>
+    /// <param name="job">The job (null = unknown).</param>
+    /// <param name="jobId">The job id, shown when the job is unknown.</param>
+    public static string JobTitle(AppDbContext ctx, Job? job, int jobId)
+    {
+        if (job == null) return $"Job #{jobId}";
+        var label = ReleaseId is int rid
+            ? ctx.JobReleases.Where(r => r.Id == rid && r.JobId == job.Id).Select(r => r.ReleaseLabel).FirstOrDefault()
+            : null;
+        return JobReleaseNaming.CoverJobNumber(job.JobNumber, label);
+    }
 
     /// <summary>
     /// Gets or sets the ordered list of manufacturers selected for the current bulk-add session.

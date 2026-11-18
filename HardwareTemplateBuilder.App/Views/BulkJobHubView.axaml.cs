@@ -36,12 +36,10 @@ public partial class BulkJobHubView : UserControl
     {
         using var ctx = DatabaseInitializer.CreateContext();
         var job = ctx.Jobs.Find(_jobId);
-        HeaderLabel.Text = job != null
-            ? $"Bulk Add — {job.JobNumber}"
-            : $"Bulk Add — Job #{_jobId}";
+        HeaderLabel.Text = $"Bulk Add — {BulkAddSession.JobTitle(ctx, job, _jobId)}";
 
         // Reload selected manufacturers from draft (in case user navigated back and changed them).
-        var draft = BulkDraftService.Load(_jobId);
+        var draft = BulkDraftService.Load(_jobId, BulkAddSession.ReleaseId);
         if (draft.ManufacturerIds.Count == 0)
         {
             StatusLabel.Text = "No manufacturers selected. Go back and select manufacturers first.";

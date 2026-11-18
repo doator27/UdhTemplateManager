@@ -69,13 +69,15 @@ namespace HardwareTemplateBuilder.Core.Migrations
                     b.Property<int>("JobId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ReleaseId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("SavedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("JobId")
-                        .IsUnique();
+                    b.HasIndex("JobId", "ReleaseId");
 
                     b.ToTable("BulkAddDrafts");
                 });

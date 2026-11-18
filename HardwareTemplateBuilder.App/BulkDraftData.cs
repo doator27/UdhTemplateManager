@@ -51,15 +51,16 @@ internal static class BulkDraftService
     };
 
     /// <summary>
-    /// Loads the draft for <paramref name="jobId"/>, returning an empty
+    /// Loads the draft for <paramref name="jobId"/> and <paramref name="releaseId"/> (each
+    /// release has its own bulk add; null = the base list), returning an empty
     /// <see cref="BulkDraftV2"/> if none exists or the JSON is unreadable.
     /// </summary>
-    public static BulkDraftV2 Load(int jobId)
+    public static BulkDraftV2 Load(int jobId, int? releaseId)
     {
         try
         {
             using var ctx = DatabaseInitializer.CreateContext();
-            var draft = new BulkAddDraftRepository(ctx).GetByJob(jobId);
+            var draft = new BulkAddDraftRepository(ctx).GetByJob(jobId, releaseId);
             if (draft == null || string.IsNullOrWhiteSpace(draft.DraftJson)) return new();
 
             // Attempt v2 parse; fall back to empty on any error.
@@ -72,25 +73,25 @@ internal static class BulkDraftService
         catch { return new(); }
     }
 
-    /// <summary>Persists <paramref name="draft"/> for <paramref name="jobId"/>.</summary>
-    public static void Save(int jobId, BulkDraftV2 draft)
+    /// <summary>Persists <paramref name="draft"/> for <paramref name="jobId"/> and <paramref name="releaseId"/> (null = base list).</summary>
+    public static void Save(int jobId, int? releaseId, BulkDraftV2 draft)
     {
         try
         {
             var json = JsonSerializer.Serialize(draft, _opts);
             using var ctx = DatabaseInitializer.CreateContext();
-            new BulkAddDraftRepository(ctx).Upsert(jobId, json);
+            new BulkAddDraftRepository(ctx).Upsert(jobId, json, releaseId);
         }
         catch { /* Non-fatal */ }
     }
 
-    /// <summary>Deletes the draft for <paramref name="jobId"/>.</summary>
-    public static void Delete(int jobId)
+    /// <summary>Deletes the draft for <paramref name="jobId"/> and <paramref name="releaseId"/> (null = base list).</summary>
+    public static void Delete(int jobId, int? releaseId)
     {
         try
         {
             using var ctx = DatabaseInitializer.CreateContext();
-            new BulkAddDraftRepository(ctx).DeleteByJob(jobId);
+            new BulkAddDraftRepository(ctx).DeleteByJob(jobId, releaseId);
         }
         catch { /* Non-fatal */ }
     }

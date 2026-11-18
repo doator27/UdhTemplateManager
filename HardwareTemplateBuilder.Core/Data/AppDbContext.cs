@@ -304,7 +304,7 @@ public class AppDbContext : DbContext
             .HasForeignKey(j => j.LastActiveReleaseId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // BulkAddDraft → Job (one draft per job; cascade on job delete)
+        // BulkAddDraft → Job (one draft per job and release; cascade on job delete)
         modelBuilder.Entity<BulkAddDraft>()
             .HasOne(d => d.Job)
             .WithMany()
@@ -312,8 +312,7 @@ public class AppDbContext : DbContext
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<BulkAddDraft>()
-            .HasIndex(d => d.JobId)
-            .IsUnique();
+            .HasIndex(d => new { d.JobId, d.ReleaseId });
 
         // IgnoredTemplateDuplicate: unique index on SharedLink + LinkType
         modelBuilder.Entity<IgnoredTemplateDuplicate>()

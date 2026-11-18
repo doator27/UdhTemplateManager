@@ -495,7 +495,7 @@ public sealed class DatabaseMergeImportService
         var nextId = (targetRows.Count == 0 ? 0 : targetRows.Keys.Max()) + 1;
         var toInsert = new List<BulkAddDraft>();
 
-        static string Key(BulkAddDraft d) => $"{d.JobId}|{d.DraftJson}";
+        static string Key(BulkAddDraft d) => $"{d.JobId}|{d.ReleaseId}|{d.DraftJson}";
 
         var targetByKey = new Dictionary<string, int>();
         foreach (var kvp in targetRows)
@@ -507,6 +507,7 @@ public sealed class DatabaseMergeImportService
         {
             var oldId = row.Id;
             row.JobId = remap.Resolve("Jobs", row.JobId);
+            row.ReleaseId = remap.ResolveNullable("JobReleases", row.ReleaseId);
             var key = Key(row);
 
             if (targetByKey.TryGetValue(key, out var matchedId))

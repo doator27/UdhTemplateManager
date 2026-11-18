@@ -40,7 +40,7 @@ public partial class BulkManufacturerSessionView : UserControl
     {
         using var ctx = DatabaseInitializer.CreateContext();
         var job = ctx.Jobs.Find(_jobId);
-        TitleLabel.Text = $"Bulk Hardware Entry — {job?.JobNumber ?? _jobId.ToString()}";
+        TitleLabel.Text = $"Bulk Hardware Entry — {BulkAddSession.JobTitle(ctx, job, _jobId)}";
 
         _manufacturers = new ManufacturerRepository(ctx).GetAll().OrderBy(m => m.ManufacturerName).ToList();
         MfrCombo.ItemsSource = _manufacturers;
@@ -65,7 +65,7 @@ public partial class BulkManufacturerSessionView : UserControl
         try
         {
             using var ctx = DatabaseInitializer.CreateContext();
-            var draft = new BulkAddDraftRepository(ctx).GetByJob(_jobId);
+            var draft = new BulkAddDraftRepository(ctx).GetByJob(_jobId, BulkAddSession.ReleaseId);
             if (draft == null || string.IsNullOrWhiteSpace(draft.DraftJson) || draft.DraftJson == "[]")
                 return;
             var parsed = JsonSerializer.Deserialize<BulkSessionDraft>(draft.DraftJson);
@@ -80,7 +80,7 @@ public partial class BulkManufacturerSessionView : UserControl
         {
             var json = JsonSerializer.Serialize(_draft);
             using var ctx = DatabaseInitializer.CreateContext();
-            new BulkAddDraftRepository(ctx).Upsert(_jobId, json);
+            new BulkAddDraftRepository(ctx).Upsert(_jobId, json, BulkAddSession.ReleaseId);
         }
         catch { }
     }
@@ -394,7 +394,7 @@ public partial class BulkManufacturerSessionView : UserControl
         _draft.Manufacturers.RemoveAll(m => m.Groups.Count == 0);
 
         if (_draft.Manufacturers.Count == 0)
-            new BulkAddDraftRepository(ctx).DeleteByJob(_jobId);
+            new BulkAddDraftRepository(ctx).DeleteByJob(_jobId, BulkAddSession.ReleaseId);
         else
             SaveDraft();
 

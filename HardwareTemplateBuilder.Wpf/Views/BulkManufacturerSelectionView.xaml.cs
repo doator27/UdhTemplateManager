@@ -42,7 +42,7 @@ public partial class BulkManufacturerSelectionView : UserControl
             .OrderBy(m => m.ManufacturerName).ToList();
 
         // Restore manufacturer selection from draft.
-        var draft = BulkDraftService.Load(_jobId);
+        var draft = BulkDraftService.Load(_jobId, BulkAddSession.ReleaseId);
         var selectedIds = new HashSet<int>(draft.ManufacturerIds);
 
         foreach (var m in _allManufacturers)
@@ -150,9 +150,9 @@ public partial class BulkManufacturerSelectionView : UserControl
 
     private void SaveDraft()
     {
-        var draft = BulkDraftService.Load(_jobId);
+        var draft = BulkDraftService.Load(_jobId, BulkAddSession.ReleaseId);
         draft.ManufacturerIds = _selected.Select(m => m.Id).ToList();
-        BulkDraftService.Save(_jobId, draft);
+        BulkDraftService.Save(_jobId, BulkAddSession.ReleaseId, draft);
     }
 
     private void GoBack()

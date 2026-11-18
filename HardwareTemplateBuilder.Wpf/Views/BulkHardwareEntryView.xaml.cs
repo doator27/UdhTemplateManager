@@ -962,7 +962,7 @@ public partial class BulkHardwareEntryView : UserControl
 
     private void SaveDraft()
     {
-        var draft = BulkDraftService.Load(_jobId);
+        var draft = BulkDraftService.Load(_jobId, BulkAddSession.ReleaseId);
         draft.Items.RemoveAll(i => i.ManufacturerId == _manufacturerId);
 
         foreach (var item in _items.Where(i => !string.IsNullOrWhiteSpace(i.ModelNumber)))
@@ -981,12 +981,12 @@ public partial class BulkHardwareEntryView : UserControl
             });
         }
 
-        BulkDraftService.Save(_jobId, draft);
+        BulkDraftService.Save(_jobId, BulkAddSession.ReleaseId, draft);
     }
 
     private bool RestoreFromDraft()
     {
-        var draft = BulkDraftService.Load(_jobId);
+        var draft = BulkDraftService.Load(_jobId, BulkAddSession.ReleaseId);
         var myItems = draft.Items.Where(i => i.ManufacturerId == _manufacturerId).ToList();
         if (myItems.Count == 0)
         {

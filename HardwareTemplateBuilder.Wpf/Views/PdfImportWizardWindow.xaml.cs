@@ -295,7 +295,7 @@ public partial class PdfImportWizardWindow : Win95Window
 
             var lines = _session.DraftLines();
             int added = 0, alreadyThere = 0;
-            var draft = BulkDraftService.Load(_jobId);
+            var draft = BulkDraftService.Load(_jobId, _releaseId);
             foreach (var line in lines)
             {
                 if (_session.IsOnJob(line)) { alreadyThere++; continue; }
@@ -319,7 +319,7 @@ public partial class PdfImportWizardWindow : Win95Window
                 if (!draft.ManufacturerIds.Contains(line.ManufacturerId)) draft.ManufacturerIds.Add(line.ManufacturerId);
                 added++;
             }
-            BulkDraftService.Save(_jobId, draft);
+            BulkDraftService.Save(_jobId, _releaseId, draft);
 
             int left = _session.Analysis.Groups.Count(g => g.Skip);
             await DialogHelper.ShowInfoAsync(this,
