@@ -77,6 +77,15 @@ public sealed class CatalogLookupResult
     /// <summary>Gets or sets the manufacturer.</summary>
     public int ManufacturerId { get; set; }
 
+    /// <summary>Gets or sets the model key the pages were found by (e.g. "4040XP").</summary>
+    public string MatchedKey { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the most specific model key (the whole first word of the callout).</summary>
+    public string FullKey { get; set; } = string.Empty;
+
+    /// <summary>True when the pages were found by a shorter part of the model ("EAX" for "EAX-500").</summary>
+    public bool IsClosestMatch => Found && MatchedKey.Length > 0 && MatchedKey != FullKey;
+
     /// <summary>Gets or sets how many indexed catalogs the manufacturer has.</summary>
     public int CatalogCount { get; set; }
 
@@ -115,6 +124,7 @@ public sealed class CatalogLookupResult
             if (!Found) return $"Not found in this manufacturer's {CatalogCount} catalog(s).";
             var sb = new StringBuilder();
             var best = Hits[0];
+            if (IsClosestMatch) sb.Append($"Closest match ({MatchedKey}; {FullKey} itself wasn't found). ");
             sb.Append($"Catalog: {best.CatalogTitle}, page {best.PageNumber}");
             if (Description != null) sb.Append($" - {Description}");
             var templates = Templates;
@@ -167,17 +177,30 @@ public sealed class CatalogLookupService
 
         string modelKey = string.Empty;
         List<ProductCatalogPage> pages = new();
-        foreach (var key in CatalogPageAnalyzer.ModelKeys(callout))
+        var modelKeys = CatalogPageAnalyzer.ModelKeys(callout);
+        result.FullKey = modelKeys.FirstOrDefault() ?? string.Empty;
+        // Most specific key first; a shorter key only when the longer one isn't on any page as a word.
+        foreach (var key in modelKeys)
         {
-            pages = ctx.ProductCatalogPages.AsNoTracking()
+            var found = ctx.ProductCatalogPages.AsNoTracking()
                 .Where(p => catalogIds.Contains(p.CatalogId) && p.SearchKey.Contains(key))
                 .OrderBy(p => p.CatalogId).ThenBy(p => p.PageNumber)
                 .Take(MaxPagesLoaded)
                 .ToList();
-            modelKey = key;
-            if (pages.Any(p => CatalogPageAnalyzer.ScorePage(p.Text, key, options) >= 35)) break;
+            if (found.Count == 0) continue;
+            if (pages.Count == 0) { pages = found; modelKey = key; }
+            if (found.Any(p => CatalogPageAnalyzer.ScorePage(p.Text, key, options) >= 35))
+            {
+                pages = found;
+                modelKey = key;
+                break;
+            }
         }
         if (pages.Count == 0) { result.UnexplainedCodes.AddRange(options); return result; }
+        result.MatchedKey = modelKey;
+
+        // Parts of the model itself ("ECL" of "ECL-230X" when the page lists ECL-230X) aren't options.
+        options = options.Where(o => !modelKey.Contains(ImportText.Key(o), StringComparison.Ordinal)).ToList();
 
         var known = Templates(manufacturerId);
         var scored = pages

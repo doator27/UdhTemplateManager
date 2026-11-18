@@ -48,6 +48,8 @@ public class CatalogLookupTests
         Assert.Equal("Spring Cush Arm", CatalogPageAnalyzer.OptionMeaning(CloserPage, "SCUSH"));
         Assert.Null(CatalogPageAnalyzer.OptionMeaning(CloserPage, "HO"));
         Assert.Equal("Heavy Duty Surface Closer", CatalogPageAnalyzer.Description(CloserPage, "4040XP", new[] { "EDA" }));
+        Assert.Equal("Alarmed Deadbolt Panic Hardware",
+            CatalogPageAnalyzer.Description("ECL-230X SERIES\nAlarmed Deadbolt Panic Hardware\nECL-230X  $1,242", "ECL230X", Array.Empty<string>()));
     }
 
     [Fact]
@@ -139,6 +141,11 @@ public class CatalogLookupTests
         Assert.Contains(result.Options, o => o.Code == "RW/PA");
         Assert.NotNull(result.SuggestedDescriptionId);
         Assert.Contains("5-3018", result.Summary);
+        Assert.False(result.IsClosestMatch);
+
+        // A model the catalog doesn't list falls back to its family, and says so.
+        var closest = service.Lookup(mfrId, "4040XPT-EDA");
+        Assert.Contains(closest.Options, o => o.Code == "EDA");
 
         // The import wizard gets the item that uses that template as a suggestion.
         var group = new HardwareImportGroup { Catalog = "4040XP EDA", ManufacturerId = mfrId, Status = ImportMatchStatus.NeedsReview, Reason = "Not found" };

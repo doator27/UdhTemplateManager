@@ -236,12 +236,18 @@ public static class CatalogPageAnalyzer
                 .FirstOrDefault();
             if (best != null) return Shorten(best);
         }
-        foreach (var line in lines.Take(8))
+        // The heading: a wording line near the top, preferring one that isn't just the model's name
+        // ("ECL-230X SERIES" → "Alarmed Deadbolt Panic Hardware").
+        foreach (bool allowModel in new[] { false, true })
         {
-            var cell = Columns.Split(line.Trim()).OrderByDescending(c => c.Length).FirstOrDefault() ?? string.Empty;
-            int letters = cell.Count(char.IsLetter);
-            if (Words.Matches(cell).Count >= 2 && letters >= cell.Length / 2 && cell.Length is >= 6 and <= 90 && !cell.Contains('$'))
-                return Shorten(Clean(cell));
+            foreach (var line in lines.Take(8))
+            {
+                if (!allowModel && WordKeys(line).Contains(modelKey)) continue;
+                var cell = Columns.Split(line.Trim()).OrderByDescending(c => c.Length).FirstOrDefault() ?? string.Empty;
+                int letters = cell.Count(char.IsLetter);
+                if (Words.Matches(cell).Count >= 2 && letters >= cell.Length / 2 && cell.Length is >= 6 and <= 90 && !cell.Contains('$'))
+                    return Shorten(Clean(cell));
+            }
         }
         return null;
     }
