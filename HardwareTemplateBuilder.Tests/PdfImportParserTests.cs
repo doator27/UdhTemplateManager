@@ -126,6 +126,78 @@ public class PdfImportParserTests
     }
 
     [Fact]
+    public void QtyFirstSchedule_HardwareSet()
+    {
+        var r = HardwarePdfParser.Parse(LoadPages("qtyfirst_set.txt"));
+
+        Assert.Contains("Hardware schedule (quantity first)", r.Formats);
+        Assert.Equal(14, r.Lines.Count);
+        var hinge = r.Lines.Single(l => l.GenericName == "Standard Hinge");
+        Assert.Equal("BEST", hinge.ManufacturerName);
+        Assert.Equal("FBB179 (4 1/2\" x 4 1/2\")", hinge.Catalog);
+        Assert.Equal("US26D", hinge.Finish);
+        Assert.Equal(171, hinge.Quantity);
+        Assert.Equal("U01 - ENTRY", hinge.SetName);
+
+        var lockset = r.Lines.Single(l => l.GenericName == "LX-M Lockset");
+        Assert.Equal("dormakaba Architectural", lockset.ManufacturerName);
+        Assert.Equal("M002KSCBPSTCB-11F", lockset.Catalog);
+        var closer = r.Lines.Single(l => l.GenericName == "Concealed Closer");
+        Assert.Equal("dormakaba", closer.ManufacturerName);
+        Assert.Equal("ITS96 INV 13 BRKTMD", closer.Catalog);
+        // No finish column: a trailing finish code is taken out of the callout.
+        var viewer = r.Lines.Single(l => l.GenericName == "UL Viewer");
+        Assert.Equal("976U", viewer.Catalog);
+        Assert.Equal("626", viewer.Finish);
+        // Notes under an item ("***CONCEALED") are not part of the callout.
+        Assert.DoesNotContain(r.Lines, l => l.Catalog.Contains('*'));
+    }
+
+    [Fact]
+    public void QtyFirstSchedule_Groups()
+    {
+        var r = HardwarePdfParser.Parse(LoadPages("qtyfirst_group.txt"));
+
+        Assert.Equal(new[] { "E1", "E1.1", "01.0B1", "13" }, r.Lines.Select(l => l.SetName).Distinct());
+        Assert.Equal(15, r.Lines.Count(l => l.SetName == "E1"));
+        Assert.Equal(8, r.Lines.Count(l => l.SetName == "01.0B1"));
+        Assert.Equal(8, r.Lines.Count(l => l.SetName == "13"));
+
+        var locks = r.Lines.Where(l => l.SetName == "E1" && l.GenericName == "Electric Lock").ToList();
+        Assert.All(locks, l => Assert.Equal("RX WBS-8271-24V LL LC", l.Catalog));
+        Assert.Equal(new[] { "LH", "RH" }, locks.Select(l => l.Handing));
+        Assert.Equal(new[] { 4, 6 }, locks.Select(l => l.Quantity));
+
+        var cyl = r.Lines.First(l => l.GenericName == "Permanent Cylinder");
+        Assert.Equal("By Others", cyl.ManufacturerName);
+        var closer = r.Lines.First(l => l.SetName == "E1" && l.GenericName == "Surface Closer");
+        Assert.Equal("4040XP RWPA", closer.Catalog);
+
+        // "003.1 - Standard Hinge": the item number is dropped from the name.
+        var hinge = r.Lines.First(l => l.SetName == "01.0B1");
+        Assert.Equal("Standard Hinge", hinge.GenericName);
+        Assert.Equal("McKinney", hinge.ManufacturerName);
+        Assert.Equal("MPB91 4 1/2\" x 4 1/2\" NRP", hinge.Catalog);
+        Assert.Equal(3, hinge.Quantity);
+        var lowProfile = r.Lines.Single(l => l.SetName == "01.0B1" && l.GenericName == "Pull Side Mount Low Profile Closer");
+        Assert.Equal("Norton Rixson", lowProfile.ManufacturerName);
+        Assert.Equal("8541ST", lowProfile.Catalog);
+        var storeroom = r.Lines.Single(l => l.SetName == "01.0B1" && l.GenericName == "Storeroom Function");
+        Assert.Equal("MO 8840FL MK CMK", storeroom.Catalog);
+        Assert.Equal("LHR", storeroom.Handing);
+        // "890 - HW/BO   Note Card Reader by Others" is a note, not hardware.
+        Assert.DoesNotContain(r.Lines, l => l.GenericName == "HW/BO");
+
+        // The name ran into the callout: split at the manufacturer.
+        var bolt = r.Lines.Single(l => l.GenericName == "Manual Flush Bolt HMD");
+        Assert.Equal("Rockwood", bolt.ManufacturerName);
+        Assert.Equal("555", bolt.Catalog);
+        Assert.Equal(28, bolt.Quantity);
+        // Door lines ("1  1 Pair of doors ...") aren't items.
+        Assert.DoesNotContain(r.Lines, l => l.Catalog.Contains("Corridor"));
+    }
+
+    [Fact]
     public void Schedule_ToleratesOcrMistakes()
     {
         var r = HardwarePdfParser.Parse(Load("scan_ocr.txt"));

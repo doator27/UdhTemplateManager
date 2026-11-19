@@ -40,7 +40,18 @@ public sealed class HardwarePdfParseResult
 /// </summary>
 public static class HardwarePdfParser
 {
-    private static readonly Regex HeadingRegex = new(@"Heading\s*#\s*([\w.\-]+)\s*\(\s*Set\s*#\s*([\w.\-]+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex HeadingRegex = new(@"Heading\s*#\s*([\w.\-]+)\s*\(\s*(?:Set\s*#|Hardware\s+Set|Group\s*:|Set\s*:)\s*([^)]*?)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex QtyFirstItemRegex = new(@"^\s{0,30}(\d{1,5}(?:,\d{3})*)\s{2,}(\S.*)$", RegexOptions.Compiled);
+    private static readonly Regex OpeningAnywhereRegex = new(@"\b\d+\s+(Single|Pair|Double)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex NameNumberPrefixRegex = new(@"^\d[\w.]*\s+-\s+", RegexOptions.Compiled);
+    private static readonly Regex TitleWordRegex = new(@"^[A-Z][a-z]+$", RegexOptions.Compiled);
+
+    /// <summary>Second words that belong to a manufacturer's name ("dormakaba Architectural", "Norton Rixson").</summary>
+    private static readonly HashSet<string> ManufacturerSuffixes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Architectural", "Duprin", "Rixson", "Others", "Hardware", "Products", "Industries", "Closers", "Locks",
+        "Manufacturing", "Group", "Systems", "Security", "Johnson", "Shop", "Companies", "Company", "Inc",
+    };
     private static readonly Regex ScheduleItemRegex = new(@"^\s{0,16}([A-Z][0-9OIl$S]{3})\s+(\d{1,3}(?:,\d{3})*|\d{1,6})[A-Za-z]?\s+(\S.*)$", RegexOptions.Compiled);
     private static readonly Regex ColumnRegex = new(@"\S+(?: \S+)*", RegexOptions.Compiled);
     private static readonly Regex ManufacturerCodeRegex = new(@"^[A-Za-z$][A-Za-z0-9$]{0,4}$", RegexOptions.Compiled);
@@ -90,6 +101,8 @@ public static class HardwarePdfParser
             MatchCostSummaryNames(pages, result);
         }
         if (machining) result.Formats.Add("Door machining sheet");
+        if (result.Lines.Count == 0 && ParseQtyFirstSchedule(pages, result))
+            result.Formats.Add("Hardware schedule (quantity first)");
 
         foreach (var line in result.Lines)
         {
@@ -225,6 +238,122 @@ public static class HardwarePdfParser
         if (i <= 0) return;
         line.Catalog = string.Join(" ", words.Skip(i));
         line.GenericName = string.Join(" ", words.Take(i));
+    }
+
+    // ── Quantity-first hardware schedules ───────────────────────────────────
+
+    private sealed record QtyFirstRow(int Page, string? Heading, int Quantity, List<(int Col, string Text)> Cols);
+
+    /// <summary>
+    /// Reads schedules whose item lines start with the quantity and name the manufacturer in the
+    /// callout: "171   Standard Hinge   BEST FBB179 (4 1/2" x 4 1/2") US26D   US26D" or
+    /// "3   003.1 - Standard Hinge   McKinney MPB91 4 1/2" x 4 1/2" NRP   US32D", under
+    /// "Heading #1 (Hardware Set U01 - ENTRY)" / "Heading #1 (Group: E1)". Quantities are the
+    /// heading's totals. The manufacturer is the callout's first word, or two words when the
+    /// second is part of the name ("Norton Rixson", "By Others"); the finish (last column) and
+    /// handing are taken out of the callout. Lines under an item are notes ("**Push Side") and are
+    /// skipped; door/opening lines and "Note …" lines are not items.
+    /// </summary>
+    private static bool ParseQtyFirstSchedule(IReadOnlyList<IReadOnlyList<string>> pages, HardwarePdfParseResult result)
+    {
+        var rows = new List<QtyFirstRow>();
+        bool sawHeading = false;
+        string? heading = null;
+        for (int p = 0; p < pages.Count; p++)
+        {
+            foreach (var line in pages[p])
+            {
+                var h = HeadingRegex.Match(line);
+                if (h.Success)
+                {
+                    heading = h.Groups[2].Value.Trim();
+                    sawHeading = true;
+                    continue;
+                }
+                var m = QtyFirstItemRegex.Match(line);
+                if (!m.Success || OpeningAnywhereRegex.IsMatch(line)) continue;
+                int offset = m.Groups[2].Index;
+                var cols = ColumnRegex.Matches(m.Groups[2].Value).Select(c => (Col: c.Index + offset, Text: c.Value)).ToList();
+                if (!int.TryParse(m.Groups[1].Value.Replace(",", ""), out var qty) || qty <= 0) continue;
+                rows.Add(new QtyFirstRow(p + 1, heading, qty, cols));
+            }
+        }
+        if (!sawHeading || rows.Count(r => r.Cols.Count >= 2) < 2) return false;
+
+        // Where the callout column usually starts, and the manufacturer names seen there.
+        int mode = rows.Where(r => r.Cols.Count >= 2).GroupBy(r => r.Cols[1].Col).OrderByDescending(g => g.Count()).First().Key;
+        var mfrWords = new HashSet<string>(rows
+            .Where(r => r.Cols.Count >= 2 && Math.Abs(r.Cols[1].Col - mode) <= 3)
+            .Select(r => r.Cols[1].Text.Split(' ')[0]), StringComparer.Ordinal);
+
+        var items = new List<(QtyFirstRow Row, string Name, string Callout, string? Finish)>();
+        foreach (var row in rows)
+        {
+            var cols = row.Cols.Select(c => c.Text).ToList();
+            // The name ran into the callout ("Manual Flush Bolt HMD Rockwood 555 US26D"): split at a known manufacturer.
+            if (cols.Count < 2 || Math.Abs(row.Cols[1].Col - mode) > 3)
+            {
+                var words = cols[0].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                int at = Array.FindLastIndex(words, w => mfrWords.Contains(w));
+                if (at >= 1 && at < words.Length - 1)
+                {
+                    cols.RemoveAt(0);
+                    cols.Insert(0, string.Join(" ", words.Skip(at)));
+                    cols.Insert(0, string.Join(" ", words.Take(at)));
+                }
+            }
+            if (cols.Count < 2) continue;
+            var name = NameNumberPrefixRegex.Replace(cols[0], string.Empty).Trim();
+            var callout = string.Join(" ", cols.Skip(1).Take(Math.Max(1, cols.Count - 2)));
+            string? finish = cols.Count > 2 ? cols[^1] : null;
+            if (callout.StartsWith("Note ", StringComparison.OrdinalIgnoreCase)) continue;
+            items.Add((row, name, ImportText.Tidy(callout), finish));
+        }
+
+        var firstCounts = items.GroupBy(i => i.Callout.Split(' ')[0], StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+        var twoCounts = items.Select(i => i.Callout.Split(' ')).Where(w => w.Length > 2)
+            .GroupBy(w => $"{w[0]} {w[1]}", StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+
+        bool found = false;
+        foreach (var (row, name, callout, finish) in items)
+        {
+            var words = callout.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+            int n = 1;
+            if (words.Count > 2 && TitleWordRegex.IsMatch(words[1]) &&
+                (ManufacturerSuffixes.Contains(words[1]) ||
+                 twoCounts.GetValueOrDefault($"{words[0]} {words[1]}") >= Math.Max(2, firstCounts.GetValueOrDefault(words[0]) / 2.0)))
+                n = 2;
+            var mfr = string.Join(" ", words.Take(n));
+            var line = new ParsedHardwareLine
+            {
+                ManufacturerName = mfr,
+                ManufacturerCode = Truncate(mfr.ToUpperInvariant(), 50),
+                GenericName = name,
+                Finish = finish,
+                Quantity = row.Quantity,
+                SetName = row.Heading,
+                Page = row.Page,
+            };
+
+            var finishes = new HashSet<string>((finish ?? string.Empty).Split('/', StringSplitOptions.RemoveEmptyEntries), StringComparer.OrdinalIgnoreCase);
+            var rest = words.Skip(n).ToList();
+            for (int i = rest.Count - 1; i >= 1; i--)
+            {
+                if (ImportText.Handings.Contains(rest[i])) { line.Handing ??= rest[i].ToUpperInvariant(); rest.RemoveAt(i); }
+                else if (finishes.Contains(rest[i])) rest.RemoveAt(i);
+            }
+            if (line.Finish == null && rest.Count > 1 && ImportText.IsFinish(rest[^1], result.FinishCodes))
+            {
+                line.Finish = rest[^1];
+                rest.RemoveAt(rest.Count - 1);
+            }
+            var catalog = DoorThicknessRegex.Replace(string.Join(" ", rest), string.Empty).Trim();
+            line.Catalog = Regex.Replace(catalog, @"\s+-$", string.Empty);
+            if (line.Catalog.Length == 0) continue;
+            result.Lines.Add(line);
+            found = true;
+        }
+        return found;
     }
 
     // ── Door machining sheets ───────────────────────────────────────────────

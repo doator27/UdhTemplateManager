@@ -1,0 +1,118 @@
+=== PAGE 1
+                                                  Hardware Schedule
+               Heading #1 (Group: E1)
+               1 Single door C04-1.F3, HALL C03 To HALL C04                                        90° RH
+               1 Single door 3-104-1, HALL C04 To IDF 3-104                                        90° LH
+               1 Single door 3-220-1, HALL C01 To SOILED HOLDING 3-220                             90° LH
+               1 Single door 3-233-1, HALL C03 To STERILE HOLDING 3-233                            90° RH
+               1 Single door C04-1.F4, HALL C03 To HALL C04                                        90° RH
+               1 Single door 4-104-1, HALL CO4 To IDF 4-104                                        90° LH
+               1 Single door 4-220-1, HALL C01 To DECONTAMINATION 4-220                            90° RH
+               1 Single door 4-221-1, HALL C01 To STERILE HOLDING 4-221                            90° RH
+               1 Single door 4-222-1, HALL C01 To CLEAN WRKRM 4-222                                90° LH
+               1 Single door 4-222-2, HALL C03 To CLEAN WRKRM 4-222                                90° RH
+               Elev: B, 3-0 x 7-0 x 1 3/4 - A40 DR x A40 FR
+         20    Standard Hinge        McKinney TA2714-MCK 4 1/2" x 4 1/2" US26D NRP                 US26D
+         10    Electric Hinge        McKinney TA2714-MCK 4 1/2" x 4 1/2" US26D QC12                US26D
+                                     **2nd Hinge From Bottom
+          4    Electric Lock         Sargent RX WBS-8271-24V LL US32D LH LC                        US32D
+          6    Electric Lock         Sargent RX WBS-8271-24V LL US32D RH LC                        US32D
+         10    Mortise Cylinder Housing  Assa 60601-2
+         10    Temp. Construction Core  Assa 70600ICRR RED CORE
+         10    Permanent Cylinder    By Others Accentra 2153 Conventional Cylinder By Locksmith
+          4    Surface Closer        LCN 4040XP RWPA 689 LH 1 3/4                                  689
+                                     **Push Side
+          6    Surface Closer        LCN 4040XP RWPA 689 RH 1 3/4                                  689
+                                     **Push Side
+         10    Kick Plate            Trimco K0050 16"x34" 630                                      630
+         10    Mop Plate             Trimco K0050 6"x34" 630                                       630
+         10    Wall Door Stop        Trimco 1270WV 630                                             630
+         30    Door Silencer         Trimco 1229A Special                                          Special
+         10    Thru-Door Wire Harness  McKinney QC-C1500P
+         10    Door Contact          By Others GRI 180-12
+               Note:
+               1. Card readers, wiring, wiring diagrams, power supplies, frame harness from power transfer to power supply, and
+               operating description by security vendor.
+                                                                                                              Page 1 of 19
+=== PAGE 2
+               Heading #2 (Group: E1.1)
+               1 Single door C04-1.F2, HALL C05 To HALL C04                                        90° LH
+               1 Single door 2-102-1, HALL C04 To IDF 2-102                                        90° RH
+               1 Single door 2-402-1, HALL C05 To BMS CTRL 2-402                                   90° LH
+               Elev: B, 3-0 x 8-0 x 1 3/4 - A40 DR x A40 FR
+          9    Standard Hinge        McKinney TA2714-MCK 4 1/2" x 4 1/2" US26D                     US26D
+          3    Electric Hinge        McKinney TA2714-MCK 4 1/2" x 4 1/2" US26D QC12                US26D
+                                     **2nd Hinge From Bottom
+          2    Electric Lock         Sargent RX WBS-8271-24V LL US32D LH LC                        US32D
+          1    Electric Lock         Sargent RX WBS-8271-24V LL US32D RH LC                        US32D
+          3    Mortise Cylinder Housing  Assa 60601-2
+          3    Temp. Construction Core  Assa 70600ICRR RED CORE
+          3    Permanent Cylinder    By Others Accentra 2153 Conventional Cylinder By Locksmith
+          3    Surface Closer        LCN 4040XP REGARM 689 1 3/4                                   689
+                                     **Pull Side
+          3    Kick Plate            Trimco K0050 16"x34" 630                                      630
+          3    Mop Plate             Trimco K0050 6"x34" 630                                       630
+          3    Wall Door Stop        Trimco 1270WV 630                                             630
+          9    Door Silencer         Trimco 1229A Special                                          Special
+          3    Thru-Door Wire Harness  McKinney QC-C1500P
+          3    Door Contact          By Others GRI 180-12
+               Note:
+               1. Card readers, wiring, wiring diagrams, power supplies, frame harness from power transfer to power supply, and
+               operating description by security vendor.
+                                                                                                              Page 2 of 19
+=== PAGE 3
+                         Heading #3 (Group: 01.0B1)
+           6    AA1      1 Single door 104, Exterior From Lobby 1-01                                                             90° LHR
+                         Type (Elev): F (A), 3-0 x 7-0 x 1 3/4 - A60 DR x A60 FR - WIND-WH-B-90
+                         Min. Building Wind Pressure Required: UNKNOWN-NOT PROVIDED.
+                         Hollow Metal Frame FBC Product Approval FBC FL 16392.1 +/- 70 PSF - Outswing Single doors with Deadbolt Engaged)
+                         Hollow Metal Door FBC Product Approval FBC FL 16392.1 +/- 70 PSF - Outswing Single doors with Deadbolt Engaged)
+                   3     003.1 - Standard Hinge             McKinney MPB91 4 1/2" x 4 1/2" US32D NRP                             US32D
+                   1     232 - Storeroom Function           Accentra MO 8840FL LHR 626 MK CMK                                    626
+                                                            Confirm MO lever
+                   1     403 - Pull Side Mount Low Profile Closer  Norton Rixson 8541ST 689                                      689
+                   1     500 - Kick Plate                   Rockwood K1050 10" x 34" US32D BEV CSK                               US32D
+                                                            Garage Side
+                   1     600 - Concave Wall Stop            Rockwood 409 US32D                                                   US32D
+                   1     720 - Weatherstripping             Pemko 303AV-36" x 84"                                                A
+                   1     700 - Bumper Threshold             Pemko 2005AV36"                                                      A
+                   1     800 - Fail Secure Electric Strike  HES 1006CAS-630                                                      630
+                   1     890 - HW/BO                        Note Card Reader by Others
+                         Note:
+                         01. Keyed from lobby . Free egress from garage. Confirm
+                         02. Added Elec strike for Card reader by others.
+                         RTS3:
+                         01. 104 added to this set ilo 02
+=== PAGE 4
+=== PAGE 4
+                                                 Hardware Schedule
+                                                          Deleted
+                  Heading #51 (Group: 13)
+      1           1 Pair of doors 2.G08, Corridor From Mech G-09                                       90°,90° RHRA
+      2           1 Pair of doors 3.G08, Corridor From Mech G-09                                       90°,90° RHRA
+      3           1 Pair of doors 3.P07, Corridor From Mech P-09                                       90°,90° RHRA
+      4           1 Pair of doors 3.Q07, Corridor From Mech Q-09                                       90°,90° RHRA
+      5           1 Pair of doors 4.G08, Corridor From Mech G-09                                       90°,90° RHRA
+      6           1 Pair of doors 4.L107, Corridor From Mech LI-08                                     90°,90° RHRA
+      7           1 Pair of doors 4.P07, Corridor From Mech P-09                                       90°,90° RHRA
+      8           1 Pair of doors 4.Q07, Corridor From Mech Q-09                                       90°,90° RHRA
+      9           1 Pair of doors 5.G08, Corridor From Mech G-09                                       90°,90° RHRA
+      10          1 Pair of doors 5.L107, Corridor From Mech LI-08                                     90°,90° RHRA
+      11          1 Pair of doors 5.P07, Corridor From Mech P-09                                       90°,90° RHRA
+      12          1 Pair of doors 5.Q07, Corridor From Mech Q-09                                       90°,90° RHRA
+      13          1 Pair of doors 6.G08, Corridor From Mech G-09                                       90°,90° RHRA
+      14          1 Pair of doors 6.L107, Corridor From Mech LI-08                                     90°,90° RHRA
+                  Type (Elev): F (B), 2-6, 2-6 x 7-0 x 1 3/4 - WD DR x PGS FR - WH-20
+            28    001.1 - Standard Hinge    McKinney MPB79 4 1/2" x 4 1/2" US26D NRP                   US26D
+            56    005 - Spring Hinge        McKinney MPS60 4 1/2" x 4 1/2" US26D                       US26D
+            28    110 - Manual Flush Bolt HMD Rockwood 555 US26D                                       US26D
+            14    212.1 - Storeroom Function  Accentra MO 4705LN RHR 480B 626 MK CMK                   626
+                                            Confirm MO lever
+            14    710.2 - Self Adhesive Seal  Pemko S88 D20                                            D
+                                            Field Cut as Required
+            28    730.2 - Sweep             Pemko 313AN 30"                                            A
+            28    750 - Split Astragal      Pemko 303AV- x 84"                                         A
+                                            Mount Pull Side Both Leafs
+            14    701.1 - Saddle Threshold  Pemko 271A60"                                              A
+                  Note:
+                  01. Confirm reverse bevel swing.

@@ -1,0 +1,48 @@
+=== PAGE 1
+                                              Hardware Schedule
+               Heading #1 (Hardware Set U01 - ENTRY)
+               1 Single door 1908B.A, CORRIDOR TO UNIT ENTRY                                        90° RH
+               1 Single door 1903B.A, CORRIDOR TO UNIT ENTRY                                        90° RH
+               1 Single door 1906B.A, CORRIDOR TO UNIT ENTRY                                        90° LH
+=== PAGE 2
+               1 Single door 2002B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2017B.A, CORRIDOR TO UNIT ENTRY                                             90° RH
+               1 Single door 2016B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2112B.A, CORRIDOR TO UNIT ENTRY                                             90° RH
+               1 Single door 2108B.A, CORRIDOR TO UNIT ENTRY                                             90° RH
+               1 Single door 2119B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2105B.A, CORRIDOR TO UNIT ENTRY                                             90° RH
+               1 Single door 2118B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2111B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2115B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2102B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2103B.A, CORRIDOR TO UNIT ENTRY                                             90° RH
+               1 Single door 2113B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2101B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2114B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2110B.A, CORRIDOR TO UNIT ENTRY                                             90° RH
+               1 Single door 2116B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2117B.A, CORRIDOR TO UNIT ENTRY                                             90° RH
+               1 Single door 2106B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2104B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2107B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               1 Single door 2109B.A, CORRIDOR TO UNIT ENTRY                                             90° LH
+               Type: F, 3-0 x 7-0 x 1 3/4 - A40 DR x A40 FR - 20
+        171    Standard Hinge   BEST FBB179 (4 1/2" x 4 1/2") US26D                                      US26D
+         57    LX-M Lockset     dormakaba Architectural M002KSCBPSTCB-11F
+         57    Concealed Closer  dormakaba ITS96 INV 13 BRKTMD 689                                       689
+                                ***CONCEALED
+         57    Mop Plate        Trimco KM050 4"x35" 630 HB CSK                                           630
+         57    Kick Plate       Trimco K0050 10"x34" 630 HB CSK                                          630
+         57    Floor Stop       Trimco 7280 630                                                          630
+         57    Gasketing        NGP 5050B-204"                                                           B
+         57    Gasketing        NGP 2525C-204"                                                           C
+         57    Threshold        NGP 8144-36"
+         57    Auto Door Bottom  NGP 335S-36" STC2 (CUT TO 35 1/4")
+        114    STC Pads         NGP 60FP
+         57    UL Viewer        Trimco 976U 626
+                                ***60" AFF
+         57    Door Knocker     Trimco 620VE 626 1 3/4                                                   626
+         57    Door Guard       Trimco 4017 626                                                          626
+                                                                                                               Page 2
+
