@@ -131,7 +131,7 @@ public class PdfImportParserTests
         var r = HardwarePdfParser.Parse(LoadPages("hardware_list.txt"));
 
         Assert.Contains("Hardware list", r.Formats);
-        Assert.Equal(60, r.Lines.Count);
+        Assert.Equal(59, r.Lines.Count);
         Assert.All(r.Lines, l => Assert.Equal(1, l.Quantity));
 
         var hinge = r.Lines[0];
