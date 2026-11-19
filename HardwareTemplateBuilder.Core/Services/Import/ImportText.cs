@@ -92,5 +92,5 @@ public static class ImportText
     /// <summary>Collapses runs of whitespace and normalises curly quotes.</summary>
     /// <param name="text">Text to tidy.</param>
     public static string Tidy(string text) =>
-        Regex.Replace(text.Replace('“', '"').Replace('”', '"').Replace('″', '"').Replace('’', '\'').Replace('‘', '\''), @"\s+", " ").Trim();
+        Regex.Replace(text.Replace('\u00AD', '-').Replace('“', '"').Replace('”', '"').Replace('″', '"').Replace('’', '\'').Replace('‘', '\''), @"\s+", " ").Trim();
 }

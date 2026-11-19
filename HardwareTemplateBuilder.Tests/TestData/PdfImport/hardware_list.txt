@@ -1,0 +1,68 @@
+=== PAGE 1
+       Hardware List                                                             Sample Job
+       Mfg    Short Description      Product Number                                      Finish
+       AB     Continuous Hinge       A500 83­1/8"                                        US32D
+              Architectural Pulls    AB3300 12"                                          US32D
+              Electromagnetic Door   2100                                                US28
+              Holder
+              Extension              20400                                               US2G
+              Overhead Stop          4024                                                US32D
+              Overhead Stop          4424                                                US32D
+       BE     Closer                 HD8016 DS SNDTPK SPC                                689
+       HS     Electric Strike Body   9500                                                630
+       IV     Door Pull              PR 9266 72" TYPE N MTG.                             BLK
+              Door Stop              60 A                                                26D
+       NA     Gasket                 673 A 30"
+              Gasket                 673 A 36"
+              Gasket                 673 A 42"
+              Gasket                 674 A 36"
+              Gasketing              107 NA 1 x 36" 2 x 84"
+              Gasketing              107 NA 1 x 42" 2 x 84"
+              Gasketing              5050 B­17 17'
+              Gasketing              5050 B­20 20'
+              Auto Door Bottom       320 NA 30"
+              Auto Door Bottom       320 NA 36"
+              Saddle Threshold       426 HD 36"
+              Saddle Threshold       426 HD 42"
+       PD     Deadbolt               KV 125 IND                                          626
+              Deadbolt               MR 154 OJSJ SFC                                     630
+              Mortise Lockset        MR 115 OJSJ SFIC­CONSTRUCTION CORE                  630
+              Lockset                SD 115 ORL 2 3/4" BS SFIC­CONSTRUCTION CORE         626
+              Passage Set            SD 126 ORL                                          626
+              Privacy Set            SD 176 ORL                                          626
+              Exit Device            4200RF                                              626
+              Exit Device            4200VF                                              626
+              Exit Device Trim       4 S 09 PHL SFIC­CONSTRUCTION CORE                   626
+              Exit Device Trim       4 S 14 PHL                                          626
+              Cylinder Core          I5206­1­A MK X EXTRA CUT KEY                        626
+              Cylinder Housing       I5308                                               626
+              Rim Cylinder           I01707­6044                                         626
+       RO     Door Knocker           614V                                                US26D
+       SR     Barn Door Hardware     SD10­6.6 TMNT                                       630
+       ST     Butt Hinge             F179 3.5" x 3.5"                                    26D
+              Butt Hinge             2060R 4.5" x 4.5"                                   P
+       TR     Manual Flushbolt       3917­12                                             626
+              Kick Plate             K0050 8" x 28"                                      630
+              Kick Plate             K0050 8" x 34"                                      630
+              Kick Plate             K0050 8" x 35"                                      630
+              Kick Plate             K0050 8" x 40"                                      630
+              Dome Stop              1211                                                626
+              Chain Crash Stop       4048                                                603
+              Door Guard             4016                                                626
+              Dust Proof Strike      3910                                                626
+              Magnetic Catch         810                                                 603
+       Nov 19, 2026 8:35 AM                                                                   Page 1 of 2
+=== PAGE 2
+       Hardware List                                                               Sample Job
+       Mfg    Short Description       Product Number                                       Finish
+              Silencer                1229A                                                GREY
+       VA01   Cylindrical Passage Set  501­VT 2 3/8" BS DELANEY                            626
+              Dummy Lever             515T­VI                                              US15
+              Privacy Set             502T­VI 2 3/8" BS DELANEY                            US15
+              Grand Master Key        GMKC­A PDQ
+              Electric Strike         F2164 RCI                                            32D
+              2­3/4" T­Strike         9106­2 3/4" X 1 1/8"                                 US10B
+              Barska Key Cabinet      BARSKA 600 KEY CABINET
+              Construction Master key  CMK
+              Cut Keys                BLANK CUT KEYS
+       Nov 19, 2026 8:35 AM                                                                      Page 2 of 2

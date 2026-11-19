@@ -45,6 +45,11 @@ public static class HardwarePdfParser
     private static readonly Regex OpeningAnywhereRegex = new(@"\b\d+\s+(Single|Pair|Double)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex NameNumberPrefixRegex = new(@"^\d[\w.]*\s+-\s+", RegexOptions.Compiled);
     private static readonly Regex TitleWordRegex = new(@"^[A-Z][a-z]+$", RegexOptions.Compiled);
+    private static readonly Regex HardwareListHeaderRegex = new(
+        @"^\s*(Mfg|Mfr|Manufacturer)\.?\s{2,}((?:Short\s+)?Description)\s{2,}((?:Product|Catalog)\s*(?:Number|No\.?|#)?)(?:\s{2,}(Finish))?\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex PageFooterRegex = new(@"\bPage\s+\d+\s+of\s+\d+\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ListCodeRegex = new(@"^[A-Z][A-Z0-9&\-]{0,7}$", RegexOptions.Compiled);
 
     /// <summary>Second words that belong to a manufacturer's name ("dormakaba Architectural", "Norton Rixson").</summary>
     private static readonly HashSet<string> ManufacturerSuffixes = new(StringComparer.OrdinalIgnoreCase)
@@ -103,6 +108,8 @@ public static class HardwarePdfParser
         if (machining) result.Formats.Add("Door machining sheet");
         if (result.Lines.Count == 0 && ParseQtyFirstSchedule(pages, result))
             result.Formats.Add("Hardware schedule (quantity first)");
+        if (result.Lines.Count == 0 && ParseHardwareList(pages, result))
+            result.Formats.Add("Hardware list");
 
         foreach (var line in result.Lines)
         {
@@ -355,6 +362,72 @@ public static class HardwarePdfParser
             if (line.Catalog.Length == 0) continue;
             result.Lines.Add(line);
             found = true;
+        }
+        return found;
+    }
+
+    // ── Hardware lists ("Mfg  Short Description  Product Number  Finish") ──
+
+    /// <summary>
+    /// Reads a hardware list report: one line per product under a "Mfg  Short Description  Product
+    /// Number  Finish" header (repeated on each page). The manufacturer code is printed only on the
+    /// first line of its group and carries down (across pages too); a description that wraps onto
+    /// a line of its own is joined to the line above. There are no quantities (each line counts 1).
+    /// Columns are placed by the header's positions; the title above the header and page footers
+    /// are ignored.
+    /// </summary>
+    private static bool ParseHardwareList(IReadOnlyList<IReadOnlyList<string>> pages, HardwarePdfParseResult result)
+    {
+        bool found = false;
+        string code = string.Empty;
+        ParsedHardwareLine? last = null;
+        for (int p = 0; p < pages.Count; p++)
+        {
+            int[]? cols = null;
+            foreach (var raw in pages[p])
+            {
+                var h = HardwareListHeaderRegex.Match(raw);
+                if (h.Success)
+                {
+                    cols = new[] { h.Groups[1].Index, h.Groups[2].Index, h.Groups[3].Index, h.Groups[4].Success ? h.Groups[4].Index : int.MaxValue };
+                    continue;
+                }
+                if (cols == null || string.IsNullOrWhiteSpace(raw) || PageFooterRegex.IsMatch(raw)) continue;
+
+                var slots = new string?[4];
+                foreach (Match chunk in ColumnRegex.Matches(raw.Replace('\u00AD', '-')))
+                {
+                    int which = 0;
+                    for (int i = 1; i < cols.Length; i++)
+                        if (cols[i] != int.MaxValue && chunk.Index + 3 >= cols[i]) which = i;
+                    slots[which] = slots[which] == null ? chunk.Value : $"{slots[which]} {chunk.Value}";
+                }
+
+                if (slots[0] != null)
+                {
+                    var c = slots[0]!.Trim();
+                    if (!ListCodeRegex.IsMatch(c)) continue;
+                    code = c;
+                }
+                if (slots[2] == null)
+                {
+                    // A description wrapped onto its own line ("Electromagnetic Door" / "Holder").
+                    if (slots[1] != null && slots[0] == null && slots[3] == null && last != null)
+                        last.GenericName = ImportText.Tidy($"{last.GenericName} {slots[1]}");
+                    continue;
+                }
+                last = new ParsedHardwareLine
+                {
+                    ManufacturerCode = code,
+                    GenericName = ImportText.Tidy(slots[1] ?? string.Empty),
+                    Catalog = ImportText.Tidy(slots[2]!),
+                    Finish = slots[3]?.Trim(),
+                    Quantity = 1,
+                    Page = p + 1,
+                };
+                result.Lines.Add(last);
+                found = true;
+            }
         }
         return found;
     }

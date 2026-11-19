@@ -126,6 +126,38 @@ public class PdfImportParserTests
     }
 
     [Fact]
+    public void HardwareList_CodesCarryDownAndDescriptionsWrap()
+    {
+        var r = HardwarePdfParser.Parse(LoadPages("hardware_list.txt"));
+
+        Assert.Contains("Hardware list", r.Formats);
+        Assert.Equal(60, r.Lines.Count);
+        Assert.All(r.Lines, l => Assert.Equal(1, l.Quantity));
+
+        var hinge = r.Lines[0];
+        Assert.Equal("AB", hinge.ManufacturerCode);
+        Assert.Equal("Continuous Hinge", hinge.GenericName);
+        Assert.Equal("A500 83-1/8\"", hinge.Catalog);
+        Assert.Equal("US32D", hinge.Finish);
+
+        var holder = r.Lines.Single(l => l.Catalog == "2100");
+        Assert.Equal("Electromagnetic Door Holder", holder.GenericName);
+        Assert.Equal("AB", holder.ManufacturerCode);
+
+        var gasket = r.Lines.First(l => l.GenericName == "Gasket");
+        Assert.Equal("NA", gasket.ManufacturerCode);
+        Assert.Equal("673 A 30\"", gasket.Catalog);
+        Assert.Null(gasket.Finish);
+
+        // The code carries onto the next page (Silencer is still TR).
+        var silencer = r.Lines.Single(l => l.GenericName == "Silencer");
+        Assert.Equal("TR", silencer.ManufacturerCode);
+        Assert.Equal(2, silencer.Page);
+        Assert.Equal("VA01", r.Lines.Single(l => l.Catalog.StartsWith("501-VT")).ManufacturerCode);
+        Assert.DoesNotContain(r.Lines, l => l.Catalog.Contains("Page") || l.GenericName.Contains("Hardware List"));
+    }
+
+    [Fact]
     public void QtyFirstSchedule_HardwareSet()
     {
         var r = HardwarePdfParser.Parse(LoadPages("qtyfirst_set.txt"));
