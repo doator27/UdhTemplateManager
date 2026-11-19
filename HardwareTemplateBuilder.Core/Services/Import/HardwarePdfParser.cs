@@ -280,10 +280,13 @@ public static class HardwarePdfParser
         }
         if (!sawHeading || rows.Count(r => r.Cols.Count >= 2) < 2) return false;
 
-        // Where the callout column usually starts, and the manufacturer names seen there.
-        int mode = rows.Where(r => r.Cols.Count >= 2).GroupBy(r => r.Cols[1].Col).OrderByDescending(g => g.Count()).First().Key;
+        // Where the callout column usually starts on each page, and the manufacturer names seen there.
+        var modes = rows.Where(r => r.Cols.Count >= 2).GroupBy(r => r.Page)
+            .ToDictionary(g => g.Key, g => g.GroupBy(r => r.Cols[1].Col).OrderByDescending(x => x.Count()).First().Key);
+        bool NearMode(QtyFirstRow r) => r.Cols.Count >= 2 && modes.TryGetValue(r.Page, out var m) && Math.Abs(r.Cols[1].Col - m) <= 3;
         var mfrWords = new HashSet<string>(rows
-            .Where(r => r.Cols.Count >= 2 && Math.Abs(r.Cols[1].Col - mode) <= 3)
+            .Where(r => r.Cols.Count >= 3 || NearMode(r))
+            .Where(r => r.Cols.Count >= 2)
             .Select(r => r.Cols[1].Text.Split(' ')[0]), StringComparer.Ordinal);
 
         var items = new List<(QtyFirstRow Row, string Name, string Callout, string? Finish)>();
@@ -291,7 +294,7 @@ public static class HardwarePdfParser
         {
             var cols = row.Cols.Select(c => c.Text).ToList();
             // The name ran into the callout ("Manual Flush Bolt HMD Rockwood 555 US26D"): split at a known manufacturer.
-            if (cols.Count < 2 || Math.Abs(row.Cols[1].Col - mode) > 3)
+            if (cols.Count < 2 || !NearMode(row))
             {
                 var words = cols[0].Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 int at = Array.FindLastIndex(words, w => mfrWords.Contains(w));
