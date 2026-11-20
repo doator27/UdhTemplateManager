@@ -169,6 +169,7 @@ make the same change in the matching Wpf view** (and vice versa).
   Page titles are navy `CaptionBar` borders; the App's `Border.panel` frames are `GroupBox` (when they
   had a bold title) or `ContentControl Style="{StaticResource Etched}"`. Lists draw their own sunken
   frame. There is no Light/Dark setting in this frontend.
+  The progress bar's busy (indeterminate) sweep is driven by `Ui/ProgressSweep` (registered in `App.OnStartup`): it animates the template's `Indeterminate` block's TranslateTransform across the track's actual width (restarted on resize/visibility), and `PART_Track` clips it — don't go back to a fixed-pixel storyboard in the template.
 - **Title bar:** the `Win95Window` style (Win95Extras.xaml, used by `MainWindow` and every `Win95Window`
   dialog) replaces the Windows 10/11 title bar via `WindowChrome` with a drawn Win95 caption (navy, gray
   when inactive; icon = system menu; bevelled min/max-restore/close) inside a raised 3D frame. Caption
