@@ -24,6 +24,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         Win95Chrome.Register();
+        ProgressSweep.Register();
         Helpers.TypeToJump.Register();
 
         DispatcherUnhandledException += (_, args) =>

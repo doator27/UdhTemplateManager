@@ -482,10 +482,15 @@
                     <Border BorderBrush="{StaticResource ShadowBrush}" BorderThickness="1,1,0,0">
                         <Border BorderBrush="{StaticResource HighlightBrush}" BorderThickness="0,0,1,1"
                                 Background="{StaticResource FaceBrush}" Padding="2">
-                            <Grid x:Name="PART_Track">
+                            <!-- ClipToBounds keeps the busy sweep inside the bar; Ui/ProgressSweep moves it across the full width. -->
+                            <Grid x:Name="PART_Track" ClipToBounds="True">
                                 <Border x:Name="PART_Indicator" HorizontalAlignment="Left" Background="{StaticResource ProgressBlocks}"/>
                                 <Border x:Name="Indeterminate" Background="{StaticResource ProgressBlocks}" Visibility="Collapsed"
-                                        HorizontalAlignment="Left" Width="60"/>
+                                        HorizontalAlignment="Left" Width="60">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform X="-60"/>
+                                    </Border.RenderTransform>
+                                </Border>
                             </Grid>
                         </Border>
                     </Border>
@@ -493,17 +498,6 @@
                         <Trigger Property="IsIndeterminate" Value="True">
                             <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="Indeterminate" Property="Visibility" Value="Visible"/>
-                            <Trigger.EnterActions>
-                                <BeginStoryboard x:Name="Sweep">
-                                    <Storyboard RepeatBehavior="Forever">
-                                        <ThicknessAnimation Storyboard.TargetName="Indeterminate" Storyboard.TargetProperty="Margin"
-                                                            From="-60,0,0,0" To="400,0,0,0" Duration="0:0:2"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.EnterActions>
-                            <Trigger.ExitActions>
-                                <StopStoryboard BeginStoryboardName="Sweep"/>
-                            </Trigger.ExitActions>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
