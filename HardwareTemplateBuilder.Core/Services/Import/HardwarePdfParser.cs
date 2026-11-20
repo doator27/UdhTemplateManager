@@ -67,6 +67,9 @@ public static class HardwarePdfParser
     private static readonly Regex MachiningHeaderRegex = new(@"^(\s*)Qty\s+(Hardware Details)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex MachiningItemRegex = new(@"^(\s*)(\d{1,3})(\s+)(\S.*)$", RegexOptions.Compiled);
     private static readonly Regex MachiningOpeningRegex = new(@"(\d{1,4})\s+Openings?\s*(?:\(([A-Z]{1,4})\))?\s*:\s*(\S+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex FrameOpeningRegex = new(@"(\d{1,4})\s+Openings?\s*\(([^)]*)\)\s*:\s*(\S.*?)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex FramePieceRegex = new(@"(?:^|\s{2,})([A-Z])\s+(\d{1,2})\s{2,}(\S.*?\b(?:Jamb|Header|Head|Sill|Mullion|Transom|Rail)\b.*?)(?:\s{2,}|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex FrameItemRegex = new(@"^(?!Prep:)(\S.*?)\s*\((\d{1,3})\)$", RegexOptions.Compiled);
     private static readonly Regex MachiningTypeRegex = new(@"\bType:\s*(\S.*?)\s*$", RegexOptions.Compiled);
     private static readonly Regex ColumnGapRegex = new(@"\s{6,}", RegexOptions.Compiled);
     private static readonly Regex DoorThicknessRegex = new(@"\s+\d\s+\d/\d$", RegexOptions.Compiled);
@@ -83,7 +86,7 @@ public static class HardwarePdfParser
         var result = new HardwarePdfParseResult();
         ReadCodeLists(pages, result);
 
-        bool schedule = false, costing = false, machining = false;
+        bool schedule = false, costing = false, machining = false, frame = false;
         string? heading = null;
         for (int p = 0; p < pages.Count; p++)
         {
@@ -91,6 +94,11 @@ public static class HardwarePdfParser
             if (lines.Any(l => MachiningHeaderRegex.IsMatch(l)))
             {
                 machining |= ParseMachiningPage(lines, p + 1, result);
+                continue;
+            }
+            if (lines.Any(l => FrameOpeningRegex.IsMatch(l)) && lines.Any(l => FramePieceRegex.IsMatch(l)))
+            {
+                frame |= ParseFramePage(lines, p + 1, result);
                 continue;
             }
             if (lines.Any(l => CostingHeaderRegex.IsMatch(l))) costing = true;
@@ -106,6 +114,7 @@ public static class HardwarePdfParser
             MatchCostSummaryNames(pages, result);
         }
         if (machining) result.Formats.Add("Door machining sheet");
+        if (frame) result.Formats.Add("Frame machining sheet");
         if (result.Lines.Count == 0 && ParseQtyFirstSchedule(pages, result))
             result.Formats.Add("Hardware schedule (quantity first)");
         if (result.Lines.Count == 0 && ParseHardwareList(pages, result))
@@ -522,6 +531,66 @@ public static class HardwarePdfParser
     /// finish and handing words are taken out (never the model itself); a trailing door thickness
     /// ("1 3/4") is dropped.
     /// </summary>
+    /// <summary>
+    /// Reads one page of a frame machining sheet: "1 Opening (RH, 90°): B210" (or "2 Openings (…): B229, B211"),
+    /// frame pieces ("A   1   Strike Jamb 7-0 (2x6-RH)   M   7-2") and under each piece the hardware it is
+    /// prepped for, manufacturer first with the count per piece at the end ("McKinney T4A3786 4 1/2" x 4 1/2"
+    /// US26D (3)"), followed by "Prep: …" (used as the item's name) and notes. Quantity = count × pieces ×
+    /// openings. The drawing on the left can share a line, so only the last column of a line is read.
+    /// </summary>
+    private static bool ParseFramePage(IReadOnlyList<string> lines, int page, HardwarePdfParseResult result)
+    {
+        int openings = 0;
+        var marks = new List<string>();
+        foreach (var line in lines)
+        {
+            var o = FrameOpeningRegex.Match(line);
+            if (!o.Success) continue;
+            openings += int.Parse(o.Groups[1].Value);
+            marks.Add(o.Groups[3].Value.Trim());
+        }
+        openings = Math.Max(1, openings);
+        var setName = string.Join(", ", marks);
+
+        bool found = false;
+        int pieces = 1;
+        ParsedHardwareLine? last = null;
+        foreach (var raw in lines)
+        {
+            if (FrameOpeningRegex.IsMatch(raw)) continue;
+            var piece = FramePieceRegex.Match(raw);
+            if (piece.Success)
+            {
+                pieces = Math.Max(1, int.Parse(piece.Groups[2].Value));
+                last = null;
+                continue;
+            }
+            var chunks = ColumnRegex.Matches(raw);
+            if (chunks.Count == 0) continue;
+            var text = chunks[^1].Value.Trim();
+            if (text.StartsWith("Prep:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (last != null && string.IsNullOrEmpty(last.GenericName))
+                    last.GenericName = ImportText.Tidy(text[5..]);
+                continue;
+            }
+            var item = FrameItemRegex.Match(text);
+            if (!item.Success || !item.Groups[1].Value.Contains(' ')) continue;
+            var line = new ParsedHardwareLine
+            {
+                Quantity = int.Parse(item.Groups[2].Value) * pieces * openings,
+                SetName = setName,
+                Page = page,
+            };
+            SplitMachiningText(line, item.Groups[1].Value);
+            if (line.Catalog.Length == 0) continue;
+            result.Lines.Add(line);
+            last = line;
+            found = true;
+        }
+        return found;
+    }
+
     private static void SplitMachiningText(ParsedHardwareLine line, string text)
     {
         var words = ImportText.Tidy(text).Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();

@@ -126,6 +126,39 @@ public class PdfImportParserTests
     }
 
     [Fact]
+    public void FrameSheet_HardwareUnderEachPiece()
+    {
+        var r = HardwarePdfParser.Parse(LoadPages("frame_sheet.txt"));
+
+        Assert.Contains("Frame machining sheet", r.Formats);
+        Assert.Equal(new[] { 3, 4, 6, 4, 4 }, Enumerable.Range(1, 5).Select(p => r.Lines.Count(l => l.Page == p)));
+
+        var markar = r.Lines.First();
+        Assert.Equal("Markar", markar.ManufacturerName);
+        Assert.Equal("LH", markar.Handing);
+        Assert.Equal("Hinge, Continuous - Mortised (HGCR)", markar.GenericName);
+        Assert.Equal("B225A", markar.SetName);
+
+        var hinge = r.Lines.First(l => l.Page == 2 && l.ManufacturerName == "McKinney");
+        Assert.Equal(3, hinge.Quantity);
+        Assert.Equal("US26D", hinge.Finish);
+        Assert.StartsWith("T4A3786", hinge.Catalog);
+        Assert.Equal("Hinge, Heavy Weight - 4 1/2\"", hinge.GenericName);
+        var closer = r.Lines.Single(l => l.Page == 2 && l.ManufacturerName == "Norton Rixson");
+        Assert.Equal("7500-REG", closer.Catalog);
+        Assert.Equal("689", closer.Finish);
+
+        // A line shared with the drawing ("B   Securitron M680EBD-630 (2)") still reads.
+        Assert.Contains(r.Lines, l => l.Page == 4 && l.ManufacturerName == "Securitron" && l.Catalog == "M680EBD-630" && l.Quantity == 2);
+
+        // "2 Openings (RH, 90°): B229, B211": counts are doubled.
+        var two = r.Lines.Where(l => l.Page == 5).ToList();
+        Assert.All(two, l => Assert.Equal("B229, B211", l.SetName));
+        Assert.Equal(6, two.Single(l => l.ManufacturerName == "McKinney").Quantity);
+        Assert.DoesNotContain(r.Lines, l => l.Catalog.StartsWith("Prep") || l.Catalog.Contains("Frame ("));
+    }
+
+    [Fact]
     public void HardwareList_CodesCarryDownAndDescriptionsWrap()
     {
         var r = HardwarePdfParser.Parse(LoadPages("hardware_list.txt"));

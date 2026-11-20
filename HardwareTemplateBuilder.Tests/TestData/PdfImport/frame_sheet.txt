@@ -1,0 +1,133 @@
+=== PAGE 1
+                                                    6-0
+                                                                                         1 Opening (RHA, 90°,90°): B225A
+                                           4-0                         2-0
+                                                                                         WSCR Anchor
+                                                     C
+                                                                                                   3-Sided Frame (LLM C 14 A40 LEAD-16 FW RHA 60 70)
+                                                                                         A    1       Hinge Jamb 7-0 (2x-LH)                       M       7-2
+                                                                                                         Markar FM300- LL 83-1/8" Satin SS LH (1)
+                                                                                                           Prep: Hinge, Continuous - Mortised (HGCR)
+                                                                                         B    1       Hinge Jamb 7-0 (2x-RH)                       M       7-2
+                                                                                                         Markar FM300- LL 83-1/8" Satin SS RH (1)
+                                                                                                           Prep: Hinge, Continuous - Mortised (HGCR)
+                                                                                         C    1       Double Header 6-0 (2x)                       M/M     6-4
+                                                                                                         Rockwood 555 US26D (1)
+                                                                                                           Prep: Flush Bolt, 12" (H2)
+                                                                                                      Additional Frame Charges
+                       A                                                           B
+                                                                                                   Prep for "Unified" locations.
+                               2          5/8
+                                    1
+                                                                                                                                                        Page 1 of 20
+
+=== PAGE 2
+                                                          3-0
+                                                                                                  1 Opening (RH, 90°): B210
+                                                           C                                      WSCR Anchor
+                                                                                                             3-Sided Frame (CM 6 C 16 A40 FW RH 30 70)
+                                                                                                  A     1      Strike Jamb 7-0 (2x6-RH)                             M      7-2
+                                                                                                                    Prep: 45° Hospital Stop
+                                                                                                                  BEST 45HW (LC) 7 DEU 16 H 626 RH RQE FSE 24V (1)
+                                                                                                                    Prep: Strike, ASA (E1)
+                                                                                                  B     1      Hinge Jamb 7-0 (2x6-RH)                              M      7-2
+                                                                                                                    Prep: 45° Hospital Stop
+                                                                                                                  McKinney T4A3786 4 1/2" x 4 1/2" US26D (3)
+                                                                                                                    Prep: Hinge, Heavy Weight - 4 1/2"
+                                                                                                                  Securitron EL-CEPT (15-1/2" top of frame to top of prep) (1)
+                                        A                                     B                                     Prep: Power Transfer (EPT)
+                                                                                                                       15-1/2" top of frame to top of prep
+                                                                                                  C     1      Header 3-0 (2x6)                                     M/M    3-4
+                                                                                                                  Norton Rixson 7500-REG 689 (1)
+                                                                                                                    Prep: Closer, Surface - Frame Plate
+                                                                                                                       RA Mount
+                                                                                                             Prep for "Unified" locations.
+                                      2      5/8
+                                        1
+                                                                                                                                                                        Page 2 of 20
+
+=== PAGE 3
+                                                               6-0
+                                                                                                           1 Opening (LHRA, 90°): B233
+                                               3-0                             3-0
+                                                                                                           WSCR Anchor
+                                                                C
+                                                                                                                       3-Sided Frame (CM UL-C 6 C 16 A40 FW LHRA 60 70)
+                                                                                                           A     1       Hinge Jamb 7-0 (2x6-LHR)                                 M        7-2
+                                                                                                                               Prep: 45° Hospital Stop
+                                                                                                                            McKinney TA2714 4 1/2" x 4 1/2" US26D NRP (3)
+                                                                                                                               Prep: Hinge, Regular Weight - 4 1/2" (450)
+                                                                                                                            Securitron EL-CEPT (15-1/2" top of frame to top of prep) (1)
+                                                                                                                               Prep: Power Transfer (EPT)
+                                                                                                                                 15-1/2" top of frame to top of prep
+                                                                                                           B     1       Hinge Jamb 7-0 (2x6-RHR)                                 M        7-2
+                                                                                                                               Prep: 45° Hospital Stop
+                              A                                                                  B
+                                                                                                                            McKinney TA2714 4 1/2" x 4 1/2" US26D NRP (3)
+                                                                                                                               Prep: Hinge, Regular Weight - 4 1/2" (450)
+                                                                                                                            Securitron EL-CEPT (15-1/2" top of frame to top of prep) (1)
+                                                                                                                               Prep: Power Transfer (EPT)
+                                                                                                                                 15-1/2" top of frame to top of prep
+                                                                                                           C     1       Double Header 6-0 (2x6)                                  M/M      6-4
+                                                                                                                            Rockwood 2805 US26D (1)
+                                                                                                                               Prep: Flush Bolt, Special Prep (FB)
+                                                                                                                                 2 3/4" T-strike in frame head
+                                                                                                                            Norton Rixson 7500-PA 689 (2)
+                                                                                                                               Prep: Closer, Surface - Frame Plate
+                                                                                                                                 PA Mount
+                                                                                                                       Prep for "Unified" locations.
+                                         2       5/8
+                                           1
+                                                                                                                                                                                       Page 4 of 20
+
+=== PAGE 4
+                                                        7-0                                    1 Opening (LHRA/RHRA, 90°,90°) : B183
+                                        3-6                            3-6
+                                                                                               WSCR Anchor
+                                                        C
+                                                                                                          3-Sided Frame (CM UL-C 6 C 14 A40 FW LHRA/RHRA 70 70)
+                                                                                               A     1       Hinge Jamb 7-0 (2x6-LHR)                          M      7-2
+                                                                                                                  Prep: 45° Hospital Stop
+                                                                                                               McKinney T4A3786 5" x 4 1/2" US26D NRP (3)
+                                                                                                                  Prep: Hinge, Heavy Weight - 5"
+                                                                                               B     1       Hinge Jamb 7-0 (2x6-RHR)                          M      7-2
+                                                                                                                  Prep: 45° Hospital Stop
+                                                                                                               McKinney T4A3786 5" x 4 1/2" US26D NRP (3)
+                                                                                                                  Prep: Hinge, Heavy Weight - 5"
+                                                                                               C     1       Double Header 7-0 (2x6)                           M/M    7-4
+                        A                                                                B
+                                                                                                               Securitron M680EBD-630 (2)
+                                                                                                                  Prep: Coordinator, Soffit Mounted (G23)
+                                                                                                                    M680EBD Mag Lock
+                                                                                                               By Others Besam SW200i (Surface Pair) (2)
+                                                                                                                  Prep: Closer, Surface - Frame Plate
+                                                                                                                    SW200i (surface pair)
+                                                                                                          Prep for "Unified" locations.
+                                     2     5/8
+                                      1
+                                                                                                                                                                   Page 8 of 20
+
+=== PAGE 5
+                                                          3-0
+                                                                                                  2 Openings (RH, 90°): B229, B211
+                                                           C                                      WSCR Anchor
+                                                                                                             3-Sided Frame (CM UL-C 6 C 16 A40 FW RH 30 70)
+                                                                                                  A    1       Strike Jamb 7-0 (2x6-RH)                            M       7-2
+                                                                                                                    Prep: 45° Hospital Stop
+                                                                                                                 BEST 45HW (LC) 7 DEU 16 H 626 RH RQE FSE 24V (1)
+                                                                                                                    Prep: Strike, ASA (E1)
+                                                                                                  B    1       Hinge Jamb 7-0 (2x6-RH)                             M       7-2
+                                                                                                                    Prep: 45° Hospital Stop
+                                                                                                                 McKinney T4A3786 4 1/2" x 4 1/2" US26D (3)
+                                                                                                                    Prep: Hinge, Heavy Weight - 4 1/2"
+                                                                                                                 Securitron EL-CEPT (15-1/2" top of frame to top of prep) (1)
+                                        A                                     B                                     Prep: Power Transfer (EPT)
+                                                                                                                      15-1/2" top of frame to top of prep
+                                                                                                  C    1       Header 3-0 (2x6)                                    M/M     3-4
+                                                                                                                 Norton Rixson 7500-REG 689 (1)
+                                                                                                                    Prep: Closer, Surface - Frame Plate
+                                                                                                                      RA Mount
+                                                                                                             Prep for "Unified" locations.
+                                      2     5/8
+                                       1
+                                                                                                                                                                      Page 11 of 20
