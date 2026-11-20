@@ -61,6 +61,15 @@ public partial class BulkHardwareEntryView : UserControl
         /// <summary>Full-detail panel shown when this card is expanded.</summary>
         public Control? ExpandedPanel { get; set; }
 
+        /// <summary>The coloured strip down the card's left edge (matched / new / empty).</summary>
+        public Border? Stripe { get; set; }
+
+        /// <summary>The line number shown at the start of the collapsed row.</summary>
+        public TextBlock? NumberText { get; set; }
+
+        /// <summary>Whether the mouse is over the card.</summary>
+        public bool Hovered { get; set; }
+
         /// <summary>Refreshes the compact summary text blocks from current entry state.</summary>
         public Action? UpdateCompact { get; set; }
 
@@ -154,6 +163,34 @@ public partial class BulkHardwareEntryView : UserControl
         _activeEntry = entry;
         if (entry.CompactPanel  != null) entry.CompactPanel.IsVisible  = false;
         if (entry.ExpandedPanel != null) entry.ExpandedPanel.IsVisible = true;
+        RestyleCards();
+    }
+
+    /// <summary>
+    /// Makes the item cards easy to tell apart: alternating backgrounds in panel order, a line
+    /// number, a coloured strip on the left (green = matched an existing item, orange = new item,
+    /// grey = no model yet), a highlight under the mouse and an accent outline on the card being edited.
+    /// Call after cards are added, removed or reordered.
+    /// </summary>
+    private void RestyleCards()
+    {
+        int n = 0;
+        foreach (var card in ItemsPanel.Children.OfType<Border>())
+        {
+            var entry = _items.FirstOrDefault(i => i.Card == card);
+            if (entry == null) continue;
+            n++;
+            bool active = entry == _activeEntry;
+            card.Background = entry.Hovered && !active ? AppColors.CardHoverBackground
+                : n % 2 == 0 ? AppColors.CardAltBackground : AppColors.CardBackground;
+            card.BorderBrush = active ? AppColors.CardActiveBorder : AppColors.CardBorder;
+            card.BorderThickness = new Avalonia.Thickness(active ? 2 : 1);
+            if (entry.NumberText != null) entry.NumberText.Text = $"{n}.";
+            if (entry.Stripe != null)
+                entry.Stripe.Background = entry.MatchedItem != null ? AppColors.Success
+                    : string.IsNullOrWhiteSpace(entry.ModelNumber) ? AppColors.Muted
+                    : AppColors.Warning;
+        }
     }
 
     /// <summary>Appends a new item card to the panel, optionally pre-populated from a draft item.</summary>
@@ -359,19 +396,28 @@ public partial class BulkHardwareEntryView : UserControl
         };
         compactTemplatesBtn.Click += (_, _) => OpenTemplatesForItem(entry);
 
+        var compactNumberText = new TextBlock
+        {
+            FontSize = 11,
+            Foreground = AppColors.Muted,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        entry.NumberText = compactNumberText;
+
         var compactRow = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("200,150,*,70,Auto,Auto"),
+            ColumnDefinitions = new ColumnDefinitions("34,200,150,*,70,Auto,Auto"),
             Cursor = new Cursor(StandardCursorType.Hand),
             Background = Brushes.Transparent,
             ContextMenu = itemContextMenu
         };
-        Grid.SetColumn(compactDescText,   0); compactRow.Children.Add(compactDescText);
-        Grid.SetColumn(compactModelText,  1); compactRow.Children.Add(compactModelText);
-        Grid.SetColumn(compactRemarksText, 2); compactRow.Children.Add(compactRemarksText);
-        Grid.SetColumn(compactMatchText,  3); compactRow.Children.Add(compactMatchText);
-        Grid.SetColumn(compactAddEditTemplateBtn, 4); compactRow.Children.Add(compactAddEditTemplateBtn);
-        Grid.SetColumn(compactTemplatesBtn, 5); compactRow.Children.Add(compactTemplatesBtn);
+        Grid.SetColumn(compactNumberText, 0); compactRow.Children.Add(compactNumberText);
+        Grid.SetColumn(compactDescText,   1); compactRow.Children.Add(compactDescText);
+        Grid.SetColumn(compactModelText,  2); compactRow.Children.Add(compactModelText);
+        Grid.SetColumn(compactRemarksText, 3); compactRow.Children.Add(compactRemarksText);
+        Grid.SetColumn(compactMatchText,  4); compactRow.Children.Add(compactMatchText);
+        Grid.SetColumn(compactAddEditTemplateBtn, 5); compactRow.Children.Add(compactAddEditTemplateBtn);
+        Grid.SetColumn(compactTemplatesBtn, 6); compactRow.Children.Add(compactTemplatesBtn);
 
         entry.UpdateCompact = () =>
         {
@@ -386,6 +432,7 @@ public partial class BulkHardwareEntryView : UserControl
             compactRemarksText.Text = entry.HardwareItemRemarks ?? string.Empty;
 
             UpdateMatchLabel(compactMatchText, entry.MatchedItem, entry.ModelNumber);
+            RestyleCards();
         };
 
         compactRow.PointerPressed += (_, _) => SetActiveEntry(entry);
@@ -402,14 +449,29 @@ public partial class BulkHardwareEntryView : UserControl
         cardContent.Children.Add(compactRow);
         cardContent.Children.Add(expandedPanel);
 
+        // A coloured strip down the left edge shows the item's state at a glance.
+        var stripe = new Border
+        {
+            Width = 4,
+            CornerRadius = new Avalonia.CornerRadius(2),
+            Margin = new Avalonia.Thickness(0, 0, 8, 0),
+        };
+        entry.Stripe = stripe;
+        var cardInner = new DockPanel();
+        DockPanel.SetDock(stripe, Dock.Left);
+        cardInner.Children.Add(stripe);
+        cardInner.Children.Add(cardContent);
+
         var card = new Border
         {
-            BorderBrush = AppColors.Muted,
+            BorderBrush = AppColors.CardBorder,
             BorderThickness = new Avalonia.Thickness(1),
-            CornerRadius = new Avalonia.CornerRadius(2),
-            Padding = new Avalonia.Thickness(10, 8),
-            Child = cardContent
+            CornerRadius = new Avalonia.CornerRadius(4),
+            Padding = new Avalonia.Thickness(6, 8, 10, 8),
+            Child = cardInner
         };
+        card.PointerEntered += (_, _) => { entry.Hovered = true; RestyleCards(); };
+        card.PointerExited += (_, _) => { entry.Hovered = false; RestyleCards(); };
         entry.Card = card;
         ItemsPanel.Children.Add(card);
 
@@ -670,6 +732,7 @@ public partial class BulkHardwareEntryView : UserControl
             if (_activeEntry == entry) _activeEntry = null;
             _items.Remove(entry);
             ItemsPanel.Children.Remove(card);
+            RestyleCards();
         };
 
         entry.RestoreUI = () =>
@@ -954,6 +1017,7 @@ public partial class BulkHardwareEntryView : UserControl
             ItemsPanel.Children.Clear();
             foreach (var item in _items)
                 ItemsPanel.Children.Add(item.Card);
+            RestyleCards();
 
             SaveDraft();
             StatusLabel.Text = $"Sorted {filled.Count} item(s) in cover sheet order.";

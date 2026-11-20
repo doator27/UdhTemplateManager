@@ -38,5 +38,20 @@ public static class AppColors
 
     /// <summary>Warning status text.</summary>
     public static IBrush Warning => Resolve("AppWarning", "#FFA94D");
+
+    /// <summary>Bulk Add item card background (odd rows).</summary>
+    public static IBrush CardBackground => Resolve("AppCardBackground", "#23262D");
+
+    /// <summary>Bulk Add item card background (even rows), so neighbouring cards stand apart.</summary>
+    public static IBrush CardAltBackground => Resolve("AppCardAltBackground", "#2C3038");
+
+    /// <summary>Bulk Add item card background under the mouse.</summary>
+    public static IBrush CardHoverBackground => Resolve("AppCardHoverBackground", "#343945");
+
+    /// <summary>Bulk Add item card outline.</summary>
+    public static IBrush CardBorder => Resolve("AppCardBorder", "#454952");
+
+    /// <summary>Outline of the expanded (being edited) Bulk Add item card.</summary>
+    public static IBrush CardActiveBorder => Resolve("AppCardActiveBorder", "#4FA3D1");
 }
 

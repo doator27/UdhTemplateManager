@@ -24,6 +24,7 @@ public partial class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         Helpers.ThemeService.ApplySaved();
+        Helpers.TypeToJump.Register();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

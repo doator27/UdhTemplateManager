@@ -74,6 +74,12 @@
                     <!-- App-level palette consumed by AppTheme.axaml Styles -->
                     <SolidColorBrush x:Key="AppPageBackground">#1A1D23</SolidColorBrush>
                     <SolidColorBrush x:Key="AppSurfaceBackground">#23262D</SolidColorBrush>
+                    <!-- Bulk Add item cards: alternating rows, hover and the expanded card's outline. -->
+                    <SolidColorBrush x:Key="AppCardBackground">#23262D</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppCardAltBackground">#2C3038</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppCardHoverBackground">#343945</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppCardBorder">#454952</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppCardActiveBorder">#4FA3D1</SolidColorBrush>
                     <SolidColorBrush x:Key="AppSurfaceBorder">#33363E</SolidColorBrush>
                     <SolidColorBrush x:Key="AppBorder">#454952</SolidColorBrush>
                     <SolidColorBrush x:Key="AppTextPrimary">#E8EAED</SolidColorBrush>
@@ -147,6 +153,11 @@
                     <!-- App-level palette consumed by AppTheme.axaml Styles -->
                     <SolidColorBrush x:Key="AppPageBackground">#F3F3F3</SolidColorBrush>
                     <SolidColorBrush x:Key="AppSurfaceBackground">#FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppCardBackground">#FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppCardAltBackground">#EEF1F5</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppCardHoverBackground">#DDE6F0</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppCardBorder">#B8BEC8</SolidColorBrush>
+                    <SolidColorBrush x:Key="AppCardActiveBorder">#3D82AA</SolidColorBrush>
                     <SolidColorBrush x:Key="AppSurfaceBorder">#C0C0C0</SolidColorBrush>
                     <SolidColorBrush x:Key="AppBorder">#808080</SolidColorBrush>
                     <SolidColorBrush x:Key="AppTextPrimary">#1A1A1A</SolidColorBrush>
