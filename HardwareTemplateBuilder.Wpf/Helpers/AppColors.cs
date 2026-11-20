@@ -27,4 +27,19 @@ public static class AppColors
 
     /// <summary>Warning status text (olive/brown).</summary>
     public static Brush Warning { get; } = UiExtensions.Brush("#806000");
+
+    /// <summary>Bulk Add item card background (odd rows): the Win95 face gray.</summary>
+    public static Brush CardBackground { get; } = UiExtensions.Brush("#C0C0C0");
+
+    /// <summary>Bulk Add item card background (even rows), so neighbouring cards stand apart.</summary>
+    public static Brush CardAltBackground { get; } = UiExtensions.Brush("#D8D8D8");
+
+    /// <summary>Bulk Add item card background under the mouse.</summary>
+    public static Brush CardHoverBackground { get; } = UiExtensions.Brush("#C8D0E8");
+
+    /// <summary>Bulk Add item card outline.</summary>
+    public static Brush CardBorder { get; } = UiExtensions.Brush("#808080");
+
+    /// <summary>Outline of the expanded (being edited) Bulk Add item card (Win95 navy).</summary>
+    public static Brush CardActiveBorder { get; } = UiExtensions.Brush("#000080");
 }
