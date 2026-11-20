@@ -1,0 +1,24 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HardwareTemplateBuilder.Wpf.Ui"
+             x:Class="HardwareTemplateBuilder.Wpf.Views.PdfFormatsView">
+    <DockPanel Margin="8">
+        <Border DockPanel.Dock="Top" Style="{StaticResource CaptionBar}" Margin="0,0,0,6"><TextBlock Text="PDF Import Formats" Style="{StaticResource CaptionText}"/></Border>
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Style="{StaticResource Hint}" Margin="0,0,0,6"
+                   Text="Formats you've taught Parse PDF into Bulk Add. When a PDF contains a format's recognize text (and its column header, if it has one), that format reads it instead of the built-in ones. Teach a new one from a PDF of that kind."/>
+        <ui:Stack DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,8">
+            <Button x:Name="TeachButton" Content="Teach New Format..."/>
+            <Button x:Name="EditButton" Content="Edit..."/>
+            <Button x:Name="DeleteButton" Content="Delete"/>
+        </ui:Stack>
+        <TextBlock DockPanel.Dock="Bottom" x:Name="StatusLabel" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        <Grid ui:GridEx.Columns="2*,8,3*">
+            <ListBox Grid.Column="0" x:Name="FormatsList"/>
+            <GroupBox Grid.Column="2" Header="Format" Padding="6">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <TextBlock x:Name="DetailsText" TextWrapping="Wrap" Text="Select a format."/>
+                </ScrollViewer>
+            </GroupBox>
+        </Grid>
+    </DockPanel>
+</UserControl>

@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HardwareTemplateBuilder.App.Views.PdfFormatsView">
+    <DockPanel Margin="8">
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="PDF Import Formats" FontSize="16" FontWeight="Bold"/>
+            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#A7ADB8" Margin="0,2,0,0"
+                       Text="Formats you've taught Parse PDF into Bulk Add. When a PDF contains a format's recognize text (and its column header, if it has one), that format reads it instead of the built-in ones. Teach a new one from a PDF of that kind."/>
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,8">
+            <Button Name="TeachButton" Content="Teach New Format..." Classes="dashboard-primary"/>
+            <Button Name="EditButton" Content="Edit..."/>
+            <Button Name="DeleteButton" Content="Delete"/>
+        </StackPanel>
+        <TextBlock DockPanel.Dock="Bottom" Name="StatusLabel" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        <Grid ColumnDefinitions="2*,8,3*">
+            <ListBox Grid.Column="0" Name="FormatsList"/>
+            <Border Grid.Column="2" Classes="panel" BorderBrush="#454952" BorderThickness="1" Padding="8">
+                <ScrollViewer>
+                    <TextBlock Name="DetailsText" TextWrapping="Wrap" FontSize="12" Text="Select a format."/>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

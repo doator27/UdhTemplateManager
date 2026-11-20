@@ -131,7 +131,7 @@ public static class HardwarePdfParser
 
     // ── Manufacturer / finish lists ─────────────────────────────────────────
 
-    private static void ReadCodeLists(IReadOnlyList<IReadOnlyList<string>> pages, HardwarePdfParseResult result)
+    internal static void ReadCodeLists(IReadOnlyList<IReadOnlyList<string>> pages, HardwarePdfParseResult result)
     {
         foreach (var lines in pages)
         {
@@ -591,7 +591,7 @@ public static class HardwarePdfParser
         return found;
     }
 
-    private static void SplitMachiningText(ParsedHardwareLine line, string text)
+    internal static void SplitMachiningText(ParsedHardwareLine line, string text)
     {
         var words = ImportText.Tidy(text).Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
         int n = 0;

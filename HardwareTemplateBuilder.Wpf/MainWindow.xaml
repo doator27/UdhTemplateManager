@@ -32,6 +32,7 @@
                 <MenuItem Header="Templates to Fix..." Tag="TemplateFixList" Click="Nav_Click"/>
                 <MenuItem Header="Product Catalogs..." Tag="ProductCatalogs" Click="Nav_Click"/>
                 <MenuItem Header="Template Description Audit..." Tag="TemplateAudit" Click="Nav_Click"/>
+                <MenuItem Header="PDF Import Formats..." Tag="PdfFormats" Click="Nav_Click"/>
                 <MenuItem Header="Deduplicate Hardware..." Tag="DeduplicateHardware" Click="Nav_Click"/>
                 <MenuItem Header="Relink Templates..." Click="RelinkTemplates_Click"/>
                 <Separator/>

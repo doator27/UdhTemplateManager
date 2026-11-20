@@ -70,7 +70,11 @@ public static class HardwarePdfImportService
         var pages = text.Pages.Select(p => (IReadOnlyList<string>)p).ToList();
 
         progress?.Report("Finding hardware lines...");
-        var parsed = HardwarePdfParser.Parse(pages);
+        List<CustomPdfFormat> taught;
+        using (var ctx = DatabaseInitializer.CreateContext())
+            taught = CustomPdfFormats.Load(ctx);
+        // A format the user taught wins over the built-in ones when the PDF looks like it.
+        var parsed = CustomPdfFormats.TryParse(taught, pages) ?? HardwarePdfParser.Parse(pages);
 
         progress?.Report("Matching against the database...");
         HardwareImportKnowledge knowledge;

@@ -76,6 +76,7 @@ public partial class MainWindow : Window
         _router.Register(TemplateFixListView.Route, () => { var v = new TemplateFixListView(); v.NavigationRequested += NavigateTo; return v; });
         _router.Register(ProductCatalogsView.Route, () => { var v = new ProductCatalogsView(); v.NavigationRequested += NavigateTo; return v; });
         _router.Register(TemplateAuditView.Route, () => { var v = new TemplateAuditView(); v.NavigationRequested += NavigateTo; return v; });
+        _router.Register(PdfFormatsView.Route, () => new PdfFormatsView());
         _router.Register("DeduplicateHardware", () => { var v = new DeduplicateHardwareView(); v.NavigationRequested += NavigateTo; return v; });
         _router.Register("JobImportWizard", () => { var v = new JobImportWizardView(); v.NavigationRequested += NavigateTo; return v; });
     }
@@ -117,6 +118,7 @@ public partial class MainWindow : Window
         MenuTemplateFixList.Click      += (_, _) => NavigateTo(TemplateFixListView.Route);
         MenuProductCatalogs.Click      += (_, _) => NavigateTo(ProductCatalogsView.Route);
         MenuTemplateAudit.Click        += (_, _) => NavigateTo(TemplateAuditView.Route);
+        MenuPdfFormats.Click           += (_, _) => NavigateTo(PdfFormatsView.Route);
         MenuDeduplicateHardware.Click  += (_, _) => NavigateTo("DeduplicateHardware");
         MenuRelinkTemplates.Click     += async (_, _) => await RelinkTemplatesAsync();
         MenuDumpDatabase.Click         += async (_, _) => await DumpDatabaseAsync();

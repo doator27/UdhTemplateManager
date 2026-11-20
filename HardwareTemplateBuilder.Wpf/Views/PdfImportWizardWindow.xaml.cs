@@ -87,6 +87,22 @@ public partial class PdfImportWizardWindow : Win95Window
                     .ShowDialogAsync(this);
         };
 
+        TeachFormatButton.Click += async (_, _) =>
+        {
+            if (await new TeachPdfFormatWindow(_pdfPath, null).ShowDialogAsync<bool?>(this) == true)
+                await LoadAnalysisAsync();
+        };
+        await LoadAnalysisAsync();
+    }
+
+    /// <summary>Reads and analyses the PDF (again after a format was taught) and shows the summary.</summary>
+    private async Task LoadAnalysisAsync()
+    {
+        _session = null;
+        _steps.Clear();
+        _index = -1;
+        SummaryList.ItemsSource = null;
+        NextButton.IsEnabled = FinishButton.IsEnabled = BackButton.IsEnabled = false;
         HeaderText.Text = "Reading the PDF...";
         var progress = new Progress<string>(s => SummaryText.Text = s);
         try
@@ -116,6 +132,9 @@ public partial class PdfImportWizardWindow : Win95Window
 
         HeaderText.Text = "Summary";
         ShowSummary();
+        if (_session!.Analysis.Groups.Count == 0)
+            SummaryText.Text += Environment.NewLine + Environment.NewLine +
+                "No hardware was found. If this is a kind of PDF the app doesn't know yet, click Teach This Format... to show it how to read it.";
     }
 
     private int ClusterCount => _session?.Clusters.Count ?? 0;

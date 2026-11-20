@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="HardwareTemplateBuilder.App.Views.TeachPdfFormatWindow"
+        Title="Teach a PDF Format" Width="1300" Height="820" MinWidth="1000" MinHeight="600"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel Margin="10">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" FontSize="12"
+                   Text="Show the app how to read this kind of PDF. 1) Click the column header line (if there is one) and press Column Header. 2) Click a line that is a hardware item and press Example Item. 3) Check what each column holds. 4) Click a heading line and press Heading, if items are grouped. Press Preview to see what it finds in the whole PDF, then Save. Next time a PDF like this is parsed, this format is used."/>
+
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,300,16,Auto,*" Margin="0,0,0,8">
+            <TextBlock Grid.Column="0" Text="Format name:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox Grid.Column="1" Name="NameBox" Watermark="e.g. Acme hardware list"/>
+            <TextBlock Grid.Column="3" Text="Recognize PDFs that contain:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox Grid.Column="4" Name="RecognizeBox" Watermark="Text every PDF of this kind has, e.g. its report title (one per line; the header line counts too)" AcceptsReturn="True" Height="48" TextWrapping="NoWrap"/>
+        </Grid>
+
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                <Button Name="PreviewButton" Content="Preview"/>
+                <Button Name="SaveButton" Content="Save Format" Classes="dashboard-primary"/>
+                <Button Name="CancelButton" Content="Cancel"/>
+            </StackPanel>
+            <TextBlock Name="StatusLabel" TextWrapping="Wrap" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <Grid ColumnDefinitions="*,10,460">
+            <DockPanel Grid.Column="0">
+                <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                    <Button Name="PrevPageButton" Content="&lt; Page" Margin="0,0,6,6"/>
+                    <TextBlock Name="PageLabel" VerticalAlignment="Center" Margin="0,0,6,6" MinWidth="90"/>
+                    <Button Name="NextPageButton" Content="Page &gt;" Margin="0,0,18,6"/>
+                    <Button Name="HeaderButton" Content="Column Header" Margin="0,0,6,6"/>
+                    <Button Name="ExampleButton" Content="Example Item" Classes="dashboard-primary" Margin="0,0,6,6"/>
+                    <Button Name="HeadingButton" Content="Heading" Margin="0,0,6,6"/>
+                    <Button Name="SkipButton" Content="Skip Lines Like This" Margin="0,0,6,6"/>
+                </WrapPanel>
+                <ListBox Name="LinesList" FontFamily="Consolas,Menlo,monospace" FontSize="11"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+            </DockPanel>
+
+            <ScrollViewer Grid.Column="2">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Column header line" FontWeight="Bold"/>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Name="ClearHeaderButton" Content="Clear" Margin="6,0,0,0"/>
+                        <TextBlock Name="HeaderLineText" Text="(none: columns are read by position)" TextWrapping="Wrap" FontFamily="Consolas,Menlo,monospace" FontSize="11"/>
+                    </DockPanel>
+                    <TextBlock Text="Example item line" FontWeight="Bold" Margin="0,6,0,0"/>
+                    <TextBlock Name="ExampleLineText" Text="(choose one on the left)" TextWrapping="Wrap" FontFamily="Consolas,Menlo,monospace" FontSize="11"/>
+                    <TextBlock Text="What each column holds" FontWeight="Bold" Margin="0,6,0,0"/>
+                    <StackPanel Name="ColumnsPanel" Spacing="4"/>
+                    <TextBlock Text="Heading lines start with (blank = no headings):" Margin="0,6,0,0"/>
+                    <TextBox Name="HeadingBox" Watermark="e.g. Heading #"/>
+                    <TextBlock Text="Skip lines that start with (one per line):"/>
+                    <TextBox Name="SkipBox" AcceptsReturn="True" Height="54" Watermark="e.g. Prep:"/>
+                    <CheckBox Name="CarryDownCheck" Content="A blank manufacturer means the same as the line above" IsChecked="True"/>
+                    <CheckBox Name="MfrInCatalogCheck" Content="The manufacturer's name starts the model text (no manufacturer column)"/>
+                    <CheckBox Name="JoinCheck" Content="A line with only a description continues the item above" IsChecked="True"/>
+                    <CheckBox Name="QtyRequiredCheck" Content="Item lines always have a quantity" IsChecked="True"/>
+                    <TextBlock Name="PreviewHeader" Text="Preview" FontWeight="Bold" Margin="0,6,0,0"/>
+                    <ListBox Name="PreviewList" Height="240" FontFamily="Consolas,Menlo,monospace" FontSize="11"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
+</Window>

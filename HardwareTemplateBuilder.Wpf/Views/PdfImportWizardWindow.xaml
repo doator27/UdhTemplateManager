@@ -25,8 +25,12 @@
             <!-- Page 1: summary -->
             <DockPanel x:Name="SummaryPanel">
                 <TextBlock DockPanel.Dock="Top" x:Name="SummaryText" TextWrapping="Wrap" Margin="0,0,0,8" Text="Reading the PDF..."/>
-                <CheckBox DockPanel.Dock="Bottom" x:Name="ReviewAllCheck" Margin="0,8,0,0"
-                          Content="Also step through the items that were identified automatically"/>
+                <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                    <Button DockPanel.Dock="Right" x:Name="TeachFormatButton" Content="Teach This Format..."
+                            ToolTip="Show the app how to read this kind of PDF (columns, headings); it's used for PDFs like this from now on"/>
+                    <CheckBox x:Name="ReviewAllCheck" VerticalAlignment="Center"
+                              Content="Also step through the items that were identified automatically"/>
+                </DockPanel>
                 <ListBox x:Name="SummaryList" FontFamily="Consolas" FontSize="11"/>
             </DockPanel>
 

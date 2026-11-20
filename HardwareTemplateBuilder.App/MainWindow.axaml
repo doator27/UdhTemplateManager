@@ -27,6 +27,7 @@
                 <MenuItem Header="Templates to _Fix..."      Name="MenuTemplateFixList" />
                 <MenuItem Header="Product _Catalogs..."      Name="MenuProductCatalogs" />
                 <MenuItem Header="Template _Description Audit..." Name="MenuTemplateAudit" />
+                <MenuItem Header="PDF _Import Formats..."    Name="MenuPdfFormats" />
                 <MenuItem Header="_Deduplicate Hardware..."  Name="MenuDeduplicateHardware" />
                 <MenuItem Header="_Relink Templates..."      Name="MenuRelinkTemplates" />
                 <Separator />
